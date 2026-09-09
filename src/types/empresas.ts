@@ -78,3 +78,45 @@ export interface SP_CodigoPostal {
   v_Asentamiento: string;
   v_TipoAsentamiento: string;
 }
+
+export interface PlantaGetDto {
+  i_CvePlanta: number;
+  i_CveEmpresa?: number;
+  v_NombrePlanta: string;
+  v_Siglas?: string;
+  s_Siglas?: string;
+  v_NombreCalle?: string;
+  s_Domicilio?: string;
+  v_NumeroExterior?: string;
+  v_NumeroInterior?: string;
+  v_Fraccionamiento?: string;
+  v_Municipio?: string;
+  v_NombreEstado?: string;
+  i_CodigoPostal?: number;
+  v_Areas?: string | null;
+  [key: string]: any;
+}
+
+export interface TokenAgendaResponse {
+  link?: string;
+  [key: string]: any;
+}
+
+export interface EnviarCorreoPayload {
+  CorreoDestino: string;
+  NombreDestino: string;
+  LinkCalendario: string;
+}
+
+export interface ContactoXEmpresa {
+  i_CveContacto: number;
+  i_CveEmpresa: number;
+  v_TipoContacto: string;
+  v_NombreContacto: string;
+  v_Celular: string;
+  v_Email: string;
+  v_TelefonoFijo: string;
+  v_SiglasTipoContacto: string;
+  v_Descripcion: string;
+}
+

@@ -1,24 +1,51 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Clock, RefreshCw, X } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { AgendaServicioGetDto } from "@/types/servicios";
+import { AgendaGetDto } from "@/types/calendario";
 import { AgendaService } from "@/services/agenda.service";
-import { Navbar } from "@/components/ui/Navbar";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { PaginadorCustom } from "@/components/ui/PaginadorCustom";
 import { ModalConfirmarEliminar } from "@/components/ui/ModalConfirmarEliminar";
-import { FiltrosAgendaServicios, FiltrosState } from "@/components/programacion/FiltrosAgendaServicios";
+import { FiltrosAgendaServicios, FiltrosState as FiltrosServiciosState } from "@/components/programacion/FiltrosAgendaServicios";
 import { TablaAgendaServicios } from "@/components/programacion/TablaAgendaServicios";
+import { FiltrosAgendaSesiones, FiltrosSesionesState } from "@/components/programacion/FiltrosAgendaSesiones";
+import { TablaAgendaSesiones } from "@/components/programacion/TablaAgendaSesiones";
+import { ModalFormServicio } from "@/components/servicios/ModalFormServicio";
+import { ModalDetalleServicio } from "@/components/programacion/ModalDetalleServicio";
+import { ModalAgendaServicio } from "@/components/programacion/ModalAgendaServicio";
+import { ModalReprogramarSesion } from "@/components/programacion/ModalReprogramarSesion";
+
+import { useToast } from "@/context/ToastContext";
 
 export default function ProgramacionPage() {
-  const [datos, setDatos] = useState<AgendaServicioGetDto[]>([]);
-  const [cargando, setCargando] = useState<boolean>(true);
+  const { toast } = useToast();
+
+  // Selector "Visualizar" (default: "sesiones")
+  const [vista, setVista] = useState<"sesiones" | "servicios">("sesiones");
+
+  // Estado Paginación Común
   const [paginaActual, setPaginaActual] = useState<number>(1);
   const [tamanoPagina, setTamanoPagina] = useState<number>(10);
   const [totalRegistros, setTotalRegistros] = useState<number>(0);
   const [totalPaginas, setTotalPaginas] = useState<number>(1);
+  const [cargando, setCargando] = useState<boolean>(true);
 
-  const [filtros, setFiltros] = useState<FiltrosState>({
+  // --- ESTADO VISTA SESIONES ---
+  const [datosSesiones, setDatosSesiones] = useState<AgendaGetDto[]>([]);
+  const [filtrosSesiones, setFiltrosSesiones] = useState<FiltrosSesionesState>({
+    visualizar: "sesiones",
+    fechaInicio: new Date().toISOString().split("T")[0],
+    fechaFin: "",
+    usarRango: false,
+    searchTerm: "",
+  });
+  const [itemReprogramar, setItemReprogramar] = useState<AgendaGetDto | null>(null);
+
+  // --- ESTADO VISTA SERVICIOS ---
+  const [datosServicios, setDatosServicios] = useState<AgendaServicioGetDto[]>([]);
+  const [filtrosServicios, setFiltrosServicios] = useState<FiltrosServiciosState>({
     programacion: "programados",
     facturacion: "todos",
     fechaInicio: new Date().toISOString().split("T")[0],
@@ -26,43 +53,100 @@ export default function ProgramacionPage() {
     usarRango: false,
     searchTerm: "",
   });
-
+  const [modalFormAbierto, setModalFormAbierto] = useState<boolean>(false);
+  const [modalAgendaAbierto, setModalAgendaAbierto] = useState<boolean>(false);
   const [itemEliminar, setItemEliminar] = useState<AgendaServicioGetDto | null>(null);
   const [eliminando, setEliminando] = useState<boolean>(false);
-
   const [itemDetalle, setItemDetalle] = useState<AgendaServicioGetDto | null>(null);
 
+  // --- Cargar datos de Sesiones ---
+  const cargarSesiones = useCallback(async () => {
+    setCargando(true);
+    const res = await AgendaService.getAgenda({
+      fechaInicio: filtrosSesiones.fechaInicio,
+      fechaFin: filtrosSesiones.usarRango && filtrosSesiones.fechaFin ? filtrosSesiones.fechaFin : undefined,
+      pagina: paginaActual,
+      tamano: tamanoPagina,
+      searchTerm: filtrosSesiones.searchTerm || undefined,
+    });
+
+    setDatosSesiones(res.datos);
+    setTotalRegistros(res.total);
+    setTotalPaginas(res.totalPaginas);
+    setCargando(false);
+  }, [filtrosSesiones, paginaActual, tamanoPagina]);
+
+  // --- Cargar datos de Servicios ---
   const cargarServicios = useCallback(async () => {
     setCargando(true);
 
     let facturadoVal: number | undefined;
-    if (filtros.facturacion === "facturado") facturadoVal = 1;
-    if (filtros.facturacion === "pendiente") facturadoVal = 0;
+    if (filtrosServicios.facturacion === "facturado") facturadoVal = 1;
+    if (filtrosServicios.facturacion === "pendiente") facturadoVal = 0;
 
     const res = await AgendaService.getAgendaServicios({
-      soloSinProgramar: filtros.programacion === "pendientes",
+      soloSinProgramar: filtrosServicios.programacion === "pendientes",
       pagina: paginaActual,
       tamano: tamanoPagina,
-      fechaInicio: filtros.programacion === "programados" ? filtros.fechaInicio : undefined,
+      fechaInicio: filtrosServicios.programacion === "programados" ? filtrosServicios.fechaInicio : undefined,
       fechaFin:
-        filtros.programacion === "programados" && filtros.usarRango && filtros.fechaFin
-          ? filtros.fechaFin
+        filtrosServicios.programacion === "programados" && filtrosServicios.usarRango && filtrosServicios.fechaFin
+          ? filtrosServicios.fechaFin
           : undefined,
-      searchTerm: filtros.searchTerm || undefined,
+      searchTerm: filtrosServicios.searchTerm || undefined,
       facturado: facturadoVal,
     });
 
-    setDatos(res.datos);
+    setDatosServicios(res.datos);
     setTotalRegistros(res.total);
     setTotalPaginas(res.totalPaginas);
     setCargando(false);
-  }, [filtros, paginaActual, tamanoPagina]);
+  }, [filtrosServicios, paginaActual, tamanoPagina]);
 
+  // Trigger de carga al cambiar vista o parámetros
   useEffect(() => {
-    cargarServicios();
-  }, [cargarServicios]);
+    if (vista === "sesiones") {
+      cargarSesiones();
+    } else {
+      cargarServicios();
+    }
+  }, [vista, cargarSesiones, cargarServicios]);
 
-  const handleConfirmarEliminar = async () => {
+  // Cambiar vista: resetea paginación y limpia filtros
+  const handleCambiarVisualizar = (nuevaVista: "sesiones" | "servicios") => {
+    setVista(nuevaVista);
+    setPaginaActual(1);
+
+    const hoy = new Date().toISOString().split("T")[0];
+    if (nuevaVista === "sesiones") {
+      setFiltrosSesiones({
+        visualizar: "sesiones",
+        fechaInicio: hoy,
+        fechaFin: "",
+        usarRango: false,
+        searchTerm: "",
+      });
+    } else {
+      setFiltrosServicios({
+        programacion: "programados",
+        facturacion: "todos",
+        fechaInicio: hoy,
+        fechaFin: "",
+        usarRango: false,
+        searchTerm: "",
+      });
+    }
+  };
+
+  const handleRecargar = () => {
+    if (vista === "sesiones") {
+      cargarSesiones();
+    } else {
+      cargarServicios();
+    }
+  };
+
+  const handleConfirmarEliminarServicio = async () => {
     if (!itemEliminar) return;
     setEliminando(true);
     const exito = await AgendaService.deleteAgenda(itemEliminar.i_CveAgenda);
@@ -70,138 +154,146 @@ export default function ProgramacionPage() {
     setItemEliminar(null);
 
     if (exito) {
+      toast.success("Agenda eliminada exitosamente");
       cargarServicios();
     } else {
-      alert("Ocurrió un error al intentar eliminar la agenda.");
+      toast.error("Ocurrió un error al intentar eliminar la agenda.");
     }
   };
 
   return (
-    <div className="app-container">
-      <Navbar />
+    <AppLayout>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">
+            Programación
+          </h1>
 
-      <main className="main-content">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">
-              <Clock size={24} className="text-primary" />
-              Programación y Agenda — Servicios
-            </h1>
-            <p className="subtext">
-              Administración de servicios agendados, estados financieros y entregables.
-            </p>
-          </div>
-
-          <button
-            className="btn btn-outline"
-            onClick={cargarServicios}
-            disabled={cargando}
-            title="Recargar datos"
-          >
-            <RefreshCw size={16} className={cargando ? "animate-spin" : ""} />
-            Recargar
-          </button>
+          <p className="subtext">
+            Administración de servicios agendados, estados financieros y entregables.
+          </p>
         </div>
 
-        <FiltrosAgendaServicios
-          filtros={filtros}
-          onCambiarFiltros={(nuevos) => {
-            setFiltros(nuevos);
-            setPaginaActual(1);
-          }}
-          onBuscar={() => setPaginaActual(1)}
-        />
+        <button
+          className="btn btn-outline"
+          onClick={handleRecargar}
+          disabled={cargando}
+          title="Recargar datos"
+        >
+          <RefreshCw size={16} className={cargando ? "animate-spin" : ""} />
+          Recargar
+        </button>
+      </div>
 
-        <TablaAgendaServicios
-          datos={datos}
-          cargando={cargando}
-          onVerDetalle={(item) => setItemDetalle(item)}
-          onEliminar={(item) => setItemEliminar(item)}
-        />
+      {vista === "sesiones" ? (
+        <>
+          <FiltrosAgendaSesiones
+            filtros={filtrosSesiones}
+            onCambiarFiltros={(nuevos) => {
+              setFiltrosSesiones(nuevos);
+              setPaginaActual(1);
+            }}
+            onCambiarVisualizar={handleCambiarVisualizar}
+            onBuscar={() => setPaginaActual(1)}
+          />
 
-        <PaginadorCustom
-          paginaActual={paginaActual}
-          totalPaginas={totalPaginas}
-          totalRegistros={totalRegistros}
-          tamano={tamanoPagina}
-          onCambioPagina={(pag) => setPaginaActual(pag)}
-          onCambioTamano={(tam) => {
-            setTamanoPagina(tam);
-            setPaginaActual(1);
-          }}
-        />
+          <TablaAgendaSesiones
+            datos={datosSesiones}
+            cargando={cargando}
+            onReprogramar={(item) => setItemReprogramar(item)}
+          />
+        </>
+      ) : (
+        <>
+          <FiltrosAgendaServicios
+            filtros={filtrosServicios}
+            onCambiarFiltros={(nuevos) => {
+              setFiltrosServicios(nuevos);
+              setPaginaActual(1);
+            }}
+            onCambiarVisualizar={handleCambiarVisualizar}
+            onBuscar={() => setPaginaActual(1)}
+            onNuevo={() => setModalAgendaAbierto(true)}
+          />
 
-        {/* Modal Confirmar Eliminar */}
-        <ModalConfirmarEliminar
-          abierto={!!itemEliminar}
-          nombreElemento={itemEliminar?.v_Servicio || "este servicio agendado"}
-          onCerrar={() => setItemEliminar(null)}
-          onConfirmar={handleConfirmarEliminar}
-          cargando={eliminando}
-        />
+          <TablaAgendaServicios
+            datos={datosServicios}
+            cargando={cargando}
+            onVerDetalle={(item) => setItemDetalle(item)}
+            onEliminar={(item) => setItemEliminar(item)}
+          />
+        </>
+      )}
 
-        {/* Modal Detalle de Servicio */}
-        {itemDetalle && (
-          <div className="modal-overlay" onClick={() => setItemDetalle(null)}>
-            <div className="modal-content wide" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3 className="modal-title">Detalle del Servicio Agendado</h3>
-                <button className="btn-icon" onClick={() => setItemDetalle(null)}>
-                  <X size={20} />
-                </button>
-              </div>
+      <PaginadorCustom
+        paginaActual={paginaActual}
+        totalPaginas={totalPaginas}
+        totalRegistros={totalRegistros}
+        tamano={tamanoPagina}
+        onCambioPagina={(pag) => setPaginaActual(pag)}
+        onCambioTamano={(tam) => {
+          setTamanoPagina(tam);
+          setPaginaActual(1);
+        }}
+      />
 
-              <div className="modal-body">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="form-label">Cliente</label>
-                    <p className="font-semibold">{itemDetalle.v_Empresa || "—"}</p>
-                    <p className="text-xs text-secondary">{itemDetalle.v_Planta || ""}</p>
-                  </div>
+      {/* Modal Reprogramar Sesión (Vista Sesiones) */}
+      <ModalReprogramarSesion
+        abierto={!!itemReprogramar}
+        onCerrar={() => setItemReprogramar(null)}
+        iCveAgenda={itemReprogramar?.i_CveAgenda ?? null}
+        iCveServAgendaDet={itemReprogramar?.i_CveServAgendaDet ?? null}
+        iCveAgendaDetalle={itemReprogramar?.i_CveAgendaDetalle ?? null}
+        onReprogramacionExitosa={() => {
+          setItemReprogramar(null);
+          cargarSesiones();
+        }}
+      />
 
-                  <div>
-                    <label className="form-label">Servicio</label>
-                    <p className="font-semibold">{itemDetalle.v_Servicio || "—"}</p>
-                    <p className="text-xs text-secondary">
-                      {itemDetalle.i_Cantidad ?? 0} {itemDetalle.v_Unidad || ""}
-                    </p>
-                  </div>
+      {/* Modal Confirmar Eliminar (Vista Servicios) */}
+      <ModalConfirmarEliminar
+        abierto={!!itemEliminar}
+        nombreElemento={itemEliminar?.v_Servicio || "este servicio agendado"}
+        onCerrar={() => setItemEliminar(null)}
+        onConfirmar={handleConfirmarEliminarServicio}
+        cargando={eliminando}
+      />
 
-                  <div>
-                    <label className="form-label">Monto Total</label>
-                    <p className="text-lg font-bold text-primary">
-                      ${itemDetalle.d_MontoTotal?.toLocaleString("es-MX", { minimumFractionDigits: 2 }) ?? "0.00"}
-                    </p>
-                  </div>
+      {/* Modal Detalle de Servicio (Vista Servicios) */}
+      <ModalDetalleServicio
+        abierto={!!itemDetalle}
+        iCveAgenda={itemDetalle?.i_CveAgenda ?? null}
+        iCveServAgendaDet={itemDetalle?.i_CveServAgendaDet ?? null}
+        onCerrar={() => setItemDetalle(null)}
+        onGuardadoExitoso={() => {
+          cargarServicios();
+        }}
+        onProgramar={() => {
+          setItemDetalle(null);
+          setModalFormAbierto(true);
+        }}
+      />
 
-                  <div>
-                    <label className="form-label">Monto Cobrado</label>
-                    <p className="text-lg font-bold text-emerald-600">
-                      ${itemDetalle.d_MontoCobrado?.toLocaleString("es-MX", { minimumFractionDigits: 2 }) ?? "0.00"}
-                    </p>
-                  </div>
+      {/* Modal Formulario de Servicio (Vista Servicios) */}
+      <ModalFormServicio
+        abierto={modalFormAbierto}
+        servicioEditar={null}
+        onCerrar={() => setModalFormAbierto(false)}
+        onGuardadoExitoso={() => {
+          setModalFormAbierto(false);
+          cargarServicios();
+        }}
+      />
 
-                  <div>
-                    <label className="form-label">Titular / Instructor</label>
-                    <p>{itemDetalle.v_Titular || "—"}</p>
-                  </div>
-
-                  <div>
-                    <label className="form-label">Apoyo</label>
-                    <p>{itemDetalle.v_Apoyo || "—"}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setItemDetalle(null)}>
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+      {/* Modal Agendar Servicio (Wizard Parte 1 & 2 - Vista Servicios) */}
+      <ModalAgendaServicio
+        abierto={modalAgendaAbierto}
+        onCerrar={() => setModalAgendaAbierto(false)}
+        onGuardadoExitoso={() => {
+          setModalAgendaAbierto(false);
+          cargarServicios();
+        }}
+      />
+    </AppLayout>
   );
 }

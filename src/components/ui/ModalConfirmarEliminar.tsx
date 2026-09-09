@@ -21,8 +21,8 @@ export const ModalConfirmarEliminar: React.FC<Props> = ({
   if (!abierto) return null;
 
   return (
-    <div className="modal-overlay" onClick={onCerrar}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal-content">
         <div className="modal-header">
           <div className="flex items-center gap-2 text-danger">
             <AlertTriangle size={22} className="text-danger" />

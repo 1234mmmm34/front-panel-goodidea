@@ -10,21 +10,30 @@ interface Props {
 export const ModalDetalleEmpresa: React.FC<Props> = ({ empresa, onCerrar }) => {
   if (!empresa) return null;
 
-  const domicilioFormateado = `Calle ${empresa.v_NombreCalle || "—"} ${
-    empresa.v_NumeroExterior || ""
-  }${empresa.v_NumeroInterior ? ` Int. ${empresa.v_NumeroInterior}` : ""}, fraccionamiento ${
-    empresa.v_Fraccionamiento || "—"
-  }. ${empresa.v_Municipio || "—"}, ${empresa.v_NombreEstado || "—"} CP ${
-    empresa.i_CodigoPostal || "—"
-  }`;
+  const partesDomicilio = [
+    empresa.v_NombreCalle ? `Calle ${empresa.v_NombreCalle}` : null,
+    empresa.v_NumeroExterior ? `No. ${empresa.v_NumeroExterior}` : null,
+    empresa.v_NumeroInterior ? `Int. ${empresa.v_NumeroInterior}` : null,
+    empresa.v_Fraccionamiento ? `Col. ${empresa.v_Fraccionamiento}` : null,
+    empresa.v_Municipio,
+    empresa.v_NombreEstado,
+    empresa.i_CodigoPostal ? `C.P. ${empresa.i_CodigoPostal}` : null,
+  ].filter(Boolean);
+
+  const domicilioFormateado =
+    partesDomicilio.length > 0
+      ? partesDomicilio.join(", ")
+      : empresa.s_Domicilio && empresa.s_Domicilio !== "N/A"
+      ? empresa.s_Domicilio
+      : "Sin domicilio registrado";
 
   return (
-    <div className="modal-overlay" onClick={onCerrar}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal-content">
         <div className="modal-header">
           <div className="flex items-center gap-2">
             <Building2 size={22} className="text-primary" />
-            <h3 className="modal-title">{empresa.s_RazonSocial || "Detalle de Cliente"}</h3>
+            <h3 className="modal-title">{empresa.s_RazonSocial || "Detalle de Empresa"}</h3>
           </div>
           <button className="btn-icon" onClick={onCerrar}>
             <X size={20} />

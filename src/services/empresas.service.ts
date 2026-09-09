@@ -9,7 +9,7 @@ export const EmpresasService = {
   async getEmpresas(searchTerm?: string): Promise<EmpresaGetDto[]> {
     return httpDefensivo(async () => {
       const sesion = await obtenerSesionActual();
-      const tenantId = sesion?.IdTenant ?? 1;
+      const tenantId = sesion?.id_tenant ?? 1;
 
       let url = `empresas/${tenantId}`;
       const params: Record<string, string> = {};
@@ -78,4 +78,95 @@ export const EmpresasService = {
       return resp.data || [];
     }, []);
   },
+
+  /**
+   * 1.1 Cargar plantas de la empresa (GET centros/GetAll/{id_empresa})
+   */
+  async getPlantas(idEmpresa: number): Promise<import("@/types/empresas").PlantaGetDto[]> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.get<import("@/types/empresas").PlantaGetDto[]>(`centros/GetAll/${idEmpresa}`);
+      return resp.data || [];
+    }, []);
+  },
+
+  /**
+   * 1.2 Generar link de agenda (POST agenda/GenerateTokenAgenda?i_CveEmpresa={id}&i_CvePlanta={id})
+   */
+  async generarLinkAgenda(idEmpresa: number, idPlanta: number): Promise<string | null> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.post<import("@/types/empresas").TokenAgendaResponse>(
+        `agenda/GenerateTokenAgenda?i_CveEmpresa=${idEmpresa}&i_CvePlanta=${idPlanta}`
+      );
+      if (resp.data) {
+        if (typeof resp.data === "string") return resp.data;
+        if (resp.data.link) return resp.data.link;
+        if (resp.data.v_LinkAgenda) return resp.data.v_LinkAgenda;
+      }
+      return null;
+    }, null);
+  },
+
+  /**
+   * 1.3 Enviar link por correo (POST token/EnviarCorreoCalendario)
+   */
+  async enviarCorreoCalendario(payload: import("@/types/empresas").EnviarCorreoPayload): Promise<boolean> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.post("token/EnviarCorreoCalendario", payload);
+      return resp.status >= 200 && resp.status < 300;
+    }, false);
+  },
+
+  /**
+   * 2.1 Listar contactos (GET ContactosXEmpresa/GetAll/{id_empresa})
+   */
+  async getContactos(idEmpresa: number): Promise<import("@/types/empresas").ContactoXEmpresa[]> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.get<import("@/types/empresas").ContactoXEmpresa[]>(`ContactosXEmpresa/GetAll/${idEmpresa}`);
+      return resp.data || [];
+    }, []);
+  },
+
+  /**
+   * 2.2 Cargar un contacto por ID (GET ContactosXEmpresa/{id_contacto})
+   */
+  async getContactoById(idContacto: number): Promise<import("@/types/empresas").ContactoXEmpresa | null> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.get<import("@/types/empresas").ContactoXEmpresa[]>(`ContactosXEmpresa/${idContacto}`);
+      if (Array.isArray(resp.data) && resp.data.length > 0) {
+        return resp.data[0];
+      }
+      return null;
+    }, null);
+  },
+
+  /**
+   * 2.3 Crear contacto (POST ContactosXEmpresa)
+   */
+  async crearContacto(payload: Partial<import("@/types/empresas").ContactoXEmpresa>): Promise<boolean> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.post("ContactosXEmpresa", payload);
+      return resp.status >= 200 && resp.status < 300;
+    }, false);
+  },
+
+  /**
+   * 2.4 Editar contacto (POST ContactosXEmpresa/editar)
+   */
+  async editarContacto(payload: Partial<import("@/types/empresas").ContactoXEmpresa>): Promise<boolean> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.post("ContactosXEmpresa/editar", payload);
+      return resp.status >= 200 && resp.status < 300;
+    }, false);
+  },
+
+  /**
+   * 2.5 Eliminar contacto (DELETE ContactosXEmpresa/{id_contacto})
+   */
+  async eliminarContacto(idContacto: number): Promise<boolean> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.delete(`ContactosXEmpresa/${idContacto}`);
+      return resp.status >= 200 && resp.status < 300;
+    }, false);
+  },
 };
+

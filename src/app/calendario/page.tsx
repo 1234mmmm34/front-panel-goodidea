@@ -1,20 +1,22 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sun } from "lucide-react";
 import { AgendaGetDto } from "@/types/calendario";
 import { AgendaService } from "@/services/agenda.service";
 import {
   generarGridCalendario,
-  obtenerMesLabel,
   startOfMonth,
   endOfMonth,
   addMonths,
   subMonths,
   format,
+  capitalizar,
 } from "@/lib/date-utils";
+import { es } from "date-fns/locale";
 import { GridCalendario } from "@/components/calendario/GridCalendario";
-import { Navbar } from "@/components/ui/Navbar";
+import { CalendarioSkeleton } from "@/components/calendario/CalendarioSkeleton";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 export default function CalendarioPage() {
   const [mesActual, setMesActual] = useState<Date>(startOfMonth(new Date()));
@@ -56,72 +58,114 @@ export default function CalendarioPage() {
 
   const celdas = generarGridCalendario(mesActual);
 
-  return (
-    <div className="app-container">
-      <Navbar />
+  const mesNombre = capitalizar(format(mesActual, "MMMM", { locale: es }));
+  const anoNombre = format(mesActual, "yyyy");
 
-      <main className="main-content">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">
-              <CalendarIcon size={24} className="text-primary" />
-              Calendario de Servicios
-            </h1>
-            <p className="subtext">
-              Vista mensual de la programación y agenda de servicios.
-            </p>
+  return (
+    <AppLayout>
+      <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "20px" }}>
+        {/* Fila 1: Saludo con icono sol */}
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "8px" }}>
+          <Sun size={20} style={{ color: "#f59e0b", fill: "#fbbf24", flexShrink: 0 }} />
+          <h1 style={{ fontSize: "18px", fontWeight: "600", color: "#1e293b", margin: 0, padding: 0 }}>
+            Bienvenido/a, MariCarmen
+          </h1>
+        </div>
+
+        {/* Fila 2: Leyenda (Izquierda) | Navegación y Mes (Derecha) */}
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", width: "100%" }}>
+          {/* Leyenda por tipo de servicio */}
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "4px", backgroundColor: "#fffbeb", borderLeft: "3px solid #f59e0b" }}>
+              <span style={{ fontSize: "12px", fontWeight: "500", color: "#475569" }}>Capacitación</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "4px", backgroundColor: "#eff6ff", borderLeft: "3px solid #188ae2" }}>
+              <span style={{ fontSize: "12px", fontWeight: "500", color: "#475569" }}>Estudios</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "4px", backgroundColor: "#f5f3ff", borderLeft: "3px solid #8b5cf6" }}>
+              <span style={{ fontSize: "12px", fontWeight: "500", color: "#475569" }}>Productos</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "4px", backgroundColor: "#f0fdf4", borderLeft: "3px solid #10b981" }}>
+              <span style={{ fontSize: "12px", fontWeight: "500", color: "#475569" }}>Servicios</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              className="btn btn-outline"
-              onClick={() => cargarEventosDelMes(mesActual)}
-              disabled={cargando}
-              title="Actualizar eventos"
-            >
-              <RefreshCw size={16} className={cargando ? "animate-spin" : ""} />
-            </button>
-
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+          {/* Navegación y Etiqueta del Mes */}
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "4px" }}>
               <button
-                className="btn btn-outline btn-sm"
                 onClick={handleMesAnterior}
                 title="Mes anterior"
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "6px",
+                  backgroundColor: "#ffffff",
+                  color: "#475569",
+                  cursor: "pointer",
+                }}
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={14} />
               </button>
-
               <button
-                className="btn btn-primary btn-sm px-3"
                 onClick={handleHoy}
+                style={{
+                  height: "28px",
+                  padding: "0 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "6px",
+                  backgroundColor: "#ffffff",
+                  color: "#334155",
+                  fontWeight: "500",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
               >
                 Hoy
               </button>
-
               <button
-                className="btn btn-outline btn-sm"
                 onClick={handleMesSiguiente}
                 title="Mes siguiente"
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "6px",
+                  backgroundColor: "#ffffff",
+                  color: "#475569",
+                  cursor: "pointer",
+                }}
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={14} />
               </button>
             </div>
 
-            <h2 className="text-xl font-bold color-primary min-w-[180px] text-center">
-              {obtenerMesLabel(mesActual)}
-            </h2>
+            <span style={{ fontSize: "14px", color: "#475569" }}>
+              Tu mes de <strong style={{ color: "#0f172a", fontWeight: "700" }}>{mesNombre} {anoNombre}</strong>
+            </span>
           </div>
         </div>
+      </div>
 
-        {cargando ? (
-          <div className="card text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
-            <p className="text-secondary">Cargando eventos del mes...</p>
-          </div>
-        ) : (
-          <GridCalendario celdas={celdas} eventos={eventos} />
-        )}
-      </main>
-    </div>
+      {cargando ? (
+        <CalendarioSkeleton />
+      ) : (
+        <GridCalendario
+          celdas={celdas}
+          eventos={eventos}
+          onReprogramarExitoso={() => cargarEventosDelMes(mesActual)}
+        />
+      )}
+    </AppLayout>
   );
 }

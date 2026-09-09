@@ -26,16 +26,17 @@ export const PaginadorCustom: React.FC<Props> = ({
 
   return (
     <div className="paginador-container">
-      <div className="paginador-info">
+      <div className="paginador-info" style={{ whiteSpace: "nowrap" }}>
         Mostrando <strong>{inicio}</strong> - <strong>{fin}</strong> de <strong>{totalRegistros}</strong> registros
       </div>
 
-      <div className="paginador-controls">
+      <div className="paginador-controls" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "8px", flexWrap: "nowrap" }}>
         {onCambioTamano && (
-          <div className="flex items-center gap-2 mr-4">
-            <span className="text-sm">Mostrar:</span>
+          <div style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "8px", whiteSpace: "nowrap", marginRight: "8px" }}>
+            <span className="text-xs text-slate-600 font-medium" style={{ whiteSpace: "nowrap" }}>Mostrar:</span>
             <select
-              className="form-select text-sm py-1 px-2"
+              className="form-select text-xs py-1 px-3"
+              style={{ width: "auto", borderRadius: "20px", height: "32px", display: "inline-block", cursor: "pointer" }}
               value={tamano}
               onChange={(e) => onCambioTamano(Number(e.target.value))}
             >
@@ -49,6 +50,7 @@ export const PaginadorCustom: React.FC<Props> = ({
 
         <button
           className="btn btn-outline btn-sm"
+          style={{ height: "32px", minWidth: "32px", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
           disabled={pagina <= 1}
           onClick={() => onCambioPagina(1)}
           title="Primera página"
@@ -58,6 +60,7 @@ export const PaginadorCustom: React.FC<Props> = ({
 
         <button
           className="btn btn-outline btn-sm"
+          style={{ height: "32px", minWidth: "32px", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
           disabled={pagina <= 1}
           onClick={() => onCambioPagina(pagina - 1)}
           title="Página anterior"
@@ -65,12 +68,13 @@ export const PaginadorCustom: React.FC<Props> = ({
           <ChevronLeft size={16} />
         </button>
 
-        <span className="px-2 font-medium">
+        <span className="px-2 font-medium text-xs text-slate-700" style={{ whiteSpace: "nowrap" }}>
           Página {pagina} de {paginasValidas}
         </span>
 
         <button
           className="btn btn-outline btn-sm"
+          style={{ height: "32px", minWidth: "32px", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
           disabled={pagina >= paginasValidas}
           onClick={() => onCambioPagina(pagina + 1)}
           title="Página siguiente"
@@ -80,6 +84,7 @@ export const PaginadorCustom: React.FC<Props> = ({
 
         <button
           className="btn btn-outline btn-sm"
+          style={{ height: "32px", minWidth: "32px", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
           disabled={pagina >= paginasValidas}
           onClick={() => onCambioPagina(paginasValidas)}
           title="Última página"

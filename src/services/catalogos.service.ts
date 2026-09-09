@@ -17,6 +17,10 @@ export const CatalogosService = {
     }, []);
   },
 
+  async getTiposServicio(): Promise<tiposServicios[]> {
+    return this.getTiposServicios();
+  },
+
   async getUnidades(): Promise<unidades[]> {
     return httpDefensivo(async () => {
       const resp = await apiClient.get<unidades[]>("unidades/GetAll");
