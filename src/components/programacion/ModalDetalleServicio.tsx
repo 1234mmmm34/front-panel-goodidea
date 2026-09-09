@@ -573,42 +573,35 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                                     </span>
                                   )}
                                   {renderBadgeSesion(sesion)}
-                                  {!esReprogramada && (() => {
-                                    const fechaSesionIso = sesion.d_FechaHoraInicio || (sesion as any).d_FechaInicio || (sesion as any).f_FechaHoraInicio;
-                                    const esPasada = esFechaPasada(fechaSesionIso);
-                                    return (
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm"
-                                        disabled={esPasada}
-                                        title={esPasada ? "No se puede reprogramar una sesión de una fecha pasada" : "Reprogramar esta sesión"}
-                                        onClick={(e) => {
-                                          if (esPasada) return;
-                                          e.stopPropagation();
-                                          setSesionAReprogramarId(sesion.i_CveAgendaDetalle);
-                                          setModalReprogramarAbierto(true);
-                                        }}
-                                        style={{
-                                          height: "26px",
-                                          fontSize: "11px",
-                                          padding: "0 8px",
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          gap: "4px",
-                                          borderRadius: "4px",
-                                          border: esPasada ? "1px solid #cbd5e1" : "1px solid #d97706",
-                                          color: esPasada ? "#94a3b8" : "#d97706",
-                                          backgroundColor: esPasada ? "#f1f5f9" : "#fffbeb",
-                                          fontWeight: 600,
-                                          cursor: esPasada ? "not-allowed" : "pointer",
-                                          opacity: esPasada ? 0.65 : 1,
-                                        }}
-                                      >
-                                        <RefreshCw size={12} />
-                                        <span>Reprogramar</span>
-                                      </button>
-                                    );
-                                  })()}
+                                  {!esReprogramada && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm"
+                                      title="Reprogramar esta sesión"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSesionAReprogramarId(sesion.i_CveAgendaDetalle);
+                                        setModalReprogramarAbierto(true);
+                                      }}
+                                      style={{
+                                        height: "26px",
+                                        fontSize: "11px",
+                                        padding: "0 8px",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        borderRadius: "4px",
+                                        border: "1px solid #d97706",
+                                        color: "#d97706",
+                                        backgroundColor: "#fffbeb",
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      <RefreshCw size={12} />
+                                      <span>Reprogramar</span>
+                                    </button>
+                                  )}
                                   {esReprogramada && (
                                     estaAbierto ? <ChevronUp size={14} style={{ color: "#94a3b8" }} /> : <ChevronDown size={14} style={{ color: "#94a3b8" }} />
                                   )}

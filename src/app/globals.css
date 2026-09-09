@@ -723,6 +723,10 @@ h3,
 }
 
 .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   padding: 6px;
   border-radius: var(--radius-sm);
   border: none;

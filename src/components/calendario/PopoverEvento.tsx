@@ -91,15 +91,13 @@ export const PopoverEvento: React.FC<Props> = ({ evento, onCerrar, onReprogramar
           <button
             type="button"
             className="btn-reprogramar-popover"
-            disabled={esPasada}
-            title={esPasada ? "No se puede reprogramar una sesión de una fecha pasada" : "Reprogramar sesión"}
-            onClick={esPasada ? undefined : handleOpenReprogramar}
+            title="Reprogramar sesión"
+            onClick={handleOpenReprogramar}
             style={{
-              opacity: esPasada ? 0.6 : 1,
-              cursor: esPasada ? "not-allowed" : "pointer",
-              backgroundColor: esPasada ? "#f1f5f9" : "#fffbeb",
-              borderColor: esPasada ? "#cbd5e1" : "#f59e0b",
-              color: esPasada ? "#94a3b8" : "#b45309",
+              cursor: "pointer",
+              backgroundColor: "#fffbeb",
+              borderColor: "#f59e0b",
+              color: "#b45309",
             }}
           >
             <RefreshCw size={13} />

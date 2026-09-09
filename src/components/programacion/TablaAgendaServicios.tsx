@@ -55,7 +55,7 @@ export const TablaAgendaServicios: React.FC<Props> = ({
             <th>Cot. GI</th>
             <th>OC cliente</th>
             <th>Facturas</th>
-            <th className="text-center">Acciones</th>
+            <th className="text-center whitespace-nowrap" style={{ width: "90px", minWidth: "90px" }}>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -349,8 +349,8 @@ export const TablaAgendaServicios: React.FC<Props> = ({
 
 
                   {/* 11. Acciones */}
-                  <td className="text-center">
-                    <div className="flex items-center justify-center gap-1">
+                  <td className="text-center whitespace-nowrap" style={{ width: "90px", minWidth: "90px" }}>
+                    <div className="flex items-center justify-center gap-1 flex-nowrap" style={{ flexWrap: "nowrap" }}>
                       <button
                         className="btn-icon"
                         onClick={() => onVerDetalle(row)}

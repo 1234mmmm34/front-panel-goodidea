@@ -368,10 +368,6 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
       toast.error("Selecciona la nueva fecha de la sesión");
       return;
     }
-    if (esFechaPasada(nuevaFecha)) {
-      toast.error("La nueva fecha no puede ser anterior al día de hoy");
-      return;
-    }
     if (cambiaInstructor && !nuevoInstructorId) {
       toast.error("Selecciona el nuevo instructor titular");
       return;
@@ -988,7 +984,6 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
                           type="date"
                           className="form-control"
                           value={nuevaFecha}
-                          min={new Date().toISOString().split("T")[0]}
                           onChange={(e) => setNuevaFecha(e.target.value)}
                           style={{ height: "38px", fontSize: "13px", borderRadius: "8px" }}
                         />
