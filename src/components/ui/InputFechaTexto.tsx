@@ -60,7 +60,7 @@ export const InputFechaTexto: React.FC<InputFechaTextoProps> = ({
         style={{
           height: "100%",
           fontSize: "12px",
-          borderRadius: "6px",
+          borderRadius: style?.borderRadius || "6px",
           border: "1px solid #d0dce8",
           backgroundColor: "#ffffff",
           color: "#1e3a5f",

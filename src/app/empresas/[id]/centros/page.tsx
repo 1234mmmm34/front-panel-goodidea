@@ -114,10 +114,10 @@ export default function CentrosTrabajoPage({ params }: PageProps) {
       </div>
 
       {/* Barra de filtros (Alineada a la derecha) */}
-      <div className="card mb-4 p-4 border border-slate-200/80 shadow-sm rounded-xl">
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "16px", justifyContent: "flex-end" }}>
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "8px", width: "auto" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "240px", minWidth: "200px" }}>
+      <div className="card mb-4 p-4 border border-slate-200/80 shadow-sm rounded-xl filter-card">
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "16px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "8px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "240px", minWidth: "160px" }}>
               <label className="form-label text-[11px] font-semibold text-slate-600" style={{ marginBottom: 0 }}>Buscar centro</label>
               <div style={{ position: "relative", width: "100%" }}>
                 <Search size={14} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }} />
@@ -139,8 +139,7 @@ export default function CentrosTrabajoPage({ params }: PageProps) {
 
             <button
               type="button"
-              className="btn btn-primary text-xs py-1.5 px-3.5 flex items-center gap-1.5 shrink-0"
-              style={{ height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "20px" }}
+              className="btn btn-primary filter-action-btn"
               onClick={() => {
                 setCentroEditar(null);
                 setModalCentroAbierto(true);
@@ -148,7 +147,7 @@ export default function CentrosTrabajoPage({ params }: PageProps) {
               title="Nuevo centro"
             >
               <Plus size={16} />
-              <span>Nuevo centro</span>
+              <span className="filter-btn-text">Nuevo centro</span>
             </button>
           </div>
         </div>

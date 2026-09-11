@@ -7,6 +7,7 @@ import {
   Home,
   Calendar,
   Folder,
+  Receipt,
   LogOut,
   ChevronDown,
   ChevronRight,
@@ -27,6 +28,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
 
   const esInicio = pathname.startsWith("/calendario") || pathname === "/";
   const esProgramacion = pathname.startsWith("/programacion");
+  const esFacturas = pathname.startsWith("/facturas");
   const esEmpresas = pathname.startsWith("/empresas");
   const esServicios = pathname.startsWith("/servicios");
 
@@ -140,8 +142,19 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
           {!collapsed && <span className="menu-text">Mis proyectos</span>}
         </Link>
 
+        {/* 3. Facturas */}
+        <Link
+          href="/facturas"
+          className={`sidebar-nav-item ${esFacturas ? "active" : ""}`}
+          title="Facturas"
+        >
+          <div className="nav-icon-wrapper">
+            <Receipt size={18} className="nav-item-icon" />
+          </div>
+          {!collapsed && <span className="menu-text">Facturas</span>}
+        </Link>
 
-        {/* 3. Divisor */}
+        {/* 4. Divisor */}
         <div className="sidebar-divider" />
 
         {/* 4. Menú dinámico (Catálogos) */}

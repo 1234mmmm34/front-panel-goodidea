@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 
 export interface FiltrosSesionesState {
   visualizar: "sesiones" | "servicios";
@@ -16,6 +16,7 @@ interface Props {
   onCambiarFiltros: (nuevosFiltros: FiltrosSesionesState) => void;
   onCambiarVisualizar: (nuevaVista: "sesiones" | "servicios") => void;
   onBuscar: () => void;
+  onNuevo?: () => void;
 }
 
 export const FiltrosAgendaSesiones: React.FC<Props> = ({
@@ -23,6 +24,7 @@ export const FiltrosAgendaSesiones: React.FC<Props> = ({
   onCambiarFiltros,
   onCambiarVisualizar,
   onBuscar,
+  onNuevo,
 }) => {
   const [localSearch, setLocalSearch] = useState(filtros.searchTerm);
 
@@ -34,7 +36,7 @@ export const FiltrosAgendaSesiones: React.FC<Props> = ({
   };
 
   return (
-    <div className="card mb-4 p-4" style={{ position: "relative", zIndex: 40, overflow: "visible" }}>
+    <div className="card mb-4 p-4 filter-card" style={{ position: "relative", zIndex: 40, overflow: "visible" }}>
       <div
         style={{
           display: "flex",
@@ -117,31 +119,45 @@ export const FiltrosAgendaSesiones: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Buscador (Texto libre alineado a la derecha, dispara con Enter) */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "240px", minWidth: "220px", marginLeft: "auto" }}>
-          <label className="form-label" style={{ marginBottom: 0 }}>Buscar</label>
-          <div style={{ position: "relative", width: "100%" }}>
-            <Search
-              size={14}
-              style={{
-                position: "absolute",
-                left: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "#94a3b8",
-                pointerEvents: "none",
-              }}
-            />
-            <input
-              type="text"
-              className="form-control text-xs py-1.5"
-              style={{ width: "100%", paddingLeft: "28px", borderRadius: "20px", height: "32px" }}
-              placeholder="Buscar sesión (Enter)..."
-              value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              onKeyDown={handleKeyDownSearch}
-            />
+        {/* Buscador y Botón Agendar al lado */}
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "8px", marginLeft: "auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "220px", minWidth: "160px" }}>
+            <label className="form-label" style={{ marginBottom: 0 }}>Buscar</label>
+            <div style={{ position: "relative", width: "100%" }}>
+              <Search
+                size={14}
+                style={{
+                  position: "absolute",
+                  left: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#94a3b8",
+                  pointerEvents: "none",
+                }}
+              />
+              <input
+                type="text"
+                className="form-control text-xs py-1.5"
+                style={{ width: "100%", paddingLeft: "28px", borderRadius: "20px", height: "32px" }}
+                placeholder="Buscar sesión (Enter)..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                onKeyDown={handleKeyDownSearch}
+              />
+            </div>
           </div>
+
+          {onNuevo && (
+            <button
+              type="button"
+              className="btn btn-primary filter-action-btn"
+              onClick={onNuevo}
+              title="Agendar Servicio"
+            >
+              <Plus size={16} />
+              <span className="filter-btn-text">Agendar</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

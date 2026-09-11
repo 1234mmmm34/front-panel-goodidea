@@ -38,7 +38,7 @@ export const FiltrosAgendaServicios: React.FC<Props> = ({
   };
 
   return (
-    <div className="card mb-4 p-4" style={{ position: "relative", zIndex: 40, overflow: "visible" }}>
+    <div className="card mb-4 p-4 filter-card" style={{ position: "relative", zIndex: 40, overflow: "visible" }}>
       {/* Contenedor principal en fila horizontal estricta con flex-row */}
       <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "16px", flexWrap: "wrap", paddingBottom: "4px", overflow: "visible" }}>
         {/* Selector Visualizar (Primero en la barra de filtros) */}
@@ -70,12 +70,12 @@ export const FiltrosAgendaServicios: React.FC<Props> = ({
             }
           >
             <option value="programados">Programados</option>
-            <option value="pendientes">Pendientes de programar</option>
+            <option value="pendientes">Pendientes</option>
           </select>
         </div>
 
         {/* Facturación */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "120px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "150px" }}>
           <label className="form-label" style={{ marginBottom: 0 }}>Facturación</label>
           <select
             className="form-select text-xs py-1.5"
@@ -89,14 +89,14 @@ export const FiltrosAgendaServicios: React.FC<Props> = ({
             }
           >
             <option value="todos">Todos</option>
-            <option value="facturado">Facturado</option>
-            <option value="pendiente">Pendiente</option>
+            <option value="facturado">Facturados</option>
+            <option value="pendiente">Pendientes de facturar</option>
           </select>
         </div>
 
         {/* Selector de Rango de Fechas (Estilo Alegra / SaaS) */}
         {filtros.programacion === "programados" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "220px", position: "relative", zIndex: 50 }}>
             <label className="form-label" style={{ marginBottom: 0 }}>Rango de fechas</label>
             <DateRangePickerPopover
               fechaInicio={filtros.fechaInicio}
@@ -112,7 +112,7 @@ export const FiltrosAgendaServicios: React.FC<Props> = ({
 
         {/* Buscador + Botón + Nuevo al lado */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "8px", width: "auto", marginLeft: "auto" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "220px", minWidth: "220px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "220px", minWidth: "160px" }}>
             <label className="form-label" style={{ marginBottom: 0 }}>Buscar</label>
             <div style={{ position: "relative", width: "100%" }}>
               <Search size={14} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }} />
@@ -131,13 +131,12 @@ export const FiltrosAgendaServicios: React.FC<Props> = ({
           {onNuevo && (
             <button
               type="button"
-              className="btn btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5 shrink-0"
-              style={{ height: "32px", borderRadius: "20px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              className="btn btn-primary filter-action-btn"
               onClick={onNuevo}
               title="Agendar Servicio"
             >
               <Plus size={16} />
-              <span>Agendar</span>
+              <span className="filter-btn-text">Agendar</span>
             </button>
           )}
         </div>

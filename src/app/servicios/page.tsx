@@ -118,10 +118,10 @@ export default function ServiciosPage() {
         </div>
       </div>
 
-      {/* Barra de Filtros Horizontal Estricta */}
-      <div className="card mb-4 p-4">
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "16px", flexWrap: "nowrap", overflowX: "auto" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "180px" }}>
+      {/* Barra de Filtros Horizontal */}
+      <div className="card mb-4 p-4 filter-card">
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "16px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "160px" }}>
             <label className="form-label" style={{ marginBottom: 0 }}>Rubro</label>
             <select
               className="form-select text-xs py-1.5"
@@ -141,7 +141,7 @@ export default function ServiciosPage() {
             </select>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "180px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "160px" }}>
             <label className="form-label" style={{ marginBottom: 0 }}>Tipo</label>
             <select
               className="form-select text-xs py-1.5"
@@ -161,9 +161,8 @@ export default function ServiciosPage() {
             </select>
           </div>
 
-          {/* Buscador + Botón + Nuevo al lado */}
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "8px", width: "auto", marginLeft: "auto" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "220px", minWidth: "220px" }}>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "8px", marginLeft: "auto" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "220px", minWidth: "160px" }}>
               <label className="form-label" style={{ marginBottom: 0 }}>Buscar</label>
               <div style={{ position: "relative", width: "100%" }}>
                 <Search size={14} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }} />
@@ -186,8 +185,7 @@ export default function ServiciosPage() {
 
             <button
               type="button"
-              className="btn btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5 shrink-0"
-              style={{ height: "32px", borderRadius: "20px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              className="btn btn-primary filter-action-btn"
               onClick={() => {
                 setServicioEditar(null);
                 setModalFormAbierto(true);
@@ -195,7 +193,7 @@ export default function ServiciosPage() {
               title="Nuevo servicio"
             >
               <Plus size={16} />
-              <span>Nuevo servicio</span>
+              <span className="filter-btn-text">Nuevo servicio</span>
             </button>
           </div>
         </div>

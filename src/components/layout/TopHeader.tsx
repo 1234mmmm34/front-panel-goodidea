@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { Plus, ChevronDown, LogOut, Upload, FileCheck } from "lucide-react";
+import { Plus, ChevronDown, LogOut, Upload, FileCheck, CreditCard } from "lucide-react";
 import { obtenerSesionActual } from "@/lib/api-client";
 import { SesionAlmacenada } from "@/types/auth";
 import { AuthService } from "@/services/auth.service";
@@ -9,6 +9,7 @@ import { AuthService } from "@/services/auth.service";
 import { useToast } from "@/context/ToastContext";
 import { ModalSubirArchivos } from "@/components/archivos/ModalSubirArchivos";
 import { ModalMarcarEntregados } from "@/components/entregables/ModalMarcarEntregados";
+import { ModalPagarFacturas } from "@/components/facturas/ModalPagarFacturas";
 
 export const TopHeader: React.FC = () => {
   const [sesion, setSesion] = useState<SesionAlmacenada | null>(null);
@@ -16,6 +17,7 @@ export const TopHeader: React.FC = () => {
   const [plusMenuAbierto, setPlusMenuAbierto] = useState<boolean>(false);
   const [modalSubirArchivosAbierto, setModalSubirArchivosAbierto] = useState<boolean>(false);
   const [modalMarcarEntregadosAbierto, setModalMarcarEntregadosAbierto] = useState<boolean>(false);
+  const [modalPagarFacturasAbierto, setModalPagarFacturasAbierto] = useState<boolean>(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const plusDropdownRef = useRef<HTMLDivElement>(null);
@@ -181,6 +183,39 @@ export const TopHeader: React.FC = () => {
                   <FileCheck size={16} style={{ color: "#2B8FCC" }} />
                   <span>Marcar entregables</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlusMenuAbierto(false);
+                    setModalPagarFacturasAbierto(true);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    border: "none",
+                    backgroundColor: "transparent",
+                    color: "#2B8FCC",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = "#eaf4fb";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  <CreditCard size={16} style={{ color: "#2B8FCC" }} />
+                  <span>Pagar facturas</span>
+                </button>
               </div>
             )}
           </div>
@@ -298,6 +333,12 @@ export const TopHeader: React.FC = () => {
       <ModalMarcarEntregados
         abierto={modalMarcarEntregadosAbierto}
         onCerrar={() => setModalMarcarEntregadosAbierto(false)}
+      />
+
+      {/* Modal Pagar Facturas / Marcar pagos de facturas masivo */}
+      <ModalPagarFacturas
+        abierto={modalPagarFacturasAbierto}
+        onCerrar={() => setModalPagarFacturasAbierto(false)}
       />
     </>
   );

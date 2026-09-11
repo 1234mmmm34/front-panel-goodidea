@@ -171,6 +171,7 @@ export {
   startOfMonth,
   endOfMonth,
   isSameDay,
+  addDays,
   addMonths,
   subMonths,
 };

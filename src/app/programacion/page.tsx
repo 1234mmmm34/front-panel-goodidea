@@ -195,6 +195,7 @@ export default function ProgramacionPage() {
             }}
             onCambiarVisualizar={handleCambiarVisualizar}
             onBuscar={() => setPaginaActual(1)}
+            onNuevo={() => setModalAgendaAbierto(true)}
           />
 
           <TablaAgendaSesiones
