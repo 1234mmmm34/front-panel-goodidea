@@ -50,7 +50,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
 
   // Parse initial dates or fallback to today
   const initStart = fechaInicio ? parseISO(fechaInicio) : new Date();
-  const initEnd = fechaFin ? parseISO(fechaFin) : new Date();
+  const initEnd = fechaFin ? parseISO(fechaFin) : fechaInicio ? parseISO(fechaInicio) : new Date();
 
   const [tempStart, setTempStart] = useState<Date>(isValid(initStart) ? initStart : new Date());
   const [tempEnd, setTempEnd] = useState<Date>(isValid(initEnd) ? initEnd : new Date());
@@ -66,7 +66,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   useEffect(() => {
     if (isOpen) {
       const s = fechaInicio ? parseISO(fechaInicio) : new Date();
-      const e = fechaFin ? parseISO(fechaFin) : new Date();
+      const e = fechaFin ? parseISO(fechaFin) : fechaInicio ? parseISO(fechaInicio) : new Date();
       setTempStart(isValid(s) ? s : new Date());
       setTempEnd(isValid(e) ? e : new Date());
       if (isValid(s)) {
@@ -170,7 +170,12 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
 
   const handleApply = () => {
     if (tempStart && tempEnd) {
-      onChangeRange(format(tempStart, "yyyy-MM-dd"), format(tempEnd, "yyyy-MM-dd"));
+      let s = tempStart;
+      let e = tempEnd;
+      if (s > e) {
+        [s, e] = [e, s];
+      }
+      onChangeRange(format(s, "yyyy-MM-dd"), format(e, "yyyy-MM-dd"));
     } else if (tempStart) {
       onChangeRange(format(tempStart, "yyyy-MM-dd"), format(tempStart, "yyyy-MM-dd"));
     }

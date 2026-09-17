@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { FacturaGetDto, FiltrosFacturasState } from "@/types/facturas";
+import { FacturaGetDto, FiltrosFacturasState, FacturasResumenDto } from "@/types/facturas";
 import { FacturasService } from "@/services/facturas.service";
 import { FiltrosFacturas } from "@/components/facturas/FiltrosFacturas";
 import { TablaFacturas } from "@/components/facturas/TablaFacturas";
+import { TarjetasResumenFacturas } from "@/components/facturas/TarjetasResumenFacturas";
 import {
   ModalNuevaFactura,
   ModalFacturaDetalle,
@@ -14,12 +16,16 @@ import {
 } from "@/components/facturas/ModalesFacturas";
 
 export default function FacturasPage() {
-  const hoyStr = new Date().toISOString().split("T")[0];
+  const ahora = new Date();
+  const primerDiaMes = format(startOfMonth(ahora), "yyyy-MM-dd");
+  const ultimoDiaMes = format(endOfMonth(ahora), "yyyy-MM-dd");
 
-  // 1. Estado de filtros (Default: "Pendientes" y fechaPago = hoy)
+  // 1. Estado de filtros (Default: "Pendientes" y Rango del mes completo)
   const [filtros, setFiltros] = useState<FiltrosFacturasState>({
     estado: "Pendientes",
-    fechaPago: hoyStr,
+    fechaInicio: primerDiaMes,
+    fechaFin: ultimoDiaMes,
+    fechaPago: primerDiaMes,
     searchTerm: "",
   });
 
@@ -29,9 +35,11 @@ export default function FacturasPage() {
   const [totalPaginas, setTotalPaginas] = useState<number>(1);
   const [totalRegistros, setTotalRegistros] = useState<number>(0);
 
-  // 3. Datos y estado de carga
+  // 3. Datos, Resumen y estado de carga
   const [datos, setDatos] = useState<FacturaGetDto[]>([]);
+  const [resumen, setResumen] = useState<FacturasResumenDto | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [cargandoResumen, setCargandoResumen] = useState<boolean>(true);
 
   // 4. Estados para Modales
   const [modalNuevaAbierto, setModalNuevaAbierto] = useState<boolean>(false);
@@ -40,22 +48,40 @@ export default function FacturasPage() {
   const [modalTimbradoAbierto, setModalTimbradoAbierto] = useState<boolean>(false);
   const [modalCancelarAbierto, setModalCancelarAbierto] = useState<boolean>(false);
 
-  // Carga de datos de facturas
+  // Carga de datos y resumen de facturas
   const cargarFacturas = useCallback(
     async (pageToLoad: number, pageSizeToLoad: number, currentFiltros: FiltrosFacturasState) => {
       setCargando(true);
-      const res = await FacturasService.getFacturas({
-        estado: currentFiltros.estado,
-        fechaPago: currentFiltros.fechaPago,
-        searchTerm: currentFiltros.searchTerm,
-        pagina: pageToLoad,
-        tamano: pageSizeToLoad,
-      });
+      setCargandoResumen(true);
 
-      setDatos(res.datos);
-      setTotalRegistros(res.total);
-      setTotalPaginas(res.totalPaginas);
+      const [resFacturas, resResumen] = await Promise.all([
+        FacturasService.getFacturas({
+          estado: currentFiltros.estado,
+          fechaInicio: currentFiltros.fechaInicio,
+          fechaFin: currentFiltros.fechaFin,
+          fechaPago: currentFiltros.fechaInicio,
+          fechaPagoFin: currentFiltros.fechaFin,
+          searchTerm: currentFiltros.searchTerm,
+          pagina: pageToLoad,
+          tamano: pageSizeToLoad,
+        }),
+        FacturasService.getFacturasResumen({
+          estado: currentFiltros.estado,
+          fechaInicio: currentFiltros.fechaInicio,
+          fechaFin: currentFiltros.fechaFin,
+          fechaPago: currentFiltros.fechaInicio,
+          fechaPagoFin: currentFiltros.fechaFin,
+          searchTerm: currentFiltros.searchTerm,
+        }),
+      ]);
+
+      setDatos(resFacturas.datos);
+      setTotalRegistros(resFacturas.total);
+      setTotalPaginas(resFacturas.totalPaginas);
       setCargando(false);
+
+      setResumen(resResumen);
+      setCargandoResumen(false);
     },
     []
   );
@@ -117,6 +143,9 @@ export default function FacturasPage() {
             Facturas
           </h1>
         </div>
+
+        {/* Tarjetas de Resumen de Facturas */}
+        <TarjetasResumenFacturas resumen={resumen} cargando={cargandoResumen} />
 
         {/* 1. Encabezado y barra de filtros */}
         <FiltrosFacturas

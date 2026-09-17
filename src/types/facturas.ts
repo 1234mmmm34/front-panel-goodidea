@@ -19,7 +19,9 @@ export interface FacturaGetDto {
 
 export interface FiltrosFacturasState {
   estado: string; // "" (Todos), "Pendientes", "Abonada", "Cobrada", "SinProgramar", "Canceladas"
-  fechaPago: string | null; // "yyyy-MM-dd"
+  fechaInicio: string;
+  fechaFin: string;
+  fechaPago?: string | null; // "yyyy-MM-dd"
   searchTerm: string;
   empresa?: string;
 }
@@ -27,6 +29,13 @@ export interface FiltrosFacturasState {
 export interface ResultadoRespuestaApi {
   exito: boolean;
   mensaje?: string;
+}
+
+export interface FacturasResumenDto {
+  d_TotalPagado: number;
+  d_TotalPendiente: number;
+  d_TotalFacturado: number;
+  i_TotalFacturas: number;
 }
 
 export interface PagoPendienteMasivoDto {

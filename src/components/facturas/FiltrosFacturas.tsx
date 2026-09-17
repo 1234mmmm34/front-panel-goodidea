@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Plus } from "lucide-react";
 import { FiltrosFacturasState, EsEstadoPendiente } from "@/types/facturas";
-import InputFechaTexto from "@/components/ui/InputFechaTexto";
+import DateRangePickerPopover from "@/components/ui/DateRangePickerPopover";
 
 interface Props {
   filtros: FiltrosFacturasState;
@@ -29,26 +30,29 @@ export const FiltrosFacturas: React.FC<Props> = ({
     const esPendientePrevio = EsEstadoPendiente(filtros.estado);
     const esPendienteNuevo = EsEstadoPendiente(nuevoEstado);
 
-    let nuevaFecha = filtros.fechaPago;
+    let nuevaFechaIni = filtros.fechaInicio;
+    let nuevaFechaFin = filtros.fechaFin;
+    let nuevaFechaPago = filtros.fechaPago;
+
     if (!esPendienteNuevo) {
       // Limpiar al cambiar a estado no-pendiente
-      nuevaFecha = null;
-    } else if (!esPendientePrevio && esPendienteNuevo && !nuevaFecha) {
-      // Restablecer a hoy si vuelve a pendiente sin fecha capturada
-      nuevaFecha = new Date().toISOString().split("T")[0];
+      nuevaFechaIni = "";
+      nuevaFechaFin = "";
+      nuevaFechaPago = null;
+    } else if (!esPendientePrevio && esPendienteNuevo && !nuevaFechaIni) {
+      // Restablecer al mes completo por default
+      const ahora = new Date();
+      nuevaFechaIni = format(startOfMonth(ahora), "yyyy-MM-dd");
+      nuevaFechaFin = format(endOfMonth(ahora), "yyyy-MM-dd");
+      nuevaFechaPago = nuevaFechaIni;
     }
 
     onCambiarFiltros({
       ...filtros,
       estado: nuevoEstado,
-      fechaPago: nuevaFecha,
-    });
-  };
-
-  const handleFechaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onCambiarFiltros({
-      ...filtros,
-      fechaPago: e.target.value || null,
+      fechaInicio: nuevaFechaIni,
+      fechaFin: nuevaFechaFin,
+      fechaPago: nuevaFechaPago,
     });
   };
 
@@ -60,7 +64,7 @@ export const FiltrosFacturas: React.FC<Props> = ({
   };
 
   return (
-    <div className="card mb-4 p-3 sm:p-4 filter-card" style={{ position: "relative", zIndex: 10 }}>
+    <div className="card mb-4 p-3 sm:p-4 filter-card" style={{ position: "relative", zIndex: 40, overflow: "visible" }}>
       <div
         style={{
           display: "flex",
@@ -70,6 +74,7 @@ export const FiltrosFacturas: React.FC<Props> = ({
           gap: "12px",
           flexWrap: "wrap",
           width: "100%",
+          overflow: "visible",
         }}
       >
         {/* Controles de filtro a la izquierda */}
@@ -81,6 +86,7 @@ export const FiltrosFacturas: React.FC<Props> = ({
             gap: "12px",
             flexWrap: "wrap",
             flex: "1 1 auto",
+            overflow: "visible",
           }}
         >
           {/* 1.1 Filtro Estado */}
@@ -102,22 +108,24 @@ export const FiltrosFacturas: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* 1.2 Filtro Fecha de pago (Condicional) */}
+          {/* 1.2 Filtro Rango de fechas de pago (Condicional) */}
           {EsEstadoPendiente(filtros.estado) && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "3px", flex: "1 1 130px", minWidth: "120px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: "220px", position: "relative", zIndex: 50 }}>
               <label className="form-label" style={{ marginBottom: 0, fontSize: "11px", fontWeight: 600, color: "#475569" }}>
                 Fecha de pago
               </label>
-              <InputFechaTexto
-                value={filtros.fechaPago || ""}
-                onChange={(val) =>
+              <DateRangePickerPopover
+                fechaInicio={filtros.fechaInicio}
+                fechaFin={filtros.fechaFin}
+                onChangeRange={(inicio, fin) => {
                   onCambiarFiltros({
                     ...filtros,
-                    fechaPago: val || null,
-                  })
-                }
-                height="34px"
-                style={{ borderRadius: "20px" }}
+                    fechaInicio: inicio,
+                    fechaFin: fin,
+                    fechaPago: inicio,
+                  });
+                  onBuscar();
+                }}
               />
             </div>
           )}

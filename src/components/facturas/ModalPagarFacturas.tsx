@@ -548,12 +548,12 @@ export const ModalPagarFacturas: React.FC<ModalPagarFacturasProps> = ({
               {guardando ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Pagando...</span>
+                  <span>Registrando...</span>
                 </>
               ) : (
                 <>
                   <Check size={16} strokeWidth={3} />
-                  <span>Pagar</span>
+                  <span>Registrar</span>
                 </>
               )}
             </button>

@@ -8,6 +8,7 @@ import {
   FacturaSinTimbrarDto,
   PagoPendienteMasivoDto,
   ResultadoRespuestaApi,
+  FacturasResumenDto,
 } from "@/types/facturas";
 import { PaginadoResponse } from "@/types/servicios";
 
@@ -39,12 +40,14 @@ function extraerMensajeError(error: any, defaultMsg: string): string {
 export const FacturasService = {
   /**
    * 1. Listar facturas (tabla principal)
-   * GET facturas?searchTerm={texto}&empresa={texto}&estado={texto}&pagina={n}&tamano={n}&fechaInicio={yyyy-MM-dd}
-   * Nota: searchTerm, empresa y estado SIEMPRE van en la URL (incluso si estan vacíos). fechaInicio solo si tiene valor.
+   * GET facturas?searchTerm={texto}&empresa={texto}&estado={texto}&pagina={n}&tamano={n}&fechaInicio={yyyy-MM-dd}&fechaFin={yyyy-MM-dd}
    */
   async getFacturas(params: {
     estado?: string;
     fechaPago?: string | null;
+    fechaPagoFin?: string | null;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
     searchTerm?: string;
     empresa?: string;
     pagina: number;
@@ -59,8 +62,14 @@ export const FacturasService = {
         tamano: params.tamano,
       };
 
-      if (params.fechaPago && params.fechaPago.trim().length > 0) {
-        queryParams.fechaInicio = params.fechaPago.trim();
+      const inicio = (params.fechaInicio || params.fechaPago || "").trim();
+      const fin = (params.fechaFin || params.fechaPagoFin || "").trim();
+
+      if (inicio.length > 0) {
+        queryParams.fechaInicio = inicio;
+      }
+      if (fin.length > 0) {
+        queryParams.fechaFin = fin;
       }
 
       const resp = await apiClient.get<any>("facturas", { params: queryParams });
@@ -108,6 +117,53 @@ export const FacturasService = {
       pagina: params.pagina,
       tamano: params.tamano,
       totalPaginas: 1,
+    });
+  },
+
+  /**
+   * 1.1 Obtener resumen de facturas (tarjetas superiores)
+   * GET facturas/Resumen?searchTerm={texto}&empresa={texto}&estado={texto}&fechaInicio={yyyy-MM-dd}&fechaFin={yyyy-MM-dd}
+   */
+  async getFacturasResumen(params: {
+    estado?: string;
+    fechaPago?: string | null;
+    fechaPagoFin?: string | null;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
+    searchTerm?: string;
+    empresa?: string;
+  }): Promise<FacturasResumenDto> {
+    return httpDefensivo(async () => {
+      const queryParams: Record<string, string> = {
+        searchTerm: params.searchTerm ?? "",
+        empresa: params.empresa ?? "",
+        estado: params.estado ?? "",
+      };
+
+      const inicio = (params.fechaInicio || params.fechaPago || "").trim();
+      const fin = (params.fechaFin || params.fechaPagoFin || "").trim();
+
+      if (inicio.length > 0) {
+        queryParams.fechaInicio = inicio;
+      }
+      if (fin.length > 0) {
+        queryParams.fechaFin = fin;
+      }
+
+      const resp = await apiClient.get<any>("facturas/Resumen", { params: queryParams });
+      const data = resp.data;
+
+      return {
+        d_TotalPagado: Number(data?.d_TotalPagado ?? data?.TotalPagado ?? 0),
+        d_TotalPendiente: Number(data?.d_TotalPendiente ?? data?.TotalPendiente ?? 0),
+        d_TotalFacturado: Number(data?.d_TotalFacturado ?? data?.TotalFacturado ?? 0),
+        i_TotalFacturas: Number(data?.i_TotalFacturas ?? data?.TotalFacturas ?? 0),
+      };
+    }, {
+      d_TotalPagado: 0,
+      d_TotalPendiente: 0,
+      d_TotalFacturado: 0,
+      i_TotalFacturas: 0,
     });
   },
 
@@ -232,7 +288,9 @@ export const FacturasService = {
     try {
       const body = {
         i_CveFacturas: Number(payload.i_CveFacturas),
+        i_CveFactura: Number(payload.i_CveFacturas),
         v_MotivoCancelacion: payload.v_MotivoCancelacion,
+        v_Motivo: payload.v_MotivoCancelacion,
       };
       const resp = await apiClient.post("facturas/CancelarFactura", body);
       if (resp.status >= 200 && resp.status < 300) {
@@ -252,7 +310,7 @@ export const FacturasService = {
       console.error(
         "[FacturasService.cancelarFactura API ERROR]:",
         error.response?.status,
-        error.response?.data || error.message
+        JSON.stringify(error.response?.data, null, 2) || error.message
       );
       const msg = extraerMensajeError(error, "No se pudo cancelar la factura");
       return { exito: false, mensaje: msg };

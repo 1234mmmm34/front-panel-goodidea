@@ -214,7 +214,7 @@ export const TopHeader: React.FC = () => {
                   }}
                 >
                   <CreditCard size={16} style={{ color: "#2B8FCC" }} />
-                  <span>Pagar facturas</span>
+                  <span>Registrar pagos</span>
                 </button>
               </div>
             )}
