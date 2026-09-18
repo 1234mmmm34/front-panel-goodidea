@@ -16,6 +16,8 @@ import { ModalFormServicio } from "@/components/servicios/ModalFormServicio";
 import { ModalDetalleServicio } from "@/components/programacion/ModalDetalleServicio";
 import { ModalAgendaServicio } from "@/components/programacion/ModalAgendaServicio";
 import { ModalReprogramarSesion } from "@/components/programacion/ModalReprogramarSesion";
+import { ModalCancelarSesion } from "@/components/programacion/ModalCancelarSesion";
+import { ModalLineaTiempoSesiones } from "@/components/programacion/ModalLineaTiempoSesiones";
 
 import { useToast } from "@/context/ToastContext";
 
@@ -42,6 +44,8 @@ export default function ProgramacionPage() {
     searchTerm: "",
   });
   const [itemReprogramar, setItemReprogramar] = useState<AgendaGetDto | null>(null);
+  const [itemCancelar, setItemCancelar] = useState<AgendaGetDto | null>(null);
+  const [itemHistorial, setItemHistorial] = useState<AgendaGetDto | null>(null);
 
   // --- ESTADO VISTA SERVICIOS ---
   const [datosServicios, setDatosServicios] = useState<AgendaServicioGetDto[]>([]);
@@ -202,6 +206,8 @@ export default function ProgramacionPage() {
             datos={datosSesiones}
             cargando={cargando}
             onReprogramar={(item) => setItemReprogramar(item)}
+            onCancelar={(item) => setItemCancelar(item)}
+            onVerHistorial={(item) => setItemHistorial(item)}
           />
         </>
       ) : (
@@ -238,6 +244,15 @@ export default function ProgramacionPage() {
         }}
       />
 
+      {/* Modal Línea Temporal de Sesiones (Vista Sesiones) */}
+      <ModalLineaTiempoSesiones
+        abierto={!!itemHistorial}
+        iCveAgenda={itemHistorial?.i_CveAgenda ?? null}
+        iCveServAgendaDet={itemHistorial?.i_CveServAgendaDet ?? null}
+        iCveAgendaDetalleResaltar={itemHistorial?.i_CveAgendaDetalle ?? null}
+        onCerrar={() => setItemHistorial(null)}
+      />
+
       {/* Modal Reprogramar Sesión (Vista Sesiones) */}
       <ModalReprogramarSesion
         abierto={!!itemReprogramar}
@@ -247,6 +262,17 @@ export default function ProgramacionPage() {
         iCveAgendaDetalle={itemReprogramar?.i_CveAgendaDetalle ?? null}
         onReprogramacionExitosa={() => {
           setItemReprogramar(null);
+          cargarSesiones();
+        }}
+      />
+
+      {/* Modal Cancelar Sesión (Vista Sesiones) */}
+      <ModalCancelarSesion
+        abierto={!!itemCancelar}
+        item={itemCancelar}
+        onCerrar={() => setItemCancelar(null)}
+        onConfirmarExito={() => {
+          setItemCancelar(null);
           cargarSesiones();
         }}
       />

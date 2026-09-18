@@ -75,26 +75,28 @@ export const ModalCrearEditarCentro: React.FC<Props> = ({
 
     setGuardando(true);
     const payload: CentroPostPayload = {
-      i_CvePlanta: centroEditar?.i_CvePlanta,
+      i_CvePlanta: centroEditar?.i_CvePlanta ?? null,
       i_CveEmpresa: idEmpresa,
+      i_CveDomicilio: (centroEditar as any)?.i_CveDomicilio ?? null,
       v_NombrePlanta: nombrePlanta.trim(),
-      v_Siglas: siglas.trim() || undefined,
-      v_NombreCalle: calle.trim() || undefined,
-      v_NumeroExterior: numeroExt.trim() || undefined,
-      v_NumeroInterior: numeroInt.trim() || undefined,
-      v_Fraccionamiento: fraccionamiento.trim() || undefined,
-      i_CodigoPostal: codigoPostal ? Number(codigoPostal) : undefined,
+      v_SiglasPlanta: siglas.trim() || "",
+      i_TipoDomicilio: 2, // 1 = Fiscal, 2 = Centro de trabajo
+      v_NombreCalle: calle.trim() || "",
+      v_NumeroExterior: numeroExt.trim() || "",
+      v_NumeroInterior: numeroInt.trim() || "",
+      v_Fraccionamiento: fraccionamiento.trim() || "",
+      i_CodigoPostal: codigoPostal ? Number(codigoPostal) : 0,
     };
 
-    const exito = await CentrosTrabajoService.SaveCentro(payload);
+    const resp = await CentrosTrabajoService.SaveCentro(payload);
     setGuardando(false);
 
-    if (exito) {
+    if (resp.exito) {
       toast.success(centroEditar ? "Centro de trabajo actualizado." : "Centro de trabajo creado exitosamente.");
       onGuardado();
       onCerrar();
     } else {
-      toast.error("Ocurrió un error al guardar el centro de trabajo.");
+      toast.error(resp.mensaje || "Ocurrió un error al guardar el centro de trabajo.");
     }
   };
 

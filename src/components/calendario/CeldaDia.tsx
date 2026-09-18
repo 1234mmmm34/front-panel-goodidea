@@ -32,6 +32,27 @@ const getEstiloTipoServicio = (tipoServicio: string | null) => {
   }
 };
 
+const getEstiloEstatus = (cveEstatus: number | null) => {
+  if (cveEstatus === 0) {
+    return {
+      textDecoration: "line-through",
+      opacity: 0.7,
+      borderLeftColor: "#ef4444",
+      backgroundColor: "#fef2f2",
+      color: "#991b1b",
+    };
+  }
+  if (cveEstatus === 4) {
+    return {
+      opacity: 0.75,
+      borderLeftColor: "#f59e0b",
+      backgroundColor: "#fffbeb",
+      color: "#92400e",
+    };
+  }
+  return null;
+};
+
 const getPopoverStyle = (rIdx: number = 0, cIdx: number = 0): React.CSSProperties => {
   const isTopRow = rIdx <= 1;
   const isLeftEdge = cIdx <= 1;
@@ -161,7 +182,10 @@ const CeldaDiaComponent: React.FC<Props> = ({
 
       <div className="eventos-lista">
         {visibles.map((ev, idx) => {
-          const estilo = getEstiloTipoServicio(ev.v_TipoServicio);
+          const estiloTipo = getEstiloTipoServicio(ev.v_TipoServicio);
+          const estiloEstatus = getEstiloEstatus(ev.i_CveEstatus);
+          const estilo = estiloEstatus ? { ...estiloTipo, ...estiloEstatus } : estiloTipo;
+
           const evKey = ev.i_CveAgendaDetalle
             ? `det_${ev.i_CveAgendaDetalle}`
             : `ag_${ev.i_CveAgenda}_${idx}`;
@@ -180,12 +204,19 @@ const CeldaDiaComponent: React.FC<Props> = ({
               style={{
                 borderLeftColor: estilo.borderLeftColor,
                 backgroundColor: estilo.backgroundColor,
+                opacity: (estilo as any).opacity ?? 1,
                 cursor: "pointer",
               }}
               onMouseEnter={() => handleMouseEnterPill(ev)}
               onClick={(e) => handlePillClick(ev, e)}
             >
-              <span className="evento-titulo" style={{ color: estilo.color }}>
+              <span
+                className="evento-titulo"
+                style={{
+                  color: estilo.color,
+                  textDecoration: (estilo as any).textDecoration || "none",
+                }}
+              >
                 {formatearHora(ev.d_FechaInicio)} {ev.v_Servicio}
               </span>
 
@@ -243,7 +274,7 @@ const CeldaDiaComponent: React.FC<Props> = ({
                   <div className="flex flex-col gap-2">
                     {restantes.map((ev, i) => {
                       const resKey = ev.i_CveAgendaDetalle
-                        ? `det_rest_${ev.i_CveAgendaDetalle}`
+                        ? `det_rest_${ev.i_CveAgendaDetalle}_${i}`
                         : `ag_rest_${ev.i_CveAgenda}_${i}`;
                       return (
                         <PopoverEvento

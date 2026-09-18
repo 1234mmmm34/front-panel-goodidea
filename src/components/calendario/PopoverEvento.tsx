@@ -13,6 +13,19 @@ interface Props {
   onReprogramarExitoso?: () => void;
 }
 
+const renderBadgeEstatus = (cve: number | null) => {
+  if (cve === 0) {
+    return <span style={{ padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700, backgroundColor: "#ef4444", color: "#ffffff" }}>Cancelado</span>;
+  }
+  if (cve === 4) {
+    return <span style={{ padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700, backgroundColor: "#f59e0b", color: "#ffffff" }}>Reprogramado</span>;
+  }
+  if (cve === 3) {
+    return <span style={{ padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700, backgroundColor: "#10b981", color: "#ffffff" }}>Terminado</span>;
+  }
+  return null;
+};
+
 export const PopoverEvento: React.FC<Props> = ({ evento, onCerrar, onReprogramarExitoso }) => {
   const [modalReprogramarAbierto, setModalReprogramarAbierto] = useState<boolean>(false);
 
@@ -32,7 +45,10 @@ export const PopoverEvento: React.FC<Props> = ({ evento, onCerrar, onReprogramar
       <div className="popover-card" onClick={(e) => e.stopPropagation()}>
         <div className="popover-header">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-            <BadgeTipoServicio tipoServicio={evento.v_TipoServicio} />
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+              <BadgeTipoServicio tipoServicio={evento.v_TipoServicio} />
+              {renderBadgeEstatus(evento.i_CveEstatus)}
+            </div>
             {onCerrar && (
               <button
                 type="button"
@@ -88,21 +104,53 @@ export const PopoverEvento: React.FC<Props> = ({ evento, onCerrar, onReprogramar
 
         {/* Botón Acción Reprogramar en Tooltip */}
         <div className="popover-footer">
-          <button
-            type="button"
-            className="btn-reprogramar-popover"
-            title="Reprogramar sesión"
-            onClick={handleOpenReprogramar}
-            style={{
-              cursor: "pointer",
-              backgroundColor: "#fffbeb",
-              borderColor: "#f59e0b",
-              color: "#b45309",
-            }}
-          >
-            <RefreshCw size={13} />
-            <span>Reprogramar sesión</span>
-          </button>
+          {evento.i_CveEstatus === 0 ? (
+            <button
+              type="button"
+              className="btn-reprogramar-popover"
+              disabled
+              style={{
+                cursor: "not-allowed",
+                backgroundColor: "#fef2f2",
+                borderColor: "#fecaca",
+                color: "#991b1b",
+                opacity: 0.8,
+              }}
+            >
+              <span>Sesión Cancelada</span>
+            </button>
+          ) : evento.i_CveEstatus === 4 ? (
+            <button
+              type="button"
+              className="btn-reprogramar-popover"
+              disabled
+              style={{
+                cursor: "not-allowed",
+                backgroundColor: "#fffbeb",
+                borderColor: "#fde68a",
+                color: "#b45309",
+                opacity: 0.8,
+              }}
+            >
+              <span>Sesión Reprogramada</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-reprogramar-popover"
+              title="Reprogramar sesión"
+              onClick={handleOpenReprogramar}
+              style={{
+                cursor: "pointer",
+                backgroundColor: "#fffbeb",
+                borderColor: "#f59e0b",
+                color: "#b45309",
+              }}
+            >
+              <RefreshCw size={13} />
+              <span>Reprogramar sesión</span>
+            </button>
+          )}
         </div>
 
         <style jsx>{`

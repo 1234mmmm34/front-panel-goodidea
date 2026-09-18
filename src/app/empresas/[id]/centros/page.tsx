@@ -190,10 +190,31 @@ export default function CentrosTrabajoPage({ params }: PageProps) {
               ))
             ) : datos.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center py-10 text-slate-500">
-                  <Building2 size={32} className="mx-auto text-slate-300 mb-2" />
-                  <p className="font-medium text-slate-700 text-xs">No se encontraron centros de trabajo</p>
-                  <p className="text-[11px] text-slate-400">Registra un nuevo centro usando el botón superior.</p>
+                <td colSpan={4} style={{ textAlign: "center", padding: "48px 16px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                    <div
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "50%",
+                        backgroundColor: "#f1f5f9",
+                        border: "1px solid #e2e8f0",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#94a3b8",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      <Building2 size={22} />
+                    </div>
+                    <p style={{ fontSize: "13px", fontWeight: 600, color: "#334155", margin: 0 }}>
+                      No se encontraron centros de trabajo
+                    </p>
+                    <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                      Registra un nuevo centro usando el botón superior "Nuevo centro".
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (

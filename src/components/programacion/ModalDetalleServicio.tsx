@@ -16,8 +16,10 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  Ban,
 } from "lucide-react";
 import { ModalReprogramarSesion } from "./ModalReprogramarSesion";
+import { ModalCancelarSesion } from "./ModalCancelarSesion";
 import {
   AgendaDetalleGetDto,
   AgendaDetalleUpdateDto,
@@ -59,6 +61,10 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   // Reprogramar sesión modal state
   const [modalReprogramarAbierto, setModalReprogramarAbierto] = useState<boolean>(false);
   const [sesionAReprogramarId, setSesionAReprogramarId] = useState<number | null>(null);
+
+  // Cancelar sesión modal state
+  const [modalCancelarAbierto, setModalCancelarAbierto] = useState<boolean>(false);
+  const [sesionACancelar, setSesionACancelar] = useState<SesionDetalleDto | null>(null);
 
   // Estados locales editables
   const [cotizacionGI, setCotizacionGI] = useState<string>("");
@@ -213,6 +219,29 @@ export const ModalDetalleServicio: React.FC<Props> = ({
 
   // Badges de Estado
   const renderBadgeSesion = (sesion: SesionDetalleDto) => {
+    const bCancelada = Boolean(
+      sesion.b_Cancelada ||
+      (sesion as any).b_cancelada ||
+      (sesion as any).bCancelada
+    );
+
+    if (bCancelada) {
+      return (
+        <span
+          style={{
+            padding: "3px 14px",
+            borderRadius: "20px",
+            fontSize: "12px",
+            fontWeight: 700,
+            backgroundColor: "#ef4444",
+            color: "#ffffff",
+            display: "inline-block",
+          }}
+        >
+          Cancelado
+        </span>
+      );
+    }
     const iCveReprograma =
       sesion.i_CveReprograma ??
       (sesion as any).i_cveReprograma ??
@@ -507,12 +536,19 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                         <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>No hay sesiones registradas.</p>
                       ) : (
                         listaSesiones.map((sesion, sIdx) => {
+                          const bCancelada = Boolean(
+                            sesion.b_Cancelada ||
+                            (sesion as any).b_cancelada ||
+                            (sesion as any).bCancelada
+                          );
+
                           const iCveReprograma =
                             sesion.i_CveReprograma ??
                             (sesion as any).i_cveReprograma ??
                             (sesion as any).iCveReprograma;
                           const esReprogramada = iCveReprograma != null && Number(iCveReprograma) > 0;
 
+                          const esExpandible = esReprogramada || (bCancelada && Boolean(sesion.v_MotivoCancelacion));
                           const estaAbierto = sesionAbiertaIdx === sIdx;
                           const sesionNueva = esReprogramada
                             ? listaSesiones.find((s) => s.i_CveAgendaDetalle === iCveReprograma)
@@ -532,11 +568,11 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "space-between",
-                                  cursor: esReprogramada ? "pointer" : "default",
+                                  cursor: esExpandible ? "pointer" : "default",
                                   gap: "12px",
                                 }}
                                 onClick={() => {
-                                  if (esReprogramada) {
+                                  if (esExpandible) {
                                     setSesionAbiertaIdx(estaAbierto ? null : sIdx);
                                   }
                                 }}
@@ -574,52 +610,103 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                                   )}
                                   {renderBadgeSesion(sesion)}
                                   {!esReprogramada && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm"
-                                      title="Reprogramar esta sesión"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSesionAReprogramarId(sesion.i_CveAgendaDetalle);
-                                        setModalReprogramarAbierto(true);
-                                      }}
-                                      style={{
-                                        height: "26px",
-                                        fontSize: "11px",
-                                        padding: "0 8px",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "4px",
-                                        borderRadius: "4px",
-                                        border: "1px solid #d97706",
-                                        color: "#d97706",
-                                        backgroundColor: "#fffbeb",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      <RefreshCw size={12} />
-                                      <span>Reprogramar</span>
-                                    </button>
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn-icon"
+                                        title="Reprogramar esta sesión"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSesionAReprogramarId(sesion.i_CveAgendaDetalle);
+                                          setModalReprogramarAbierto(true);
+                                        }}
+                                        style={{
+                                          padding: "4px",
+                                          border: "none",
+                                          background: "transparent",
+                                          color: "#d97706",
+                                          cursor: "pointer",
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                        }}
+                                      >
+                                        <RefreshCw size={15} />
+                                      </button>
+
+                                      {bCancelada ? (
+                                        <button
+                                          type="button"
+                                          className="btn-icon"
+                                          title="Esta sesión ya se encuentra cancelada"
+                                          disabled
+                                          onClick={(e) => e.stopPropagation()}
+                                          style={{
+                                            padding: "4px",
+                                            border: "none",
+                                            background: "transparent",
+                                            color: "#cbd5e1",
+                                            cursor: "not-allowed",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            opacity: 0.6,
+                                          }}
+                                        >
+                                          <Ban size={15} />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          className="btn-icon"
+                                          title="Cancelar esta sesión"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSesionACancelar(sesion);
+                                            setModalCancelarAbierto(true);
+                                          }}
+                                          style={{
+                                            padding: "4px",
+                                            border: "none",
+                                            background: "transparent",
+                                            color: "#ef4444",
+                                            cursor: "pointer",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                          }}
+                                        >
+                                          <Ban size={15} />
+                                        </button>
+                                      )}
+                                    </>
                                   )}
-                                  {esReprogramada && (
+                                  {esExpandible && (
                                     estaAbierto ? <ChevronUp size={14} style={{ color: "#94a3b8" }} /> : <ChevronDown size={14} style={{ color: "#94a3b8" }} />
                                   )}
                                 </div>
                               </div>
 
-                              {esReprogramada && estaAbierto && (
+                              {esExpandible && estaAbierto && (
                                 <div style={{ padding: "12px", backgroundColor: "#f8fafc", fontSize: "12px", borderTop: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: "6px" }}>
-                                  <div style={{ padding: "10px", backgroundColor: "#fffbeb", border: "1px solid #fde68a", borderRadius: "6px", color: "#92400e", display: "flex", flexDirection: "column", gap: "4px", fontSize: "11px" }}>
-                                    <span style={{ fontWeight: 500, color: "#b45309" }}>Detalles de Reprogramación:</span>
-                                    {sesion.v_Observaciones && <span>• Motivo: {sesion.v_Observaciones}</span>}
-                                    {sesion.v_Contacto && <span>• Solicitado por: {sesion.v_Contacto}</span>}
-                                    {sesionNueva && (
-                                      <span>
-                                        • Nueva Fecha: <strong>{formatearFechaCorta(sesionNueva.d_FechaHoraInicio)}</strong>
-                                      </span>
-                                    )}
-                                  </div>
+                                  {esReprogramada && (
+                                    <div style={{ padding: "10px", backgroundColor: "#fffbeb", border: "1px solid #fde68a", borderRadius: "6px", color: "#92400e", display: "flex", flexDirection: "column", gap: "4px", fontSize: "11px" }}>
+                                      <span style={{ fontWeight: 500, color: "#b45309" }}>Detalles de Reprogramación:</span>
+                                      {sesion.v_Observaciones && <span>• Motivo: {sesion.v_Observaciones}</span>}
+                                      {sesion.v_Contacto && <span>• Solicitado por: {sesion.v_Contacto}</span>}
+                                      {sesionNueva && (
+                                        <span>
+                                          • Nueva Fecha: <strong>{formatearFechaCorta(sesionNueva.d_FechaHoraInicio)}</strong>
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {bCancelada && sesion.v_MotivoCancelacion && (
+                                    <div style={{ padding: "10px", backgroundColor: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", color: "#991b1b", display: "flex", flexDirection: "column", gap: "4px", fontSize: "11px" }}>
+                                      <span style={{ fontWeight: 500, color: "#991b1b" }}>Detalles de Cancelación:</span>
+                                      <span>• Motivo: {sesion.v_MotivoCancelacion}</span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1083,6 +1170,24 @@ export const ModalDetalleServicio: React.FC<Props> = ({
         iCveServAgendaDet={iCveServAgendaDet}
         iCveAgendaDetalle={sesionAReprogramarId}
         onReprogramacionExitosa={() => {
+          cargarDetalle();
+          if (onGuardadoExitoso) onGuardadoExitoso();
+        }}
+      />
+      {/* Modal Cancelar Sesión */}
+      <ModalCancelarSesion
+        abierto={modalCancelarAbierto}
+        iCveAgendaDetalle={sesionACancelar?.i_CveAgendaDetalle ?? null}
+        empresaNombre={detalle?.v_Empresa}
+        servicioNombre={detalle?.v_Servicio}
+        fechaInicio={sesionACancelar?.d_FechaHoraInicio}
+        onCerrar={() => {
+          setModalCancelarAbierto(false);
+          setSesionACancelar(null);
+        }}
+        onConfirmarExito={() => {
+          setModalCancelarAbierto(false);
+          setSesionACancelar(null);
           cargarDetalle();
           if (onGuardadoExitoso) onGuardadoExitoso();
         }}

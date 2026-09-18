@@ -205,7 +205,7 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                             <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
                               {items.map((item: string, iIdx: number) => (
                                 <React.Fragment key={`ent-txt-${iIdx}`}>
-                                  <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>{item}</span>
+                                  <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }}>{item}</span>
                                   {iIdx < items.length - 1 && <span className="text-slate-400 text-xs">, </span>}
                                 </React.Fragment>
                               ))}
@@ -240,7 +240,8 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                         partes.push(
                           <button
                             key={`ent-group-${key}`}
-                            className="text-blue-600 underline font-medium hover:text-blue-800 cursor-pointer text-xs text-left"
+                            className="text-blue-600 underline font-medium hover:text-blue-800 cursor-pointer text-xs text-left whitespace-nowrap"
+                            style={{ whiteSpace: "nowrap" }}
                             onClick={() => VerDocumento(key)}
                             title={`Ver documento: ${labelText}`}
                           >
@@ -252,7 +253,7 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                       // 2. Entregados sin v_Key -> texto plano negro
                       entregadosSinKey.forEach((nombre, idx) => {
                         partes.push(
-                          <span key={`ent-nokey-${idx}`} className="text-slate-800 text-xs font-normal">
+                          <span key={`ent-nokey-${idx}`} className="text-slate-800 text-xs font-normal whitespace-nowrap" style={{ whiteSpace: "nowrap" }}>
                             {nombre}
                           </span>
                         );
@@ -261,7 +262,7 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                       // 3. Pendientes (b_Entregado = false) -> texto rojo
                       pendientes.forEach((item, idx) => {
                         partes.push(
-                          <span key={`ent-pend-${idx}`} style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>
+                          <span key={`ent-pend-${idx}`} style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }} className="whitespace-nowrap">
                             {item.v_Nombre}
                           </span>
                         );

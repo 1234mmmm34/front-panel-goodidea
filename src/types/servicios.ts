@@ -62,6 +62,8 @@ export interface SesionDetalleDto {
   b_TipoProvInsApoyo: boolean | null;
   i_CveArea: number;
   v_NombreArea: string;
+  b_Cancelada?: boolean;
+  v_MotivoCancelacion?: string | null;
 }
 
 export interface EntregableDetalleDto {

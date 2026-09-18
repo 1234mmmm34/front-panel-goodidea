@@ -490,4 +490,21 @@ export const AgendaService = {
 
     return { exito: false, mensaje: ultimoMensaje };
   },
+
+  /**
+   * Cancela una sesión por i_CveAgendaDetalle.
+   * Endpoint: PUT agenda/CancelarSesion/{i_CveAgendaDetalle}
+   */
+  async cancelarSesion(iCveAgendaDetalle: number, motivo: string): Promise<boolean> {
+    try {
+      const resp = await apiClient.put(`agenda/CancelarSesion/${iCveAgendaDetalle}`, {
+        v_MotivoCancelacion: motivo,
+      });
+      return resp.status >= 200 && resp.status < 300;
+    } catch (err) {
+      console.error("Error al cancelar sesión:", err);
+      return false;
+    }
+  },
 };
+

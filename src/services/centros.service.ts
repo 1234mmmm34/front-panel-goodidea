@@ -21,14 +21,16 @@ export interface AreaSavePayload {
 }
 
 export interface CentroPostPayload {
-  i_CvePlanta?: number;
+  i_CvePlanta?: number | null;
   i_CveEmpresa: number;
+  i_CveDomicilio?: number | null;
   v_NombrePlanta: string;
-  v_Siglas?: string;
-  v_NombreCalle?: string;
-  v_NumeroExterior?: string;
-  v_NumeroInterior?: string;
-  v_Fraccionamiento?: string;
+  v_SiglasPlanta?: string | null;
+  i_TipoDomicilio?: number;   // 1 = Fiscal, 2 = Centro de trabajo
+  v_NombreCalle?: string | null;
+  v_NumeroInterior?: string | null;
+  v_NumeroExterior?: string | null;
+  v_Fraccionamiento?: string | null;
   i_CodigoPostal?: number;
   [key: string]: any;
 }
@@ -70,17 +72,47 @@ export const CentrosTrabajoService = {
     }, false);
   },
 
-  /**
-   * Guardar / Crear / Editar centro de trabajo
-   * POST centros o POST centros/editar
-   */
-  async SaveCentro(payload: CentroPostPayload): Promise<boolean> {
-    return httpDefensivo(async () => {
-      const isEdit = payload.i_CvePlanta && payload.i_CvePlanta > 0;
-      const url = isEdit ? "centros/editar" : "centros";
-      const resp = await apiClient.post(url, payload);
-      return resp.status >= 200 && resp.status < 300;
-    }, false);
+  async SaveCentro(payload: CentroPostPayload): Promise<{ exito: boolean; mensaje?: string }> {
+    const isEdit = payload.i_CvePlanta && payload.i_CvePlanta > 0;
+    const url = isEdit ? "centros/editar" : "centros";
+
+    const body = {
+      i_CvePlanta: payload.i_CvePlanta ? Number(payload.i_CvePlanta) : null,
+      i_CveEmpresa: Number(payload.i_CveEmpresa) || 0,
+      i_CveDomicilio: payload.i_CveDomicilio ? Number(payload.i_CveDomicilio) : null,
+      v_NombrePlanta: (payload.v_NombrePlanta || "").trim(),
+      v_SiglasPlanta: (payload.v_SiglasPlanta || payload.v_Siglas || "").trim(),
+      i_TipoDomicilio: payload.i_TipoDomicilio ?? 2, // 1 = Fiscal, 2 = Centro de trabajo
+      v_NombreCalle: (payload.v_NombreCalle || "").trim(),
+      v_NumeroInterior: (payload.v_NumeroInterior || "").trim(),
+      v_NumeroExterior: (payload.v_NumeroExterior || "").trim(),
+      v_Fraccionamiento: (payload.v_Fraccionamiento || "").trim(),
+      i_CodigoPostal: payload.i_CodigoPostal ? Number(payload.i_CodigoPostal) : 0,
+      v_Siglas: (payload.v_SiglasPlanta || payload.v_Siglas || "").trim(),
+    };
+
+    try {
+      const resp = await apiClient.post(url, body);
+      if (resp.status >= 200 && resp.status < 300) {
+        return { exito: true };
+      }
+      return { exito: false, mensaje: "No se pudo procesar la solicitud en el servidor." };
+    } catch (err: any) {
+      console.warn(`[CentrosService] SaveCentro fallo en ${url}:`, err?.response?.data || err?.message);
+      let msg = "";
+      if (err?.response?.data) {
+        const data = err.response.data;
+        if (typeof data === "string") msg = data;
+        else if (data.mensaje || data.Mensaje || data.message || data.Message) msg = data.mensaje || data.Mensaje || data.message || data.Message;
+        else if (data.title && data.title !== "One or more validation errors occurred.") msg = data.title;
+        else if (data.errors) {
+          msg = Object.entries(data.errors)
+            .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`)
+            .join(" | ");
+        }
+      }
+      return { exito: false, mensaje: msg || "Ocurrió un error al intentar guardar el centro de trabajo." };
+    }
   },
 
   /**

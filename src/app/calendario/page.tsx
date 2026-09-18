@@ -30,7 +30,11 @@ export default function CalendarioPage() {
     const fin = format(endOfMonth(fechaMes), "yyyy-MM-dd");
 
     const datos = await AgendaService.getAgendaMes(inicio, fin);
-    setEventos(datos);
+    // Filtrar únicamente sesiones vigentes (excluir Canceladas: 0 y Reprogramadas: 4)
+    const vigentes = datos.filter(
+      (ev) => ev.i_CveEstatus !== 0 && ev.i_CveEstatus !== 4
+    );
+    setEventos(vigentes);
     setCargando(false);
   };
 

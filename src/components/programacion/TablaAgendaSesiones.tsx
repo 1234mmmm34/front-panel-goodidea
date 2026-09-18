@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Ban, Eye } from "lucide-react";
 import { AgendaGetDto } from "@/types/calendario";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
 import { isToday, isSameDay, addDays, format } from "date-fns";
@@ -12,6 +12,8 @@ interface Props {
   datos: AgendaGetDto[];
   cargando: boolean;
   onReprogramar: (item: AgendaGetDto) => void;
+  onCancelar?: (item: AgendaGetDto) => void;
+  onVerHistorial?: (item: AgendaGetDto) => void;
 }
 
 function formatearFechaSesion(fechaStr: string | null): { texto: string; esHoy: boolean } {
@@ -69,6 +71,8 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
   datos,
   cargando,
   onReprogramar,
+  onCancelar,
+  onVerHistorial,
 }) => {
   return (
     <div className="alegra-table-container">
@@ -203,8 +207,20 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
                   </td>
 
                   {/* 10. Acciones */}
-                  <td className="text-center">
-                    <div className="flex items-center justify-center">
+                  <td className="text-center whitespace-nowrap" style={{ width: "110px", minWidth: "110px" }}>
+                    <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "6px", flexWrap: "nowrap" }}>
+                      {onVerHistorial && (
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          onClick={() => onVerHistorial(item)}
+                          title="Sesiones"
+                          style={{ color: "#188ae2" }}
+                        >
+                          <Eye size={16} />
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         className="btn-icon"
@@ -214,6 +230,30 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
                       >
                         <RefreshCw size={16} />
                       </button>
+
+                      {(() => {
+                        const esDeshabilitado = item.i_CveEstatus === 0 || item.i_CveEstatus === 4;
+                        let titleText = "Cancelar sesión";
+                        if (item.i_CveEstatus === 0) titleText = "Sesión cancelada";
+                        if (item.i_CveEstatus === 4) titleText = "Sesión reprogramada";
+
+                        return (
+                          <button
+                            type="button"
+                            className={`btn-icon ${esDeshabilitado ? "opacity-40 cursor-not-allowed" : ""}`}
+                            onClick={() => {
+                              if (!esDeshabilitado && onCancelar) {
+                                onCancelar(item);
+                              }
+                            }}
+                            disabled={esDeshabilitado}
+                            title={titleText}
+                            style={{ color: esDeshabilitado ? "#94a3b8" : "#dc3545" }}
+                          >
+                            <Ban size={16} />
+                          </button>
+                        );
+                      })()}
                     </div>
                   </td>
                 </tr>
