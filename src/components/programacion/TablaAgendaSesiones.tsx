@@ -143,7 +143,7 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
 
               return (
                 <tr
-                  key={item.i_CveAgendaDetalle || item.i_CveAgenda || idx}
+                  key={`sesion-${item.i_CveAgendaDetalle || 'det'}-${item.i_CveAgenda || 'ag'}-${idx}`}
                   style={esHoy ? { backgroundColor: "#eef6fd" } : undefined}
                 >
                   {/* 1. Fecha inicio */}

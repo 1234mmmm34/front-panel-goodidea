@@ -523,7 +523,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                             .join(", ");
 
                           return (
-                            <div key={sesion.i_CveAgendaDetalle || sIdx} style={{ border: "1px solid #e2e8f0", borderRadius: "6px", overflow: "hidden" }}>
+                            <div key={`det-sesion-${sesion.i_CveAgendaDetalle || 'det'}-${sIdx}`} style={{ border: "1px solid #e2e8f0", borderRadius: "6px", overflow: "hidden" }}>
                               <div
                                 style={{
                                   minHeight: "38px",
@@ -684,9 +684,9 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                           <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>No hay alumnos inscritos en este servicio.</p>
                         ) : (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                            {alumnos.map((alumno) => (
+                            {alumnos.map((alumno, aIdx) => (
                               <div
-                                key={alumno.i_CveAlumnoAgenda}
+                                key={`alum-${alumno.i_CveAlumnoAgenda || 'x'}-${aIdx}`}
                                 style={{
                                   display: "inline-flex",
                                   alignItems: "center",
@@ -897,7 +897,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                         </thead>
                         <tbody style={{ fontFamily: "var(--font-mono)" }}>
                           {facturas.map((f, idx) => (
-                            <tr key={f.i_CveFacturas || idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <tr key={`fact-${f.i_CveFacturas || 'x'}-${idx}`} style={{ borderBottom: "1px solid #f1f5f9" }}>
                               <td style={{ padding: "8px 12px", fontWeight: 400 }}>{f.v_NoFactura || "Sin número"}</td>
                               <td style={{ padding: "8px 12px", fontWeight: 400 }}>
                                 {f.d_FechaHora ? (
@@ -944,7 +944,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                       const keyArchivo = ent.v_Key || (ent.i_CveArchivo ? String(ent.i_CveArchivo) : null);
                       return (
                         <div
-                          key={ent.i_CveAgendaEntregables || idx}
+                          key={`ent-${ent.i_CveAgendaEntregables || 'x'}-${idx}`}
                           style={{
                             display: "flex",
                             alignItems: "center",
