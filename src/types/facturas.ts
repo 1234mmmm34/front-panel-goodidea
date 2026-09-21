@@ -18,7 +18,7 @@ export interface FacturaGetDto {
 }
 
 export interface FiltrosFacturasState {
-  estado: string; // "" (Todos), "Pendientes", "Abonada", "Cobrada", "SinProgramar", "Canceladas"
+  estado: string; // "" (Todos), "Pendientes", "Vencidas", "Abonada", "Cobrada", "SinProgramar", "Canceladas"
   fechaInicio: string;
   fechaFin: string;
   fechaPago?: string | null; // "yyyy-MM-dd"

@@ -102,9 +102,11 @@ export const FiltrosFacturas: React.FC<Props> = ({
             >
               <option value="">Todos</option>
               <option value="Pendientes">Pendientes de cobro</option>
+              <option value="Vencidas">Vencidas</option>
               <option value="Abonada">Abonada</option>
               <option value="Cobrada">Liquidada</option>
               <option value="SinProgramar">Sin pago programado</option>
+              <option value="Canceladas">Canceladas</option>
             </select>
           </div>
 

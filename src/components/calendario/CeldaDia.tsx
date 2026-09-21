@@ -53,40 +53,37 @@ const getEstiloEstatus = (cveEstatus: number | null) => {
   return null;
 };
 
-const getPopoverStyle = (rIdx: number = 0, cIdx: number = 0): React.CSSProperties => {
-  const isTopRow = rIdx <= 1;
-  const isLeftEdge = cIdx <= 1;
-  const isRightEdge = cIdx >= 5;
+const computeFixedPos = (el: HTMLElement | null): React.CSSProperties => {
+  if (!el || typeof window === "undefined") return { display: "none" };
+  const rect = el.getBoundingClientRect();
+  const popoverWidth = 310;
+  const estimatedHeight = 260;
+  const winWidth = window.innerWidth;
+  const winHeight = window.innerHeight;
 
-  const style: React.CSSProperties = {
-    position: "absolute",
+  let top: number;
+  if (rect.bottom + estimatedHeight + 10 <= winHeight) {
+    top = rect.bottom + 6;
+  } else if (rect.top - estimatedHeight - 10 >= 0) {
+    top = rect.top - estimatedHeight - 6;
+  } else {
+    top = Math.max(12, Math.min(rect.bottom + 6, winHeight - estimatedHeight - 12));
+  }
+
+  let left = rect.left + rect.width / 2 - popoverWidth / 2;
+  if (left < 12) left = 12;
+  if (left + popoverWidth > winWidth - 12) {
+    left = winWidth - popoverWidth - 12;
+  }
+
+  return {
+    position: "fixed",
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${popoverWidth}px`,
     zIndex: 999999,
     pointerEvents: "auto",
   };
-
-  if (isTopRow) {
-    style.top = "calc(100% + 4px)";
-    style.bottom = "auto";
-  } else {
-    style.bottom = "calc(100% + 4px)";
-    style.top = "auto";
-  }
-
-  if (isLeftEdge) {
-    style.left = "0px";
-    style.right = "auto";
-    style.transform = "none";
-  } else if (isRightEdge) {
-    style.right = "0px";
-    style.left = "auto";
-    style.transform = "none";
-  } else {
-    style.left = "50%";
-    style.right = "auto";
-    style.transform = "translateX(-50%)";
-  }
-
-  return style;
 };
 
 const CeldaDiaComponent: React.FC<Props> = ({
@@ -95,59 +92,82 @@ const CeldaDiaComponent: React.FC<Props> = ({
   eventoSeleccionado,
   onSeleccionarEvento,
   onReprogramarExitoso,
-  rowIndex = 0,
-  colIndex = 0,
 }) => {
-  const [eventoHover, setEventoHover] = useState<AgendaGetDto | null>(null);
-  const [hoverMasEvents, setHoverMasEvents] = useState<boolean>(false);
+  const [popoverAnchor, setPopoverAnchor] = useState<{
+    ev: AgendaGetDto;
+    el: HTMLElement;
+  } | null>(null);
 
-  const masTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [popoverMasAnchor, setPopoverMasAnchor] = useState<{
+    el: HTMLElement;
+  } | null>(null);
 
-  const handleMouseEnterPill = (ev: AgendaGetDto) => {
-    if (onSeleccionarEvento) {
-      onSeleccionarEvento(ev);
-    } else {
-      setEventoHover(ev);
-    }
+  const hoverTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnterPill = (ev: AgendaGetDto, e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setPopoverAnchor({ ev, el });
+    }, 140);
   };
 
-  const handlePillClick = (ev: AgendaGetDto, e: React.MouseEvent) => {
+  const handleMouseLeavePill = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  };
+
+  const handlePillClick = (ev: AgendaGetDto, e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    if (onSeleccionarEvento) {
-      const prevId = eventoSeleccionado?.i_CveAgendaDetalle || eventoSeleccionado?.i_CveAgenda;
-      const currentId = ev.i_CveAgendaDetalle || ev.i_CveAgenda;
-      onSeleccionarEvento(prevId === currentId ? null : ev);
-    } else {
-      setEventoHover((prev) => {
-        if (!prev) return ev;
-        const prevId = prev.i_CveAgendaDetalle || prev.i_CveAgenda;
-        const currentId = ev.i_CveAgendaDetalle || ev.i_CveAgenda;
-        return prevId === currentId ? null : ev;
-      });
-    }
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    const el = e.currentTarget;
+    setPopoverAnchor((prev) => {
+      if (
+        prev &&
+        (prev.ev.i_CveAgendaDetalle === ev.i_CveAgendaDetalle &&
+          prev.ev.i_CveAgenda === ev.i_CveAgenda)
+      ) {
+        return null;
+      }
+      return { ev, el };
+    });
   };
 
   const handleCerrarPopover = () => {
-    if (onSeleccionarEvento) {
-      onSeleccionarEvento(null);
-    }
-    setEventoHover(null);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    setPopoverAnchor(null);
+    if (onSeleccionarEvento) onSeleccionarEvento(null);
   };
 
-  const handleMouseEnterMas = () => {
-    if (masTimerRef.current) clearTimeout(masTimerRef.current);
-    setHoverMasEvents(true);
+  const handleMouseEnterMas = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setPopoverMasAnchor({ el });
+    }, 140);
   };
 
   const handleMouseLeaveMas = () => {
-    masTimerRef.current = setTimeout(() => {
-      setHoverMasEvents(false);
-    }, 400);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
   };
 
-  const handleMouseEnterPopoverMas = () => {
-    if (masTimerRef.current) clearTimeout(masTimerRef.current);
-  };
+  // Escuchar clics fuera para cerrar popovers activos
+  React.useEffect(() => {
+    if (!popoverAnchor && !popoverMasAnchor) return;
+    const handleOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        !target.closest(".popover-card") &&
+        !target.closest(".popover-card-mas") &&
+        !target.closest(".evento-pill") &&
+        !target.closest(".btn-mas-wrapper")
+      ) {
+        setPopoverAnchor(null);
+        setPopoverMasAnchor(null);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [popoverAnchor, popoverMasAnchor]);
 
   // Ordenar eventos por fecha de inicio ascendente
   const eventosOrdenados = React.useMemo(() => {
@@ -163,10 +183,6 @@ const CeldaDiaComponent: React.FC<Props> = ({
   const restantes = eventosOrdenados.slice(maxVisibles);
 
   const diaNumero = celda.fecha.getDate();
-
-  const isTopRow = rowIndex <= 1;
-  const popoverPosClass = isTopRow ? "pos-below" : "pos-above";
-  const popoverStyle = getPopoverStyle(rowIndex, colIndex);
 
   return (
     <div
@@ -190,13 +206,6 @@ const CeldaDiaComponent: React.FC<Props> = ({
             ? `det_${ev.i_CveAgendaDetalle}`
             : `ag_${ev.i_CveAgenda}_${idx}`;
 
-          const activeEv = eventoSeleccionado !== undefined ? eventoSeleccionado : eventoHover;
-          const isHovered = activeEv
-            ? (activeEv.i_CveAgendaDetalle
-                ? activeEv.i_CveAgendaDetalle === ev.i_CveAgendaDetalle
-                : activeEv.i_CveAgenda === ev.i_CveAgenda)
-            : false;
-
           return (
             <div
               key={evKey}
@@ -207,7 +216,8 @@ const CeldaDiaComponent: React.FC<Props> = ({
                 opacity: (estilo as any).opacity ?? 1,
                 cursor: "pointer",
               }}
-              onMouseEnter={() => handleMouseEnterPill(ev)}
+              onMouseEnter={(e) => handleMouseEnterPill(ev, e)}
+              onMouseLeave={handleMouseLeavePill}
               onClick={(e) => handlePillClick(ev, e)}
             >
               <span
@@ -219,54 +229,75 @@ const CeldaDiaComponent: React.FC<Props> = ({
               >
                 {formatearHora(ev.d_FechaInicio)} {ev.v_Servicio}
               </span>
-
-              {isHovered && (
-                <div
-                  className={`popover-wrapper ${popoverPosClass}`}
-                  style={popoverStyle}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <PopoverEvento
-                    evento={ev}
-                    onCerrar={handleCerrarPopover}
-                    onReprogramarExitoso={() => {
-                      handleCerrarPopover();
-                      if (onReprogramarExitoso) onReprogramarExitoso();
-                    }}
-                  />
-                </div>
-              )}
             </div>
           );
         })}
 
+        {/* Popover flotante con posición fija viewport para el evento individual */}
+        {popoverAnchor && (
+          <div
+            style={computeFixedPos(popoverAnchor.el)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PopoverEvento
+              evento={popoverAnchor.ev}
+              onCerrar={handleCerrarPopover}
+              onReprogramarExitoso={() => {
+                handleCerrarPopover();
+                if (onReprogramarExitoso) onReprogramarExitoso();
+              }}
+            />
+          </div>
+        )}
+
+        {/* Botón +X más y Popover flotante para eventos adicionales */}
         {restantes.length > 0 && (
           <div
             className="btn-mas-wrapper"
             onMouseEnter={handleMouseEnterMas}
             onMouseLeave={handleMouseLeaveMas}
           >
-            <button className="btn-mas-eventos">
+            <button
+              className="btn-mas-eventos"
+              onClick={(e) => {
+                e.stopPropagation();
+                const el = e.currentTarget;
+                setPopoverMasAnchor((prev) => (prev ? null : { el }));
+              }}
+            >
               +{restantes.length} más
             </button>
 
-            {hoverMasEvents && (
+            {popoverMasAnchor && (
               <div
-                className={`popover-wrapper-mas ${popoverPosClass}`}
-                style={popoverStyle}
-                onMouseEnter={handleMouseEnterPopoverMas}
-                onMouseLeave={handleMouseLeaveMas}
+                style={computeFixedPos(popoverMasAnchor.el)}
+                onClick={(e) => e.stopPropagation()}
               >
                 <div className="popover-card-mas">
-                  <div className="popover-mas-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>Eventos adicionales del día {diaNumero} ({restantes.length})</span>
+                  <div
+                    className="popover-mas-header"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span>
+                      Eventos del día {diaNumero} ({restantes.length})
+                    </span>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setHoverMasEvents(false);
+                        setPopoverMasAnchor(null);
                       }}
-                      style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "12px" }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#94a3b8",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                      }}
                     >
                       ✕
                     </button>
@@ -280,9 +311,9 @@ const CeldaDiaComponent: React.FC<Props> = ({
                         <PopoverEvento
                           key={resKey}
                           evento={ev}
-                          onCerrar={() => setHoverMasEvents(false)}
+                          onCerrar={() => setPopoverMasAnchor(null)}
                           onReprogramarExitoso={() => {
-                            setHoverMasEvents(false);
+                            setPopoverMasAnchor(null);
                             if (onReprogramarExitoso) onReprogramarExitoso();
                           }}
                         />

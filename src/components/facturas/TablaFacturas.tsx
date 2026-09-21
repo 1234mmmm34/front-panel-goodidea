@@ -43,26 +43,84 @@ export const TablaFacturas: React.FC<Props> = ({
     })}`;
   };
 
-  const renderProximoPago = (item: FacturaGetDto) => {
+  const obtenerEstadoProximoPago = (fechaStr: string): "vencido" | "proximo" | "normal" => {
+    if (!fechaStr) return "normal";
+    const fechaSolo = fechaStr.split("T")[0];
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const [year, month, day] = fechaSolo.split("-").map(Number);
+    const fechaPago = new Date(year, month - 1, day);
+    fechaPago.setHours(0, 0, 0, 0);
+
+    const diffMs = fechaPago.getTime() - hoy.getTime();
+    const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDias < 0) return "vencido";
+    if (diffDias <= 5) return "proximo";
+    return "normal";
+  };
+
+  const renderProximoPagoCell = (item: FacturaGetDto) => {
     const saldo = item.d_SaldoPendiente ?? (item as any).f_PorCobrar ?? 0;
+
     // "Sin deuda" (gris) si está cancelada o el saldo pendiente es <= 0
     if (item.b_Cancelada || saldo <= 0) {
-      return <span style={{ color: "#64748b", fontWeight: 500 }}>Sin deuda</span>;
-    }
-    // Si no tiene fecha de próximo pago pero sí deuda > 0: "Sin programar" (rojo)
-    if (!item.d_ProximoPago) {
-      return <span style={{ color: "#ef4444", fontWeight: 600 }}>Sin programar</span>;
+      return (
+        <td style={{ color: "#64748b", fontWeight: 500, fontSize: "12px" }}>
+          Sin deuda
+        </td>
+      );
     }
 
-    const fechaSolo = item.d_ProximoPago.split("T")[0];
-    if (fechaSolo === hoyStr) {
-      return <span style={{ color: "#ef4444", fontWeight: 700 }}>Hoy</span>;
+    // Si no tiene fecha de próximo pago pero sí deuda > 0: "Sin programar" (rojo bajito)
+    if (!item.d_ProximoPago) {
+      return (
+        <td style={{ backgroundColor: "#fee2e2", color: "#991b1b", fontWeight: 600, fontSize: "12px" }}>
+          Sin programar
+        </td>
+      );
+    }
+
+    const estadoPago = obtenerEstadoProximoPago(item.d_ProximoPago);
+    const textoFecha = formatearFechaTexto(item.d_ProximoPago);
+
+    if (estadoPago === "vencido") {
+      return (
+        <td
+          style={{
+            backgroundColor: "#fee2e2",
+            color: "#991b1b",
+            fontWeight: 600,
+            fontSize: "12px",
+          }}
+          title="Próximo pago vencido"
+        >
+          {textoFecha}
+        </td>
+      );
+    }
+
+    if (estadoPago === "proximo") {
+      return (
+        <td
+          style={{
+            backgroundColor: "#fef9c3",
+            color: "#854d0e",
+            fontWeight: 600,
+            fontSize: "12px",
+          }}
+          title="Próximo pago vence en 5 días o menos"
+        >
+          {textoFecha}
+        </td>
+      );
     }
 
     return (
-      <span style={{ color: "#334155", fontWeight: 500 }}>
-        {formatearFechaTexto(item.d_ProximoPago)}
-      </span>
+      <td style={{ color: "#334155", fontWeight: 500, fontSize: "12px" }}>
+        {textoFecha}
+      </td>
     );
   };
 
@@ -214,7 +272,7 @@ export const TablaFacturas: React.FC<Props> = ({
                   </td>
 
                   {/* Próximo pago */}
-                  <td>{renderProximoPago(item)}</td>
+                  {renderProximoPagoCell(item)}
 
                   {/* Total (d_Monto) */}
                   <td style={{ textAlign: "right", fontWeight: 600, color: "#0f172a" }}>
