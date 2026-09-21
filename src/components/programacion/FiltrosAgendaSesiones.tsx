@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { Search, Plus } from "lucide-react";
 
+import DateRangePickerPopover from "@/components/ui/DateRangePickerPopover";
+
 export interface FiltrosSesionesState {
   visualizar: "sesiones" | "servicios";
   fechaInicio: string;
@@ -62,62 +64,19 @@ export const FiltrosAgendaSesiones: React.FC<Props> = ({
           </select>
         </div>
 
-        {/* Fecha Inicio */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "150px" }}>
-          <label className="form-label" style={{ marginBottom: 0 }}>Buscar por fecha</label>
-          <input
-            type="date"
-            className="form-control text-xs py-1.5"
-            style={{ borderRadius: "20px", height: "32px" }}
-            value={filtros.fechaInicio}
-            onChange={(e) => {
-              const nuevaIni = e.target.value;
-              const nuevos = { ...filtros, fechaInicio: nuevaIni };
-              if (filtros.usarRango && filtros.fechaFin && filtros.fechaFin < nuevaIni) {
-                nuevos.fechaFin = nuevaIni;
-              }
-              onCambiarFiltros(nuevos);
+        {/* Selector de Rango de Fechas (Estilo Alegra / SaaS) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "220px", position: "relative", zIndex: 50 }}>
+          <label className="form-label" style={{ marginBottom: 0 }}>Rango de fechas</label>
+          <DateRangePickerPopover
+            fechaInicio={filtros.fechaInicio}
+            fechaFin={filtros.fechaFin}
+            onChangeRange={(inicio, fin) => {
+              const nuevosFiltros = { ...filtros, fechaInicio: inicio, fechaFin: fin, usarRango: true };
+              onCambiarFiltros(nuevosFiltros);
+              onBuscar();
             }}
           />
         </div>
-
-        {/* Checkbox Buscar por Rango */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", height: "32px" }}>
-          <input
-            type="checkbox"
-            id="chkUsarRangoSesiones"
-            className="form-checkbox h-4 w-4 text-primary rounded cursor-pointer"
-            checked={filtros.usarRango}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              onCambiarFiltros({
-                ...filtros,
-                usarRango: checked,
-                fechaFin: checked && !filtros.fechaFin ? filtros.fechaInicio : filtros.fechaFin,
-              });
-            }}
-          />
-          <label htmlFor="chkUsarRangoSesiones" className="text-xs text-slate-700 font-medium cursor-pointer select-none">
-            Buscar por rango
-          </label>
-        </div>
-
-        {/* Fecha Fin ("Hasta" - aparece al activar rango) */}
-        {filtros.usarRango && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "150px" }}>
-            <label className="form-label" style={{ marginBottom: 0 }}>Hasta</label>
-            <input
-              type="date"
-              className="form-control text-xs py-1.5"
-              style={{ borderRadius: "20px", height: "32px" }}
-              min={filtros.fechaInicio}
-              value={filtros.fechaFin || filtros.fechaInicio}
-              onChange={(e) =>
-                onCambiarFiltros({ ...filtros, fechaFin: e.target.value })
-              }
-            />
-          </div>
-        )}
 
         {/* Buscador y Botón Agendar al lado */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "8px", marginLeft: "auto" }}>

@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import { SesionAlmacenada } from "@/types/auth";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.panel.good-idea.com.mx/api/";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api-proxy/";
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
