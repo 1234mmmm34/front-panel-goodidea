@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Building2, Plus, Search, Edit2, Trash2, RefreshCw } from "lucide-react";
+import { Building2, Plus, Search, Edit2, Trash2, RefreshCw, ChevronRight } from "lucide-react";
 import { EmpresaGetDto } from "@/types/empresas";
 import { EmpresasService } from "@/services/empresas.service";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -49,6 +49,15 @@ export default function EmpresasPage() {
 
   return (
     <AppLayout>
+      {/* Breadcrumb Minimalista */}
+      <div style={{ fontSize: "12px", color: "#7a96b0", display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px" }}>
+        <Link href="/programacion" style={{ color: "#7a96b0", textDecoration: "none" }} className="hover:text-slate-900 transition-colors">
+          Catálogos
+        </Link>
+        <ChevronRight size={13} style={{ color: "#b5cfe8" }} />
+        <span style={{ color: "#1e293b", fontWeight: 500 }}>Empresas</span>
+      </div>
+
       <div className="page-header">
         <div>
           <h1 className="page-title">

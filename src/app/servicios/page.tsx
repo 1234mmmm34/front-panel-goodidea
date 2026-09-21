@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Search, Layers, RefreshCw, Edit2, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, Search, Layers, RefreshCw, Edit2, Trash2, ChevronRight } from "lucide-react";
 import { ServiciosDrpDto, ServiciosDropdownDto } from "@/types/servicios";
 import { ServiciosService } from "@/services/servicios.service";
 import { CatalogosService } from "@/services/catalogos.service";
@@ -96,6 +97,15 @@ export default function ServiciosPage() {
 
   return (
     <AppLayout>
+      {/* Breadcrumb Minimalista */}
+      <div style={{ fontSize: "12px", color: "#7a96b0", display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px" }}>
+        <Link href="/programacion" style={{ color: "#7a96b0", textDecoration: "none" }} className="hover:text-slate-900 transition-colors">
+          Catálogos
+        </Link>
+        <ChevronRight size={13} style={{ color: "#b5cfe8" }} />
+        <span style={{ color: "#1e293b", fontWeight: 500 }}>Servicios</span>
+      </div>
+
       <div className="page-header">
         <div>
           <h1 className="page-title">

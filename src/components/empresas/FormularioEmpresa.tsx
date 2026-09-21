@@ -407,11 +407,15 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
     <div style={{ maxWidth: "920px", margin: "0 auto", width: "100%", paddingBottom: "40px" }}>
       {/* 2. BREADCRUMB */}
       <div style={{ fontSize: "12px", color: "#7a96b0", display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px" }}>
-        <Link href="/empresas" style={{ color: "#2B8FCC", textDecoration: "none" }}>
+        <Link href="/programacion" style={{ color: "#7a96b0", textDecoration: "none" }} className="hover:text-slate-900 transition-colors">
+          Catálogos
+        </Link>
+        <ChevronRight size={13} style={{ color: "#b5cfe8" }} />
+        <Link href="/empresas" style={{ color: "#7a96b0", textDecoration: "none" }} className="hover:text-slate-900 transition-colors">
           Empresas
         </Link>
-        <ChevronRight size={14} style={{ color: "#b5cfe8" }} />
-        <span>{esEdicion ? (empresaEditar?.s_RazonSocial || "Editar empresa") : "Agregar empresa"}</span>
+        <ChevronRight size={13} style={{ color: "#b5cfe8" }} />
+        <span style={{ color: "#1e293b", fontWeight: 500 }}>{esEdicion ? (empresaEditar?.s_RazonSocial || "Editar empresa") : "Agregar empresa"}</span>
       </div>
 
       {/* 3. ENCABEZADO DE SECCIÓN */}

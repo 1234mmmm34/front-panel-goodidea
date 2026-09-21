@@ -80,6 +80,10 @@ export default function CentrosTrabajoPage({ params }: PageProps) {
     <AppLayout>
       {/* Breadcrumb Minimalista */}
       <div style={{ fontSize: "12px", color: "#7a96b0", display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px" }}>
+        <Link href="/programacion" style={{ color: "#7a96b0", textDecoration: "none" }} className="hover:text-slate-900 transition-colors">
+          Catálogos
+        </Link>
+        <ChevronRight size={13} style={{ color: "#b5cfe8" }} />
         <Link href="/empresas" style={{ color: "#7a96b0", textDecoration: "none" }} className="hover:text-slate-900 transition-colors">
           Empresas
         </Link>

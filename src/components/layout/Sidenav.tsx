@@ -31,6 +31,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
   const esFacturas = pathname.startsWith("/facturas");
   const esEmpresas = pathname.startsWith("/empresas");
   const esServicios = pathname.startsWith("/servicios");
+  const esInstructores = pathname.startsWith("/instructores");
 
   const { confirmModal, toast } = useToast();
 
@@ -205,6 +206,13 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
                   title="Servicios"
                 >
                   <span>Servicios</span>
+                </Link>
+                <Link
+                  href="/instructores"
+                  className={`sidebar-subitem ${esInstructores ? "active-sub" : ""}`}
+                  title="Instructores"
+                >
+                  <span>Instructores</span>
                 </Link>
               </div>
             </div>

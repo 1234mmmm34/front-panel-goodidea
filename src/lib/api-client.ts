@@ -1,10 +1,11 @@
 import axios, { AxiosInstance } from "axios";
 import { SesionAlmacenada } from "@/types/auth";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api-proxy/";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.panel.good-idea.com.mx/api/";
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
+  timeout: 20000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -88,18 +89,28 @@ apiClient.interceptors.response.use(
 );
 
 /**
- * Wrapper defensivo para peticiones HTTP.
+ * Wrapper defensivo para peticiones HTTP con reintento automático ante errores de red o servidor.
  */
 export async function httpDefensivo<T>(
   requestFn: () => Promise<T>,
-  fallbackValue: T
+  fallbackValue: T,
+  retries: number = 1
 ): Promise<T> {
   try {
     return await requestFn();
   } catch (error: any) {
     const status = error?.response?.status;
+    const isServerError = !error.response || status >= 500 || error.code === "ECONNABORTED" || error.code === "ERR_NETWORK";
+
+    if (retries > 0 && isServerError) {
+      console.warn(`[HTTP Defensivo] Error temporal detectado. Reintentando petición (${retries} reintento restante)...`);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      return httpDefensivo(requestFn, fallbackValue, retries - 1);
+    }
+
     const msg = error?.message || "Error desconocido";
     console.warn(`[HTTP Defensivo] ${status ? `Status ${status}: ` : ""}${msg}`);
     return fallbackValue;
   }
 }
+
