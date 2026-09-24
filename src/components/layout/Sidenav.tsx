@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { AuthService } from "@/services/auth.service";
 import { useToast } from "@/context/ToastContext";
+import { obtenerSesionActual } from "@/lib/api-client";
 
 interface Props {
   collapsed: boolean;
@@ -25,6 +26,18 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
   const pathname = usePathname();
   const router = useRouter();
   const [catalogosAbiertos, setCatalogosAbiertos] = useState<boolean>(true);
+  const [emailUsuario, setEmailUsuario] = useState<string>("");
+
+  useEffect(() => {
+    const sesion = obtenerSesionActual();
+    if (sesion?.email) {
+      setEmailUsuario(sesion.email.toLowerCase().trim());
+    }
+  }, []);
+
+  const esRestringido =
+    emailUsuario === "jarreola@good-idea.com.mx" ||
+    emailUsuario === "igallegos@good-idea.com.mx";
 
   const esInicio = pathname.startsWith("/calendario") || pathname === "/";
   const esProgramacion = pathname.startsWith("/programacion");
@@ -143,81 +156,85 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
           {!collapsed && <span className="menu-text">Mis proyectos</span>}
         </Link>
 
-        {/* 3. Facturas */}
-        <Link
-          href="/facturas"
-          className={`sidebar-nav-item ${esFacturas ? "active" : ""}`}
-          title="Facturas"
-        >
-          <div className="nav-icon-wrapper">
-            <Receipt size={18} className="nav-item-icon" />
-          </div>
-          {!collapsed && <span className="menu-text">Facturas</span>}
-        </Link>
-
-        {/* 4. Divisor */}
-        <div className="sidebar-divider" />
-
-        {/* 4. Menú dinámico (Catálogos) */}
-        <div className="sidebar-section">
-          <button
-            className="sidebar-nav-item sidebar-header-btn"
-            onClick={() => {
-              if (collapsed) {
-                onToggleCollapse();
-              } else {
-                setCatalogosAbiertos(!catalogosAbiertos);
-              }
-            }}
-            title="Catálogos"
-          >
-            <div className="nav-icon-wrapper">
-              <Folder size={18} className="nav-item-icon" />
-            </div>
-
-            {!collapsed && (
-              <>
-                <span className="menu-text" style={{ flex: 1, textAlign: "left" }}>
-                  Catálogos
-                </span>
-                {catalogosAbiertos ? (
-                  <ChevronDown size={15} className="submenu-arrow" />
-                ) : (
-                  <ChevronRight size={15} className="submenu-arrow" />
-                )}
-              </>
-            )}
-          </button>
-
-          {!collapsed && catalogosAbiertos && (
-            <div className="sidebar-subitems-container">
-              <div className="sidebar-guide-line" />
-              <div className="sidebar-subitems">
-                <Link
-                  href="/empresas"
-                  className={`sidebar-subitem ${esEmpresas ? "active-sub" : ""}`}
-                  title="Empresas"
-                >
-                  <span>Empresas</span>
-                </Link>
-                <Link
-                  href="/servicios"
-                  className={`sidebar-subitem ${esServicios ? "active-sub" : ""}`}
-                  title="Servicios"
-                >
-                  <span>Servicios</span>
-                </Link>
-                <Link
-                  href="/instructores"
-                  className={`sidebar-subitem ${esInstructores ? "active-sub" : ""}`}
-                  title="Instructores"
-                >
-                  <span>Instructores</span>
-                </Link>
+        {/* 3. Facturas y Catálogos (Solo si no es usuario restringido) */}
+        {!esRestringido && (
+          <>
+            <Link
+              href="/facturas"
+              className={`sidebar-nav-item ${esFacturas ? "active" : ""}`}
+              title="Facturas"
+            >
+              <div className="nav-icon-wrapper">
+                <Receipt size={18} className="nav-item-icon" />
               </div>
+              {!collapsed && <span className="menu-text">Facturas</span>}
+            </Link>
+
+            {/* Divisor */}
+            <div className="sidebar-divider" />
+
+            {/* Menú dinámico (Catálogos) */}
+            <div className="sidebar-section">
+              <button
+                className="sidebar-nav-item sidebar-header-btn"
+                onClick={() => {
+                  if (collapsed) {
+                    onToggleCollapse();
+                  } else {
+                    setCatalogosAbiertos(!catalogosAbiertos);
+                  }
+                }}
+                title="Catálogos"
+              >
+                <div className="nav-icon-wrapper">
+                  <Folder size={18} className="nav-item-icon" />
+                </div>
+
+                {!collapsed && (
+                  <>
+                    <span className="menu-text" style={{ flex: 1, textAlign: "left" }}>
+                      Catálogos
+                    </span>
+                    {catalogosAbiertos ? (
+                      <ChevronDown size={15} className="submenu-arrow" />
+                    ) : (
+                      <ChevronRight size={15} className="submenu-arrow" />
+                    )}
+                  </>
+                )}
+              </button>
+
+              {!collapsed && catalogosAbiertos && (
+                <div className="sidebar-subitems-container">
+                  <div className="sidebar-guide-line" />
+                  <div className="sidebar-subitems">
+                    <Link
+                      href="/empresas"
+                      className={`sidebar-subitem ${esEmpresas ? "active-sub" : ""}`}
+                      title="Empresas"
+                    >
+                      <span>Empresas</span>
+                    </Link>
+                    <Link
+                      href="/servicios"
+                      className={`sidebar-subitem ${esServicios ? "active-sub" : ""}`}
+                      title="Servicios"
+                    >
+                      <span>Servicios</span>
+                    </Link>
+                    <Link
+                      href="/instructores"
+                      className={`sidebar-subitem ${esInstructores ? "active-sub" : ""}`}
+                      title="Instructores"
+                    >
+                      <span>Instructores</span>
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </nav>
 
       {/* 5. Salir (Incondicional) */}
