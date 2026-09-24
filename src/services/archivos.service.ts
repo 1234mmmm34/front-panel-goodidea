@@ -90,18 +90,15 @@ export const ArchivosService = {
 
   /**
    * 3.6 Obtener URL temporal de un archivo
-   * Endpoint: GET archivos/ObtenerUrlTemporal?key={key}
+   * Endpoint: GET archivos/url-temporal?key={key}
    */
   async obtenerUrlTemporal(key: string): Promise<string | null> {
     return httpDefensivo(async () => {
       if (!key) return null;
-      const resp = await apiClient.get<string | { url?: string }>("archivos/ObtenerUrlTemporal", {
+      const resp = await apiClient.get<{ v_Url?: string }>("archivos/url-temporal", {
         params: { key },
       });
-      if (typeof resp.data === "string") {
-        return resp.data;
-      }
-      return resp.data?.url ?? null;
+      return resp.data?.v_Url ?? null;
     }, null);
   },
 

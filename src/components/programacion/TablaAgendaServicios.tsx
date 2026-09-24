@@ -234,35 +234,51 @@ export const TablaAgendaServicios: React.FC<Props> = ({
 
                       const partes: React.ReactNode[] = [];
 
-                      // 1. Entregados con v_Key -> link azul subrayado
+                      // 1. Entregados con v_Key -> link <a> azul #2B8FCC con subrayado
                       gruposConKeyMap.forEach((nombres, key) => {
                         const labelText = nombres.join(", ");
                         partes.push(
-                          <button
+                          <a
                             key={`ent-group-${key}`}
-                            className="text-blue-600 underline font-medium hover:text-blue-800 cursor-pointer text-xs text-left whitespace-nowrap"
-                            style={{ whiteSpace: "nowrap" }}
-                            onClick={() => VerDocumento(key)}
+                            href="#"
+                            style={{
+                              color: "#2B8FCC",
+                              textDecoration: "underline",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                              fontWeight: 500,
+                              whiteSpace: "nowrap",
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              VerDocumento(key);
+                            }}
                             title={`Ver documento: ${labelText}`}
                           >
                             {labelText}
-                          </button>
+                          </a>
                         );
                       });
 
-                      // 2. Entregados sin v_Key -> texto plano negro
+                      // 2. Entregados sin v_Key -> texto plano
                       entregadosSinKey.forEach((nombre, idx) => {
                         partes.push(
-                          <span key={`ent-nokey-${idx}`} className="text-slate-800 text-xs font-normal whitespace-nowrap" style={{ whiteSpace: "nowrap" }}>
+                          <span
+                            key={`ent-nokey-${idx}`}
+                            style={{ color: "#1e293b", fontSize: "12px", fontWeight: 400, whiteSpace: "nowrap" }}
+                          >
                             {nombre}
                           </span>
                         );
                       });
 
-                      // 3. Pendientes (b_Entregado = false) -> texto rojo
+                      // 3. Pendientes (b_Entregado = false) -> texto rojo sin link
                       pendientes.forEach((item, idx) => {
                         partes.push(
-                          <span key={`ent-pend-${idx}`} style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }} className="whitespace-nowrap">
+                          <span
+                            key={`ent-pend-${idx}`}
+                            style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }}
+                          >
                             {item.v_Nombre}
                           </span>
                         );
@@ -288,24 +304,33 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                   {/* 8. Cot. GI */}
                   <td>
                     {(() => {
-                      const tieneCotizacion = row.b_TieneCotizacion;
                       const numCot = row.v_NoCotizacionGI && row.v_NoCotizacionGI.trim() !== "" ? row.v_NoCotizacionGI.trim() : null;
                       const keyCot = row.v_KeyCotizacion && row.v_KeyCotizacion.trim() !== "" ? row.v_KeyCotizacion.trim() : null;
 
-                      if (tieneCotizacion && keyCot) {
+                      if (keyCot) {
                         return (
-                          <button
-                            className="text-blue-600 underline font-medium hover:text-blue-800 cursor-pointer text-xs"
-                            onClick={() => VerDocumento(keyCot)}
+                          <a
+                            href="#"
+                            style={{
+                              color: "#2B8FCC",
+                              textDecoration: "underline",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                              fontWeight: 500,
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              VerDocumento(keyCot);
+                            }}
                             title="Consultar Cotización"
                           >
                             {numCot || "Cotización"}
-                          </button>
+                          </a>
                         );
                       }
 
-                      if (tieneCotizacion && numCot && numCot.toLowerCase() !== "pendiente") {
-                        return <span className="text-slate-800 text-xs font-normal">{numCot}</span>;
+                      if (numCot && numCot.toLowerCase() !== "pendiente") {
+                        return <span style={{ color: "#1e293b", fontSize: "12px", fontWeight: 400 }}>{numCot}</span>;
                       }
 
                       return <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>Pendiente</span>;
@@ -315,24 +340,33 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                   {/* 9. OC cliente */}
                   <td>
                     {(() => {
-                      const tieneOC = row.b_TieneOC;
                       const numOC = row.v_NoOrdenCompraCliente && row.v_NoOrdenCompraCliente.trim() !== "" ? row.v_NoOrdenCompraCliente.trim() : null;
                       const keyOC = row.v_KeyOC && row.v_KeyOC.trim() !== "" ? row.v_KeyOC.trim() : null;
 
-                      if (tieneOC && keyOC) {
+                      if (keyOC) {
                         return (
-                          <button
-                            className="text-blue-600 underline font-medium hover:text-blue-800 cursor-pointer text-xs"
-                            onClick={() => VerDocumento(keyOC)}
+                          <a
+                            href="#"
+                            style={{
+                              color: "#2B8FCC",
+                              textDecoration: "underline",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                              fontWeight: 500,
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              VerDocumento(keyOC);
+                            }}
                             title="Consultar Orden de Compra"
                           >
                             {numOC || "OC"}
-                          </button>
+                          </a>
                         );
                       }
 
-                      if (tieneOC && numOC && numOC.toLowerCase() !== "pendiente") {
-                        return <span className="text-slate-800 text-xs font-normal">{numOC}</span>;
+                      if (numOC && numOC.toLowerCase() !== "pendiente") {
+                        return <span style={{ color: "#1e293b", fontSize: "12px", fontWeight: 400 }}>{numOC}</span>;
                       }
 
                       return <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>Pendiente</span>;
@@ -342,7 +376,7 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                   {/* 10. Facturas: solo texto plano, nunca es link */}
                   <td>
                     {row.v_Facturas && row.v_Facturas.trim() !== "" && row.v_Facturas.toLowerCase() !== "pendiente" ? (
-                      <span className="text-slate-800 text-xs font-normal">{row.v_Facturas}</span>
+                      <span style={{ color: "#1e293b", fontSize: "12px", fontWeight: 400 }}>{row.v_Facturas}</span>
                     ) : (
                       <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>Pendiente</span>
                     )}
