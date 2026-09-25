@@ -18,8 +18,9 @@ export const AuthGuard: React.FC<Props> = ({ children }) => {
   useEffect(() => {
     const sesion = obtenerSesionActual();
     const esRutaLogin = pathname === "/login";
+    const esRutaPublica = esRutaLogin || pathname.startsWith("/contrasenia");
 
-    if (!sesion && !esRutaLogin) {
+    if (!sesion && !esRutaPublica) {
       router.replace("/login");
     } else if (sesion && esRutaLogin) {
       router.replace("/calendario");

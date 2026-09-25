@@ -159,7 +159,7 @@ export default function CentrosTrabajoPage({ params }: PageProps) {
 
       {/* Tabla Combinada: Nombre | Dirección | Áreas | Acciones */}
       <div className="alegra-table-container border border-slate-200/80 shadow-sm rounded-xl overflow-hidden">
-        <table className="alegra-table">
+        <table className="alegra-table alegra-table-compact">
           <thead>
             <tr>
               <th style={{ width: "22%" }}>Nombre</th>

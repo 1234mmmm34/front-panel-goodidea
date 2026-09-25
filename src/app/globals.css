@@ -345,6 +345,10 @@ h3,
   overflow-y: auto;
 }
 
+.mt-auto {
+  margin-top: auto !important;
+}
+
 .sidebar-divider {
   height: 1px;
   background-color: var(--divider-color);
@@ -833,6 +837,17 @@ textarea:focus {
 
 .alegra-table tbody tr:hover td {
   background-color: #f8fafc;
+}
+
+/* Variante delgada / compacta para tablas */
+.alegra-table.alegra-table-compact th,
+.alegra-table-compact th {
+  padding: 7px 12px;
+}
+
+.alegra-table.alegra-table-compact td,
+.alegra-table-compact td {
+  padding: 6.5px 12px;
 }
 
 /* Ajustes Responsivos para Pantallas Medianas y Pequeñas */

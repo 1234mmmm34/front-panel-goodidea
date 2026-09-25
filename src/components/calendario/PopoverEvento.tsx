@@ -91,7 +91,7 @@ export const PopoverEvento: React.FC<Props> = ({ evento, onCerrar, onReprogramar
 
           <div className="popover-item">
             <User size={14} className="text-secondary" />
-            <span>Instructor: <strong>{evento.v_Titular || "—"}</strong></span>
+            <span>Personal: <strong>{evento.v_Titular || "—"}</strong></span>
           </div>
 
           {evento.v_Apoyo && evento.v_Apoyo.trim().length > 0 && (

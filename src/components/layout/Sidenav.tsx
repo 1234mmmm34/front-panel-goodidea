@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   PanelLeft,
+  Settings,
 } from "lucide-react";
 import { AuthService } from "@/services/auth.service";
 import { useToast } from "@/context/ToastContext";
@@ -26,6 +27,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
   const pathname = usePathname();
   const router = useRouter();
   const [catalogosAbiertos, setCatalogosAbiertos] = useState<boolean>(true);
+  const [configuracionAbierta, setConfiguracionAbierta] = useState<boolean>(true);
   const [emailUsuario, setEmailUsuario] = useState<string>("");
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
   const esEmpresas = pathname.startsWith("/empresas");
   const esServicios = pathname.startsWith("/servicios");
   const esInstructores = pathname.startsWith("/instructores");
+  const esUsuarios = pathname.startsWith("/usuarios");
 
   const { confirmModal, toast } = useToast();
 
@@ -144,19 +147,19 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
           {!collapsed && <span className="menu-text">Inicio</span>}
         </Link>
 
-        {/* 2. Mis proyectos (estático) */}
+        {/* 2. Programación (estático) */}
         <Link
           href="/programacion"
           className={`sidebar-nav-item ${esProgramacion ? "active" : ""}`}
-          title="Mis proyectos"
+          title="Programación"
         >
           <div className="nav-icon-wrapper">
             <Calendar size={18} className="nav-item-icon" />
           </div>
-          {!collapsed && <span className="menu-text">Mis proyectos</span>}
+          {!collapsed && <span className="menu-text">Programación</span>}
         </Link>
 
-        {/* 3. Facturas y Catálogos (Solo si no es usuario restringido) */}
+        {/* 3. Facturas, Catálogos y Configuración (Solo si no es usuario restringido) */}
         {!esRestringido && (
           <>
             <Link
@@ -225,9 +228,56 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
                     <Link
                       href="/instructores"
                       className={`sidebar-subitem ${esInstructores ? "active-sub" : ""}`}
-                      title="Instructores"
+                      title="Personal"
                     >
-                      <span>Instructores</span>
+                      <span>Personal</span>
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Menú dinámico (Configuración - parte inferior) */}
+            <div className="sidebar-section mt-auto" style={{ marginTop: "auto" }}>
+              <button
+                className="sidebar-nav-item sidebar-header-btn"
+                onClick={() => {
+                  if (collapsed) {
+                    onToggleCollapse();
+                  } else {
+                    setConfiguracionAbierta(!configuracionAbierta);
+                  }
+                }}
+                title="Configuración"
+              >
+                <div className="nav-icon-wrapper">
+                  <Settings size={18} className="nav-item-icon" />
+                </div>
+
+                {!collapsed && (
+                  <>
+                    <span className="menu-text" style={{ flex: 1, textAlign: "left" }}>
+                      Configuración
+                    </span>
+                    {configuracionAbierta ? (
+                      <ChevronDown size={15} className="submenu-arrow" />
+                    ) : (
+                      <ChevronRight size={15} className="submenu-arrow" />
+                    )}
+                  </>
+                )}
+              </button>
+
+              {!collapsed && configuracionAbierta && (
+                <div className="sidebar-subitems-container">
+                  <div className="sidebar-guide-line" />
+                  <div className="sidebar-subitems">
+                    <Link
+                      href="/usuarios"
+                      className={`sidebar-subitem ${esUsuarios ? "active-sub" : ""}`}
+                      title="Usuarios"
+                    >
+                      <span>Usuarios</span>
                     </Link>
                   </div>
                 </div>

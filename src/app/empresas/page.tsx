@@ -119,7 +119,7 @@ export default function EmpresasPage() {
 
       {/* Tabla de Clientes */}
       <div className="alegra-table-container">
-        <table className="alegra-table">
+        <table className="alegra-table alegra-table-compact">
           <thead>
             <tr>
               <th>Razón Social / RFC</th>
