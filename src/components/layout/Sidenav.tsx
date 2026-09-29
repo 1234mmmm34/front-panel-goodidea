@@ -13,6 +13,7 @@ import {
   ChevronRight,
   PanelLeft,
   Settings,
+  LineChart,
 } from "lucide-react";
 import { AuthService } from "@/services/auth.service";
 import { useToast } from "@/context/ToastContext";
@@ -44,6 +45,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
   const esInicio = pathname.startsWith("/calendario") || pathname === "/";
   const esProgramacion = pathname.startsWith("/programacion");
   const esFacturas = pathname.startsWith("/facturas");
+  const esFinanzas = pathname.startsWith("/finanzas");
   const esEmpresas = pathname.startsWith("/empresas");
   const esServicios = pathname.startsWith("/servicios");
   const esInstructores = pathname.startsWith("/instructores");
@@ -171,6 +173,17 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
                 <Receipt size={18} className="nav-item-icon" />
               </div>
               {!collapsed && <span className="menu-text">Facturas</span>}
+            </Link>
+
+            <Link
+              href="/finanzas"
+              className={`sidebar-nav-item ${esFinanzas ? "active" : ""}`}
+              title="Finanzas"
+            >
+              <div className="nav-icon-wrapper">
+                <LineChart size={18} className="nav-item-icon" />
+              </div>
+              {!collapsed && <span className="menu-text">Finanzas</span>}
             </Link>
 
             {/* Divisor */}

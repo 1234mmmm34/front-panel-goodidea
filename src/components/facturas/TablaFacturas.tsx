@@ -171,7 +171,7 @@ export const TablaFacturas: React.FC<Props> = ({
           <tr>
             <th>Cliente</th>
             <th>Factura</th>
-            <th>Creación</th>
+            <th>Fecha de facturación</th>
             <th>Próximo pago</th>
             <th style={{ textAlign: "right" }}>Total</th>
             <th style={{ textAlign: "right" }}>Por cobrar</th>

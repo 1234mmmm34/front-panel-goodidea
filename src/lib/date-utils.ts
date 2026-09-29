@@ -76,6 +76,18 @@ export function formatearFechaTexto(fechaIso: string | null | undefined): string
   return fechaIso;
 }
 
+export function formatearFechaBonita(str?: string): string {
+  if (!str) return "";
+  const clean = str.split("T")[0];
+  const parts = clean.split("-");
+  if (parts.length !== 3) return str;
+  const year = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${day} ${meses[monthIdx] || ""} ${year}`;
+}
+
 export function formatearFechaCorta(fechaStr: string | null): string {
   if (!fechaStr) return "—";
   try {
@@ -166,6 +178,85 @@ export function esFechaPasada(fechaIsoStr: string | null | undefined): boolean {
   }
 }
 
+export interface InfoRetraso {
+  dias: number;
+  esVencido: boolean;
+  texto: string;
+}
+
+/**
+ * Calcula los días de retraso de un pago o abono.
+ * - Si ya está PAGADO (iEstado === 1): compara la fecha real de pago (fechaPagoStr) vs la fecha programada (fechaProgStr).
+ * - Si está PENDIENTE (iEstado === 0): compara la fecha de hoy vs la fecha programada (fechaProgStr).
+ * - Si está CANCELADO (iEstado === 2): retorna null.
+ */
+export function calcularDiasRetraso(
+  fechaProgStr?: string | null,
+  fechaPagoStr?: string | null,
+  iEstado: number = 0
+): InfoRetraso | null {
+  if (iEstado === 2 || !fechaProgStr) return null;
+
+  try {
+    const cleanProg = fechaProgStr.split("T")[0];
+    const partsProg = cleanProg.split("-");
+    if (partsProg.length !== 3) return null;
+
+    const yearP = parseInt(partsProg[0], 10);
+    const monthP = parseInt(partsProg[1], 10) - 1;
+    const dayP = parseInt(partsProg[2], 10);
+    if (isNaN(yearP) || isNaN(monthP) || isNaN(dayP)) return null;
+    const progDate = new Date(yearP, monthP, dayP);
+
+    if (iEstado === 1) {
+      // Pagado
+      if (!fechaPagoStr) return { dias: 0, esVencido: false, texto: "A tiempo" };
+      const cleanPago = fechaPagoStr.split("T")[0];
+      const partsPago = cleanPago.split("-");
+      if (partsPago.length !== 3) return { dias: 0, esVencido: false, texto: "A tiempo" };
+
+      const yearReal = parseInt(partsPago[0], 10);
+      const monthReal = parseInt(partsPago[1], 10) - 1;
+      const dayReal = parseInt(partsPago[2], 10);
+      if (isNaN(yearReal) || isNaN(monthReal) || isNaN(dayReal)) {
+        return { dias: 0, esVencido: false, texto: "A tiempo" };
+      }
+      const pagoDate = new Date(yearReal, monthReal, dayReal);
+
+      const diffMs = pagoDate.getTime() - progDate.getTime();
+      const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDias > 0) {
+        return {
+          dias: diffDias,
+          esVencido: true,
+          texto: `${diffDias} ${diffDias === 1 ? "día" : "días"}`,
+        };
+      }
+      return { dias: 0, esVencido: false, texto: "A tiempo" };
+    } else if (iEstado === 0) {
+      // Pendiente
+      const hoy = new Date();
+      const hoyMidnight = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+      const diffMs = hoyMidnight.getTime() - progDate.getTime();
+      const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDias > 0) {
+        return {
+          dias: diffDias,
+          esVencido: true,
+          texto: `${diffDias} ${diffDias === 1 ? "día" : "días"}`,
+        };
+      }
+      return { dias: 0, esVencido: false, texto: "En tiempo" };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export {
   format,
   startOfMonth,
@@ -175,3 +266,4 @@ export {
   addMonths,
   subMonths,
 };
+

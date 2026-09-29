@@ -111,8 +111,8 @@ export interface FacturaSinTimbrarDto {
  * Determina si el estado elegido es considerado "de tipo pendiente"
  * para efectos de mostrar el filtro condicional de fecha de pago.
  */
-export function EsEstadoPendiente(estado: string): boolean {
-  return estado === "Pendientes" || estado === "No cobrada" || estado === "Abonada";
+export function EsEstadoPendiente(_estado: string): boolean {
+  return true;
 }
 
 /**

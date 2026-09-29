@@ -19,7 +19,7 @@ import {
   LineaServicioFacturaDto,
 } from "@/types/facturas";
 import { FacturasService } from "@/services/facturas.service";
-import { formatearFechaTexto } from "@/lib/date-utils";
+import { formatearFechaTexto, calcularDiasRetraso } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
 
 interface Props {
@@ -706,6 +706,7 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                           <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#f8fafc" }}>
                             <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, color: "#475569" }}>Fecha programada</th>
                             <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, color: "#475569" }}>Fecha en que se pagó</th>
+                            <th style={{ textAlign: "center", padding: "6px 10px", fontWeight: 600, color: "#475569" }}>Días de retraso</th>
                             <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600, color: "#475569" }}>Cantidad</th>
                             <th style={{ textAlign: "center", width: "80px", padding: "6px 10px", fontWeight: 600, color: "#475569" }}>Acciones</th>
                           </tr>
@@ -719,6 +720,8 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                             const fechaProgramada = abono.d_FechaProgramada || (abono as any).d_FechaAbono;
                             const fechaPagoRealAbono = abono.d_FechaAbono;
                             const montoAbono = abono.d_Monto ?? (abono as any).f_Monto ?? 0;
+
+                            const infoRetraso = calcularDiasRetraso(fechaProgramada, fechaPagoRealAbono, abono.i_Estado);
 
                             return (
                               <tr key={abono.i_CveAbono || idx} style={{ borderBottom: (idx === abonos.length - 1 && !mostrandoFilaAgregar) ? "none" : "1px solid #e2e8f0" }}>
@@ -748,6 +751,43 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                     </div>
                                   ) : (
                                     <span style={{ color: "#dc2626", fontWeight: 700 }}>Pendiente</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: "6px 10px", textAlign: "center" }}>
+                                  {infoRetraso ? (
+                                    infoRetraso.esVencido ? (
+                                      <span
+                                        style={{
+                                          display: "inline-block",
+                                          padding: "2px 8px",
+                                          borderRadius: "12px",
+                                          backgroundColor: "#fef2f2",
+                                          color: "#dc2626",
+                                          fontWeight: 600,
+                                          fontSize: "11px",
+                                          border: "1px solid #fecaca",
+                                        }}
+                                      >
+                                        {infoRetraso.texto}
+                                      </span>
+                                    ) : (
+                                      <span
+                                        style={{
+                                          display: "inline-block",
+                                          padding: "2px 8px",
+                                          borderRadius: "12px",
+                                          backgroundColor: "#f0fdf4",
+                                          color: "#16a34a",
+                                          fontWeight: 600,
+                                          fontSize: "11px",
+                                          border: "1px solid #bbf7d0",
+                                        }}
+                                      >
+                                        {infoRetraso.texto}
+                                      </span>
+                                    )
+                                  ) : (
+                                    <span style={{ color: "#94a3b8" }}>—</span>
                                   )}
                                 </td>
                                 <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "#0f172a" }}>
@@ -806,6 +846,9 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                               </td>
                               <td style={{ padding: "4px 8px" }}>
                                 <span style={{ color: "#dc2626", fontWeight: 700 }}>Pendiente</span>
+                              </td>
+                              <td style={{ padding: "4px 8px", textAlign: "center", color: "#94a3b8" }}>
+                                —
                               </td>
                               <td style={{ padding: "4px 8px", textAlign: "right" }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "2px" }}>

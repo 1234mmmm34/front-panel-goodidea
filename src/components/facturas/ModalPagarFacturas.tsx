@@ -11,7 +11,7 @@ import {
 import { PagoPendienteMasivoDto } from "@/types/facturas";
 import { FacturasService } from "@/services/facturas.service";
 import { useToast } from "@/context/ToastContext";
-import { formatearFechaTexto } from "@/lib/date-utils";
+import { formatearFechaTexto, calcularDiasRetraso } from "@/lib/date-utils";
 
 interface ModalPagarFacturasProps {
   abierto: boolean;
@@ -406,6 +406,7 @@ export const ModalPagarFacturas: React.FC<ModalPagarFacturasProps> = ({
                       <th style={{ padding: "10px 12px" }}>No. de factura</th>
                       <th style={{ padding: "10px 12px" }}>Fecha factura</th>
                       <th style={{ padding: "10px 12px" }}>Fecha de pago</th>
+                      <th style={{ padding: "10px 12px", textAlign: "center" }}>Días de retraso</th>
                       <th style={{ padding: "10px 12px", textAlign: "right" }}>Monto</th>
                       <th style={{ padding: "10px 12px", textAlign: "center", width: "90px" }}>Estatus</th>
                     </tr>
@@ -466,6 +467,44 @@ export const ModalPagarFacturas: React.FC<ModalPagarFacturasProps> = ({
 
                           <td style={{ padding: "8px 12px", color: "#475569" }}>
                             {formatearFechaTexto(item.d_FechaProximoPago)}
+                          </td>
+
+                          <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                            {(() => {
+                              const info = calcularDiasRetraso(item.d_FechaProximoPago, null, 0);
+                              if (!info) return <span style={{ color: "#94a3b8" }}>—</span>;
+                              return info.esVencido ? (
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "2px 8px",
+                                    borderRadius: "12px",
+                                    backgroundColor: "#fef2f2",
+                                    color: "#dc2626",
+                                    fontWeight: 600,
+                                    fontSize: "11px",
+                                    border: "1px solid #fecaca",
+                                  }}
+                                >
+                                  {info.texto}
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "2px 8px",
+                                    borderRadius: "12px",
+                                    backgroundColor: "#f0fdf4",
+                                    color: "#16a34a",
+                                    fontWeight: 600,
+                                    fontSize: "11px",
+                                    border: "1px solid #bbf7d0",
+                                  }}
+                                >
+                                  {info.texto}
+                                </span>
+                              );
+                            })()}
                           </td>
 
                           <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#dc2626" }}>

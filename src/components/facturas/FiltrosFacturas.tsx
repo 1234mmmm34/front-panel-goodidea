@@ -27,33 +27,28 @@ export const FiltrosFacturas: React.FC<Props> = ({
 
   const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nuevoEstado = e.target.value;
-    const esPendientePrevio = EsEstadoPendiente(filtros.estado);
-    const esPendienteNuevo = EsEstadoPendiente(nuevoEstado);
-
-    let nuevaFechaIni = filtros.fechaInicio;
-    let nuevaFechaFin = filtros.fechaFin;
-    let nuevaFechaPago = filtros.fechaPago;
-
-    if (!esPendienteNuevo) {
-      // Limpiar al cambiar a estado no-pendiente
-      nuevaFechaIni = "";
-      nuevaFechaFin = "";
-      nuevaFechaPago = null;
-    } else if (!esPendientePrevio && esPendienteNuevo && !nuevaFechaIni) {
-      // Restablecer al mes completo por default
-      const ahora = new Date();
-      nuevaFechaIni = format(startOfMonth(ahora), "yyyy-MM-dd");
-      nuevaFechaFin = format(endOfMonth(ahora), "yyyy-MM-dd");
-      nuevaFechaPago = nuevaFechaIni;
-    }
-
     onCambiarFiltros({
       ...filtros,
       estado: nuevoEstado,
-      fechaInicio: nuevaFechaIni,
-      fechaFin: nuevaFechaFin,
-      fechaPago: nuevaFechaPago,
     });
+  };
+
+  const obtenerLabelFecha = (estado: string): string => {
+    switch (estado) {
+      case "Cobrada":
+        return "Fecha de pago";
+      case "Pendientes":
+      case "No cobrada":
+      case "Abonada":
+      case "Vencidas":
+        return "Fecha de pago programada";
+      case "Canceladas":
+      case "SinProgramar":
+        return "Fecha de emisión";
+      case "":
+      default:
+        return "Fecha de facturación";
+    }
   };
 
   const handleKeyDownSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -114,7 +109,7 @@ export const FiltrosFacturas: React.FC<Props> = ({
           {EsEstadoPendiente(filtros.estado) && (
             <div style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: "220px", position: "relative", zIndex: 50 }}>
               <label className="form-label" style={{ marginBottom: 0, fontSize: "11px", fontWeight: 600, color: "#475569" }}>
-                Fecha de pago
+                {obtenerLabelFecha(filtros.estado)}
               </label>
               <DateRangePickerPopover
                 fechaInicio={filtros.fechaInicio}

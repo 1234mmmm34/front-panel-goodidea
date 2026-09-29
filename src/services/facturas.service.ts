@@ -72,10 +72,9 @@ export const FacturasService = {
         queryParams.fechaFin = fin;
       }
 
-      const resp = await apiClient.get<any>("facturas", { params: queryParams });
-
+      let resp = await apiClient.get<any>("facturas", { params: queryParams });
       let rawDatos: FacturaGetDto[] = [];
-      const data = resp.data;
+      let data = resp.data;
 
       if (Array.isArray(data)) {
         rawDatos = data;
@@ -83,6 +82,32 @@ export const FacturasService = {
         if (Array.isArray(data.datos)) rawDatos = data.datos;
         else if (Array.isArray(data.data)) rawDatos = data.data;
         else if (Array.isArray(data.Datos)) rawDatos = data.Datos;
+      }
+
+      // Reintento inteligente: si no devolvió nada con "Cobrada" o "Liquidada", intentar con el estado alternativo
+      if (
+        rawDatos.length === 0 &&
+        (queryParams.estado === "Cobrada" || queryParams.estado === "Liquidada")
+      ) {
+        const estadoAlt = queryParams.estado === "Cobrada" ? "Liquidada" : "Cobrada";
+        const queryParamsAlt = { ...queryParams, estado: estadoAlt };
+        try {
+          const respAlt = await apiClient.get<any>("facturas", { params: queryParamsAlt });
+          const dataAlt = respAlt.data;
+          let rawAlt: FacturaGetDto[] = [];
+          if (Array.isArray(dataAlt)) {
+            rawAlt = dataAlt;
+          } else if (dataAlt && typeof dataAlt === "object") {
+            if (Array.isArray(dataAlt.datos)) rawAlt = dataAlt.datos;
+            else if (Array.isArray(dataAlt.data)) rawAlt = dataAlt.data;
+            else if (Array.isArray(dataAlt.Datos)) rawAlt = dataAlt.Datos;
+          }
+          if (rawAlt.length > 0) {
+            rawDatos = rawAlt;
+          }
+        } catch {
+          // Si falla la petición alternativa, se mantiene la respuesta original
+        }
       }
 
       if (rawDatos.length === 0) {
@@ -150,8 +175,22 @@ export const FacturasService = {
         queryParams.fechaFin = fin;
       }
 
-      const resp = await apiClient.get<any>("facturas/Resumen", { params: queryParams });
-      const data = resp.data;
+      let resp = await apiClient.get<any>("facturas/Resumen", { params: queryParams });
+      let data = resp.data;
+
+      if (
+        (!data || (!data.d_TotalPagado && !data.d_TotalFacturado && !data.i_TotalFacturas)) &&
+        (queryParams.estado === "Cobrada" || queryParams.estado === "Liquidada")
+      ) {
+        const estadoAlt = queryParams.estado === "Cobrada" ? "Liquidada" : "Cobrada";
+        const queryParamsAlt = { ...queryParams, estado: estadoAlt };
+        try {
+          const respAlt = await apiClient.get<any>("facturas/Resumen", { params: queryParamsAlt });
+          if (respAlt?.data) data = respAlt.data;
+        } catch {
+          // Ignorar error alternativo
+        }
+      }
 
       return {
         d_TotalPagado: Number(data?.d_TotalPagado ?? data?.TotalPagado ?? 0),
