@@ -11,6 +11,7 @@ import {
   RangoFechaDto,
   AgendaInsertDto,
   ReprogramacionInsertDto,
+  AgregarEntregablesDto,
 } from "@/types/servicios";
 
 export const AgendaService = {
@@ -244,16 +245,94 @@ export const AgendaService = {
       const sesiones = data.Sesiones || data.sesiones || data.Detalles || data.detalles || data.Sesion || data.sesion || [];
       const alumnos = data.Alumnos || data.alumnos || [];
       const facturas = data.Facturas || data.facturas || [];
-      const entregables = data.Entregables || data.entregables || [];
+      const entregablesRaw = data.Entregables || data.entregables || [];
+
+      const entregablesParsed = (Array.isArray(entregablesRaw) ? entregablesRaw : []).map((item: any) => ({
+        ...item,
+        i_CveAgendaEntregables: item.i_CveAgendaEntregables ?? item.i_cveAgendaEntregables ?? item.iCveAgendaEntregables ?? 0,
+        i_CveEntregables: item.i_CveEntregables ?? item.i_cveEntregables ?? item.iCveEntregables ?? undefined,
+        v_Nombre: item.v_Nombre ?? item.v_nombre ?? item.nombre ?? "",
+        b_Entregado: Boolean(item.b_Entregado ?? item.b_entregado ?? item.bEntregado),
+        f_FechaEntregable: item.f_FechaEntregable ?? item.f_fechaEntregable ?? item.fechaEntregable ?? null,
+        i_CveArchivo: item.i_CveArchivo ?? item.i_cveArchivo ?? item.iCveArchivo ?? null,
+        v_Key: item.v_Key ?? item.v_key ?? item.key ?? null,
+      }));
 
       return {
         ...data,
         Sesiones: Array.isArray(sesiones) ? sesiones : [],
         Alumnos: Array.isArray(alumnos) ? alumnos : [],
         Facturas: Array.isArray(facturas) ? facturas : [],
-        Entregables: Array.isArray(entregables) ? entregables : [],
+        Entregables: entregablesParsed,
       };
     }, null);
+  },
+
+  /**
+   * Agrega entregables del catálogo al servicio agendado.
+   * Endpoint: POST api/entregables/AgregarEntregables (con fallbacks)
+   */
+  async agregarEntregables(payload: AgregarEntregablesDto): Promise<{ exito: boolean; agregados?: number; mensaje?: string }> {
+    const candidateEndpoints = [
+      "entregables/AgregarEntregables",
+      "Entregables/AgregarEntregables",
+      "entregables/agregarEntregables",
+      "Entregables/agregarEntregables",
+      "Agenda/AgregarEntregables",
+      "agenda/AgregarEntregables",
+    ];
+
+    let ultimoMensaje = "Ocurrió un error al agregar los entregables.";
+
+    for (const ep of candidateEndpoints) {
+      try {
+        const resp = await apiClient.post(ep, payload);
+        if (resp.status >= 200 && resp.status < 300) {
+          if (resp.data && typeof resp.data === "object" && (resp.data.exito === false || resp.data.success === false)) {
+            ultimoMensaje = resp.data.mensaje || resp.data.message || resp.data.error || ultimoMensaje;
+            continue;
+          }
+          return {
+            exito: true,
+            agregados: resp.data?.agregados ?? resp.data?.Agregados ?? payload.Entregables.length,
+          };
+        }
+      } catch (err: any) {
+        const status = err?.response?.status;
+        const data = err?.response?.data;
+
+        if (data && typeof data === "object") {
+          let detailedMsg = "";
+          if (data.errors && typeof data.errors === "object") {
+            const fieldErrors: string[] = [];
+            Object.entries(data.errors).forEach(([field, msgs]) => {
+              if (Array.isArray(msgs)) fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+              else if (typeof msgs === "string") fieldErrors.push(`${field}: ${msgs}`);
+            });
+            if (fieldErrors.length > 0) detailedMsg = fieldErrors.join(" | ");
+          }
+          if (!detailedMsg) {
+            detailedMsg =
+              data.mensaje ||
+              data.message ||
+              (data.title && data.title !== "One or more validation errors occurred." ? data.title : null) ||
+              (typeof data === "string" ? data : null);
+          }
+          if (detailedMsg) {
+            ultimoMensaje = detailedMsg;
+            if (status === 400 || (status === 404 && (data.mensaje || data.message))) {
+              return { exito: false, mensaje: ultimoMensaje };
+            }
+          }
+        } else if (typeof data === "string" && data.trim()) {
+          ultimoMensaje = data;
+        }
+
+        console.warn(`[agregarEntregables] Endpoint '${ep}' falló (Status ${status || "red"})`);
+      }
+    }
+
+    return { exito: false, mensaje: ultimoMensaje };
   },
 
   /**

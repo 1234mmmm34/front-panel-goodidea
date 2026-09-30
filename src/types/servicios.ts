@@ -68,11 +68,19 @@ export interface SesionDetalleDto {
 
 export interface EntregableDetalleDto {
   i_CveAgendaEntregables: number;
+  i_CveEntregables?: number;
   v_Nombre: string;
   b_Entregado: boolean;
   f_FechaEntregable: string | null;
   i_CveArchivo: number | null;
   v_Key?: string | null;
+}
+
+export interface AgregarEntregablesDto {
+  i_CveAgenda: number;
+  i_CveServAgendaDet: number;
+  Entregables: number[];
+  b_GuardarEnCatalogo: boolean;
 }
 
 export interface AlumnoAgendaDto {

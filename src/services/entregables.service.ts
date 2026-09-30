@@ -137,4 +137,28 @@ export class EntregablesService {
       return [];
     }
   }
+
+  /**
+   * 4. Agregar entregables al servicio agendado
+   * POST {UrlApi}entregables/AgregarEntregables
+   */
+  static async agregarEntregables(payload: any): Promise<{ exito: boolean; agregados?: number; mensaje?: string }> {
+    try {
+      const resp = await apiClient.post<any>("entregables/AgregarEntregables", payload);
+      if (resp.status >= 200 && resp.status < 300) {
+        return {
+          exito: true,
+          agregados: resp.data?.agregados ?? resp.data?.Agregados ?? payload?.Entregables?.length,
+        };
+      }
+      return { exito: false, mensaje: resp.data?.mensaje || resp.data?.message || "No se pudieron agregar los entregables." };
+    } catch (err: any) {
+      console.error("Error al agregar entregables:", err);
+      const data = err?.response?.data;
+      return {
+        exito: false,
+        mensaje: data?.mensaje || data?.message || (typeof data === "string" ? data : "Ocurrió un error al agregar los entregables."),
+      };
+    }
+  }
 }

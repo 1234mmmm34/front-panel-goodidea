@@ -30,6 +30,8 @@ import {
 } from "@/types/servicios";
 import { AgendaService } from "@/services/agenda.service";
 import { AlumnosService } from "@/services/alumnos.service";
+import { CatalogosService } from "@/services/catalogos.service";
+import { entregables as entregablesCat } from "@/types/catalogos";
 import { VerDocumento } from "@/services/archivos.service";
 import { formatearFechaCorta, esFechaPasada } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
@@ -76,6 +78,16 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [entregables, setEntregables] = useState<EntregableDetalleDto[]>([]);
   const [alumnos, setAlumnos] = useState<AlumnoAgendaDto[]>([]);
 
+  // Estados para panel de Agregar Entregables
+  const [panelAgregarAbierto, setPanelAgregarAbierto] = useState<boolean>(false);
+  const [catalogoEntregables, setCatalogoEntregables] = useState<entregablesCat[]>([]);
+  const [cargandoCatalogo, setCargandoCatalogo] = useState<boolean>(false);
+  const [catalogoCargado, setCatalogoCargado] = useState<boolean>(false);
+  const [busquedaEntregable, setBusquedaEntregable] = useState<string>("");
+  const [seleccionadosIds, setSeleccionadosIds] = useState<Set<number>>(new Set());
+  const [guardarEnCatalogo, setGuardarEnCatalogo] = useState<boolean>(true);
+  const [agregandoEntregables, setAgregandoEntregables] = useState<boolean>(false);
+
   // Acordeones
   const [acordeonSesiones, setAcordeonSesiones] = useState<boolean>(true);
   const [acordeonAlumnos, setAcordeonAlumnos] = useState<boolean>(true);
@@ -105,10 +117,133 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       cargarDetalle();
       setEditandoCotizacion(false);
       setEditandoOC(false);
+      setPanelAgregarAbierto(false);
+      setBusquedaEntregable("");
+      setSeleccionadosIds(new Set());
+      setGuardarEnCatalogo(true);
+      setAgregandoEntregables(false);
+      setCatalogoCargado(false);
     } else {
       setDetalle(null);
+      setPanelAgregarAbierto(false);
+      setBusquedaEntregable("");
+      setSeleccionadosIds(new Set());
+      setGuardarEnCatalogo(true);
+      setAgregandoEntregables(false);
+      setCatalogoCargado(false);
     }
   }, [abierto, iCveAgenda, iCveServAgendaDet]);
+
+  const handleAbrirPanelAgregar = async () => {
+    setPanelAgregarAbierto(true);
+    if (!catalogoCargado) {
+      setCargandoCatalogo(true);
+      const data = await CatalogosService.getEntregables();
+      setCatalogoEntregables(Array.isArray(data) ? data : []);
+      setCatalogoCargado(true);
+      setCargandoCatalogo(false);
+    }
+  };
+
+  const handleCancelarPanelAgregar = () => {
+    setPanelAgregarAbierto(false);
+    setSeleccionadosIds(new Set());
+    setBusquedaEntregable("");
+  };
+
+  const handleToggleSeleccionId = (id: number) => {
+    setSeleccionadosIds((prev) => {
+      const copy = new Set(prev);
+      if (copy.has(id)) {
+        copy.delete(id);
+      } else {
+        copy.add(id);
+      }
+      return copy;
+    });
+  };
+
+  const handleAgregarEntregablesConfirmar = async () => {
+    if (!iCveAgenda || !iCveServAgendaDet || seleccionadosIds.size === 0) return;
+    setAgregandoEntregables(true);
+
+    const res = await AgendaService.agregarEntregables({
+      i_CveAgenda: iCveAgenda,
+      i_CveServAgendaDet: iCveServAgendaDet,
+      Entregables: Array.from(seleccionadosIds),
+      b_GuardarEnCatalogo: guardarEnCatalogo,
+    });
+
+    if (!res.exito) {
+      toast.error(res.mensaje || "Ocurrió un error al agregar los entregables.");
+      setAgregandoEntregables(false);
+      return;
+    }
+
+    toast.success("Entregables agregados exitosamente");
+
+    // Re-pedir el detalle del servicio para traer los nuevos entregables con sus i_CveAgendaEntregables creados
+    const nuevoDetalle = await AgendaService.getAgendaDetalle(iCveAgenda, iCveServAgendaDet);
+
+    if (nuevoDetalle) {
+      const nuevosEntregables = nuevoDetalle.Entregables || [];
+
+      // Mapear b_Entregado y f_FechaEntregable de la lista previa por i_CveAgendaEntregables
+      const mapaEstadosPrevios = new Map<number, { b_Entregado: boolean; f_FechaEntregable: string | null }>();
+      entregables.forEach((e) => {
+        if (e.i_CveAgendaEntregables) {
+          mapaEstadosPrevios.set(e.i_CveAgendaEntregables, {
+            b_Entregado: e.b_Entregado,
+            f_FechaEntregable: e.f_FechaEntregable,
+          });
+        }
+      });
+
+      const entregablesFusionados = nuevosEntregables.map((nuevo) => {
+        const prev = mapaEstadosPrevios.get(nuevo.i_CveAgendaEntregables);
+        if (prev) {
+          return {
+            ...nuevo,
+            b_Entregado: prev.b_Entregado,
+            f_FechaEntregable: prev.f_FechaEntregable,
+          };
+        }
+        return nuevo;
+      });
+
+      setEntregables(entregablesFusionados);
+      setDetalle((prev) => (prev ? { ...prev, Entregables: entregablesFusionados } : nuevoDetalle));
+    }
+
+    onGuardadoExitoso?.();
+
+    setAgregandoEntregables(false);
+    setPanelAgregarAbierto(false);
+    setSeleccionadosIds(new Set());
+    setBusquedaEntregable("");
+  };
+
+  // Entregables del catálogo filtrados y ordenados (excluyendo los que el servicio ya tiene)
+  const cvesExistentesServicio = new Set(
+    entregables
+      .map((e) => e.i_CveEntregables)
+      .filter((id): id is number => id !== undefined && id !== null)
+  );
+  const nombresExistentesServicio = new Set(
+    entregables.map((e) => e.v_Nombre.trim().toLowerCase())
+  );
+
+  const entregablesDisponiblesCatalogo = catalogoEntregables.filter((cat) => {
+    if (cvesExistentesServicio.has(cat.i_CveEntregables)) return false;
+    if (nombresExistentesServicio.has(cat.v_Nombre.trim().toLowerCase())) return false;
+    return true;
+  });
+
+  const entregablesDisponiblesFiltrados = entregablesDisponiblesCatalogo
+    .filter((cat) =>
+      cat.v_Nombre.toLowerCase().includes(busquedaEntregable.trim().toLowerCase())
+    )
+    .sort((a, b) => a.v_Nombre.localeCompare(b.v_Nombre, "es", { sensitivity: "base" }));
 
   if (!abierto) return null;
 
@@ -1019,9 +1154,158 @@ export const ModalDetalleServicio: React.FC<Props> = ({
 
               {/* BLOQUE 1.6 — Entregables (Checklist simple sin caja exterior) */}
               <div>
-                <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: "0 0 8px 0" }}>
-                  Checklist de entregables
-                </h4>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                  <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
+                    Checklist de entregables
+                  </h4>
+                  {!panelAgregarAbierto && (
+                    <button
+                      type="button"
+                      className="btn-icon"
+                      style={{ color: "#94a3b8", padding: "2px", cursor: "pointer" }}
+                      onClick={handleAbrirPanelAgregar}
+                      title="Agregar entregables"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Panel de selección inline */}
+                {panelAgregarAbierto && (
+                  <div
+                    style={{
+                      padding: "12px",
+                      backgroundColor: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      marginBottom: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}
+                  >
+                    {cargandoCatalogo ? (
+                      <div style={{ padding: "12px 0", fontSize: "12px", color: "#64748b" }}>
+                        Cargando catálogo…
+                      </div>
+                    ) : (
+                      <>
+                        {/* Buscador */}
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ fontSize: "12px", padding: "6px 10px", height: "32px", width: "100%" }}
+                          placeholder="Buscar entregable..."
+                          value={busquedaEntregable}
+                          onChange={(e) => setBusquedaEntregable(e.target.value)}
+                        />
+
+                        {/* Lista de checkboxes */}
+                        <div
+                          className="no-scrollbar"
+                          style={{
+                            maxHeight: "220px",
+                            overflowY: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                            paddingRight: "4px",
+                          }}
+                        >
+                          {entregablesDisponiblesCatalogo.length === 0 ? (
+                            <p style={{ fontSize: "12px", color: "#64748b", margin: "4px 0" }}>
+                              No hay más entregables disponibles para agregar.
+                            </p>
+                          ) : entregablesDisponiblesFiltrados.length === 0 ? (
+                            <p style={{ fontSize: "12px", color: "#64748b", margin: "4px 0" }}>
+                              No se encontraron entregables que coincidan con la búsqueda.
+                            </p>
+                          ) : (
+                            entregablesDisponiblesFiltrados.map((item) => {
+                              const checked = seleccionadosIds.has(item.i_CveEntregables);
+                              return (
+                                <label
+                                  key={`cat-ent-${item.i_CveEntregables}`}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    padding: "6px 8px",
+                                    borderRadius: "6px",
+                                    backgroundColor: checked ? "#eff6ff" : "#ffffff",
+                                    border: "1px solid",
+                                    borderColor: checked ? "#bfdbfe" : "#f1f5f9",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    color: "#1e293b",
+                                    transition: "all 0.15s ease",
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => handleToggleSeleccionId(item.i_CveEntregables)}
+                                    style={{ cursor: "pointer", width: "14px", height: "14px", accentColor: "#2B8FCC" }}
+                                  />
+                                  <span>{item.v_Nombre}</span>
+                                </label>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Checkbox guardar en catálogo */}
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontSize: "12px",
+                            color: "#334155",
+                            cursor: "pointer",
+                            marginTop: "4px",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={guardarEnCatalogo}
+                            onChange={(e) => setGuardarEnCatalogo(e.target.checked)}
+                            style={{ cursor: "pointer", width: "14px", height: "14px", accentColor: "#2B8FCC" }}
+                          />
+                          <span>
+                            Guardar también en el catálogo de este servicio{" "}
+                            <span style={{ color: "#64748b", fontSize: "11px" }}>
+                              (las próximas agendas los traerán por default)
+                            </span>
+                          </span>
+                        </label>
+
+                        {/* Botones */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ height: "30px", padding: "0 12px", fontSize: "12px" }}
+                            onClick={handleCancelarPanelAgregar}
+                            disabled={agregandoEntregables}
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ backgroundColor: "#2B8FCC", height: "30px", padding: "0 12px", fontSize: "12px" }}
+                            onClick={handleAgregarEntregablesConfirmar}
+                            disabled={seleccionadosIds.size === 0 || agregandoEntregables}
+                          >
+                            {agregandoEntregables ? "Agregando…" : `Agregar (${seleccionadosIds.size})`}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {entregables.length === 0 ? (
                   <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>No hay entregables configurados para este servicio.</p>
