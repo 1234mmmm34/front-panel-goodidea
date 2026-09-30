@@ -189,7 +189,7 @@ export const AgendaService = {
         rawDatos = (resp.data as PaginadoResponse<AgendaServicioGetDto>).datos;
       }
 
-      const datosParseados = rawDatos.map((item) => {
+      const datosParseados = rawDatos.map((item: any) => {
         let entregablesParseados = item.entregablesParseados;
         if (!entregablesParseados && item.v_EntregablesJson) {
           try {
@@ -200,6 +200,9 @@ export const AgendaService = {
         }
         return {
           ...item,
+          b_AplicaVoBo: Boolean(item.b_AplicaVoBo ?? item.b_aplicaVoBo ?? item.bAplicaVoBo),
+          b_VoBoEntregado: Boolean(item.b_VoBoEntregado ?? item.b_voBoEntregado ?? item.bVoBoEntregado),
+          v_KeyVoBo: item.v_KeyVoBo ?? item.v_keyVoBo ?? item.vKeyVoBo ?? null,
           entregablesParseados: entregablesParseados ?? [],
         };
       });
@@ -260,6 +263,9 @@ export const AgendaService = {
 
       return {
         ...data,
+        b_AplicaVoBo: Boolean(data.b_AplicaVoBo ?? data.b_aplicaVoBo ?? data.bAplicaVoBo),
+        d_FechaVoBo: data.d_FechaVoBo ?? data.d_fechaVoBo ?? data.dFechaVoBo ?? null,
+        v_KeyVoBo: data.v_KeyVoBo ?? data.v_keyVoBo ?? data.vKeyVoBo ?? null,
         Sesiones: Array.isArray(sesiones) ? sesiones : [],
         Alumnos: Array.isArray(alumnos) ? alumnos : [],
         Facturas: Array.isArray(facturas) ? facturas : [],

@@ -366,7 +366,7 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
       plantaSeleccionadaId &&
       haySeleccion &&
       archivo &&
-      (vTipo !== "entregable" || fechaEntrega)
+      ((vTipo !== "entregable" && vTipo !== "vobo_autoridad") || fechaEntrega)
   );
 
   // Submit guardar
@@ -391,6 +391,10 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
       toast.error("Ingresa la fecha de entrega");
       return;
     }
+    if (vTipo === "vobo_autoridad" && !fechaEntrega) {
+      toast.error("Ingresa la fecha del visto bueno");
+      return;
+    }
 
     try {
       setSubiendo(true);
@@ -402,6 +406,11 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
       if (vTipo === "entregable") {
         requestDto.EntregablesSeleccionados = entregablesSeleccionadosIds;
         requestDto.d_FechaEntrega = fechaEntrega;
+      } else if (vTipo === "vobo_autoridad") {
+        requestDto.ServiciosSeleccionados = serviciosSeleccionados.map(
+          (s) => s.i_CveServAgendaDet
+        );
+        requestDto.d_FechaEntrega = fechaEntrega;
       } else {
         requestDto.ServiciosSeleccionados = serviciosSeleccionados.map(
           (s) => s.i_CveServAgendaDet
@@ -409,18 +418,18 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
         requestDto.v_Referencia = vReferenciaGlobal.trim() || undefined;
       }
 
-      const exito = await ArchivosService.subirArchivo(archivo, requestDto);
+      const resSubir = await ArchivosService.subirArchivo(archivo, requestDto);
 
-      if (exito) {
+      if (resSubir.exito) {
         toast.success("Archivo subido correctamente");
         if (onGuardadoExitoso) onGuardadoExitoso();
         onCerrar();
       } else {
-        toast.error("Error al subir el archivo. Intenta de nuevo.");
+        toast.error(resSubir.mensaje || "Error al subir el archivo. Intenta de nuevo.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error al subir archivo:", err);
-      toast.error("Ocurrió un error al procesar el archivo");
+      toast.error(err?.message || "Ocurrió un error al procesar el archivo");
     } finally {
       setSubiendo(false);
     }
@@ -503,7 +512,7 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
                 Subir archivos
               </h2>
               <span style={{ fontSize: "12px", color: "#64748b" }}>
-                Carga de cotizaciones, órdenes de compra y cartas de entrega
+                Carga de cotizaciones, órdenes de compra, cartas de entrega y vistos buenos
               </span>
             </div>
           </div>
@@ -563,6 +572,7 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
                 setServiciosConEntregablesSeleccionados([]);
                 setEntregablesSeleccionadosIds([]);
                 setSearchServicioText("");
+                setFechaEntrega(new Date().toISOString().split("T")[0]);
                 if (plantaSeleccionadaId && nuevoTipo) {
                   ejecutarBusquedaServicios(searchServicioText, plantaSeleccionadaId);
                 }
@@ -582,6 +592,7 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
               <option value="cotizacion_cliente">Cotización cliente</option>
               <option value="oc_cliente">Orden de compra cliente</option>
               <option value="entregable">Carta de entrega</option>
+              <option value="vobo_autoridad">Visto bueno de la autoridad</option>
             </select>
           </div>
 
@@ -955,7 +966,7 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
               </div>
 
               {/* 2.5 TABLA DE SELECCIONADOS — VARIANTE COTIZACIÓN / OC */}
-              {vTipo !== "entregable" && (
+              {(vTipo === "cotizacion_cliente" || vTipo === "oc_cliente") && (
                 <div>
                   <div
                     style={{
@@ -1102,6 +1113,125 @@ export const ModalSubirArchivos: React.FC<ModalSubirArchivosProps> = ({
                         borderRadius: "8px",
                         height: "36px",
                         fontSize: "13px",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 2.5.B TABLA DE SELECCIONADOS — VARIANTE VISTO BUENO DE LA AUTORIDAD */}
+              {vTipo === "vobo_autoridad" && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#475569",
+                      marginBottom: "8px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span>
+                      Servicios seleccionados ({serviciosSeleccionados.length})
+                      {nombrePlantaSeleccionada && ` — Planta: ${nombrePlantaSeleccionada}`}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      border: "1px solid #d0dce8",
+                      borderRadius: "10px",
+                      overflow: "hidden",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <div style={{ maxHeight: "240px", overflowY: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                        <thead>
+                          <tr
+                            style={{
+                              backgroundColor: "#f1f5f9",
+                              borderBottom: "1px solid #cbd5e1",
+                              color: "#64748b",
+                              fontSize: "11px",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            <th style={{ padding: "10px 12px", textAlign: "left", width: "55%" }}>Servicio</th>
+                            <th style={{ padding: "10px 12px", textAlign: "left", width: "35%" }}>Fecha inicio</th>
+                            <th style={{ padding: "10px 12px", textAlign: "center", width: "10%" }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {serviciosSeleccionados.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} style={{ padding: "20px", textAlign: "center", color: "#94a3b8" }}>
+                                Ningún servicio seleccionado
+                              </td>
+                            </tr>
+                          ) : (
+                            serviciosSeleccionados.map((item) => (
+                              <tr key={item.i_CveServAgendaDet} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                <td style={{ padding: "10px 12px", verticalAlign: "middle" }}>
+                                  <strong style={{ color: "#0f172a" }}>{item.v_Servicio}</strong>
+                                  <div style={{ fontSize: "11px", color: "#64748b" }}>{item.v_TipoServicio}</div>
+                                </td>
+
+                                <td style={{ padding: "10px 12px", verticalAlign: "middle", color: "#334155" }}>
+                                  {formatearFechaTexto(item.d_FechaInicio)}
+                                </td>
+
+                                <td style={{ padding: "10px 12px", textAlign: "center", verticalAlign: "middle" }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuitarServicioCotizacionOC(item.i_CveServAgendaDet)}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      color: "#ef4444",
+                                      cursor: "pointer",
+                                      padding: "4px",
+                                      borderRadius: "4px",
+                                    }}
+                                    title="Quitar de seleccionados"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* FECHA DEL VISTO BUENO */}
+                  <div style={{ marginTop: "14px" }}>
+                    <label
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: "#4a6580",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Fecha del visto bueno <span style={{ color: "#dc3545" }}>*</span>
+                    </label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={fechaEntrega}
+                      onChange={(e) => setFechaEntrega(e.target.value)}
+                      style={{
+                        borderRadius: "8px",
+                        height: "36px",
+                        fontSize: "13px",
+                        maxWidth: "240px",
                       }}
                     />
                   </div>

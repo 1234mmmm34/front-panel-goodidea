@@ -33,6 +33,9 @@ export interface AgendaServicioGetDto {
   b_TieneCotizacion: boolean;
   b_TieneOC: boolean;
   b_SinProgramar: boolean;
+  b_AplicaVoBo?: boolean;
+  b_VoBoEntregado?: boolean;
+  v_KeyVoBo?: string | null;
   i_TotalRegistros: number;
   v_NoCotizacionGI: string | null;
   v_NoOrdenCompraCliente: string | null;
@@ -130,6 +133,9 @@ export interface AgendaDetalleGetDto {
   b_SinProgramar: boolean;
   d_MontoProyecto: number | null;     // solo relevante si v_TipoVenta === "proyecto"
   d_PrecioUnitario: number;
+  b_AplicaVoBo?: boolean;
+  d_FechaVoBo?: string | null;
+  v_KeyVoBo?: string | null;
 }
 
 export interface FacturaUpdateDto {
@@ -162,6 +168,7 @@ export interface servicios {
   i_CveUnidad: number;
   i_Cantidad: number | null;
   i_CveNorma: number | null;
+  b_AplicaVoBo?: boolean;
   entregables: number[];
 }
 
@@ -179,6 +186,7 @@ export interface ServiciosDrpDto {
   v_Norma: string | null;
   i_Cantidad: number | null;
   v_Entregables: string | null;
+  b_AplicaVoBo?: boolean;
   total: number;
 }
 
@@ -196,6 +204,7 @@ export interface ServiciosDropdownDto {
   i_Cantidad: number | null;
   b_TipoDato: boolean;
   b_ModifCantEnAgenda: boolean;
+  b_AplicaVoBo?: boolean;
   entregables: number[];
 }
 

@@ -595,7 +595,7 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
                 </label>
                 <input
                   type="text"
-                  maxLength={50}
+                  maxLength={100}
                   className={`form-control ${esGiroInvalido ? "is-invalid" : ""}`}
                   style={{ width: "100%", borderRadius: "8px", height: "36px", border: esGiroInvalido ? "1px solid #dc3545" : "1px solid #d0dce8" }}
                   placeholder="Ej. Manufactura"
@@ -787,23 +787,8 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
                 />
               </div>
 
-              {/* 5. Núm. interior | Núm. exterior */}
+              {/* 5. Núm. exterior | Núm. interior */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ fontSize: "11px", fontWeight: 600, color: "#4a6580", display: "block", marginBottom: "4px" }}>
-                    Núm. interior
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={10}
-                    className="form-control"
-                    style={{ width: "100%", borderRadius: "8px", height: "36px", border: "1px solid #d0dce8" }}
-                    placeholder="Piso 4"
-                    value={numeroInterior}
-                    onChange={(e) => setNumeroInterior(e.target.value)}
-                  />
-                </div>
-
                 <div>
                   <label style={{ fontSize: "11px", fontWeight: 600, color: "#4a6580", display: "block", marginBottom: "4px" }}>
                     Núm. exterior <span style={{ color: "#2B8FCC" }}>*</span>
@@ -816,6 +801,21 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
                     placeholder="123"
                     value={numeroExterior}
                     onChange={(e) => setNumeroExterior(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "11px", fontWeight: 600, color: "#4a6580", display: "block", marginBottom: "4px" }}>
+                    Núm. interior
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={10}
+                    className="form-control"
+                    style={{ width: "100%", borderRadius: "8px", height: "36px", border: "1px solid #d0dce8" }}
+                    placeholder="Piso 4"
+                    value={numeroInterior}
+                    onChange={(e) => setNumeroInterior(e.target.value)}
                   />
                 </div>
               </div>

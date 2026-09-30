@@ -197,92 +197,132 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                         list = row.entregablesParseados;
                       }
 
-                      if (list.length === 0) {
+                      const partes: React.ReactNode[] = [];
+
+                      if (list.length > 0) {
+                        const entregados = list.filter((item) => item.b_Entregado);
+                        const pendientes = list.filter((item) => !item.b_Entregado);
+
+                        const gruposConKeyMap = new Map<string, string[]>();
+                        const entregadosSinKey: string[] = [];
+
+                        for (const item of entregados) {
+                          const key = item.v_Key && item.v_Key.trim() !== "" ? item.v_Key.trim() : null;
+                          if (key) {
+                            const actual = gruposConKeyMap.get(key) || [];
+                            actual.push(item.v_Nombre);
+                            gruposConKeyMap.set(key, actual);
+                          } else {
+                            entregadosSinKey.push(item.v_Nombre);
+                          }
+                        }
+
+                        // 1. Entregados con v_Key -> link <a> azul #2B8FCC con subrayado
+                        gruposConKeyMap.forEach((nombres, key) => {
+                          const labelText = nombres.join(", ");
+                          partes.push(
+                            <a
+                              key={`ent-group-${key}`}
+                              href="#"
+                              style={{
+                                color: "#2B8FCC",
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                                fontWeight: 500,
+                                whiteSpace: "nowrap",
+                              }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                VerDocumento(key);
+                              }}
+                              title={`Ver documento: ${labelText}`}
+                            >
+                              {labelText}
+                            </a>
+                          );
+                        });
+
+                        // 2. Entregados sin v_Key -> texto plano
+                        entregadosSinKey.forEach((nombre, idx) => {
+                          partes.push(
+                            <span
+                              key={`ent-nokey-${idx}`}
+                              style={{ color: "#1e293b", fontSize: "12px", fontWeight: 400, whiteSpace: "nowrap" }}
+                            >
+                              {nombre}
+                            </span>
+                          );
+                        });
+
+                        // 3. Pendientes (b_Entregado = false) -> texto rojo sin link
+                        pendientes.forEach((item, idx) => {
+                          partes.push(
+                            <span
+                              key={`ent-pend-${idx}`}
+                              style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }}
+                            >
+                              {item.v_Nombre}
+                            </span>
+                          );
+                        });
+                      } else {
                         const texto = (row as any).v_Entregables || "";
                         if (typeof texto === "string" && texto.trim()) {
                           const items: string[] = texto.split(",").map((s: string) => s.trim()).filter(Boolean);
-                          return (
-                            <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
-                              {items.map((item: string, iIdx: number) => (
-                                <React.Fragment key={`ent-txt-${iIdx}`}>
-                                  <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }}>{item}</span>
-                                  {iIdx < items.length - 1 && <span className="text-slate-400 text-xs">, </span>}
-                                </React.Fragment>
-                              ))}
-                            </div>
+                          items.forEach((item: string, iIdx: number) => {
+                            partes.push(
+                              <span key={`ent-txt-${iIdx}`} style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }}>
+                                {item}
+                              </span>
+                            );
+                          });
+                        }
+                      }
+
+                      // VoBo autoridad (si aplica) se agrega AL FINAL de la lista
+                      const bAplicaVoBo = Boolean(row.b_AplicaVoBo ?? (row as any).b_aplicaVoBo ?? (row as any).bAplicaVoBo);
+                      const bVoBoEntregado = Boolean(row.b_VoBoEntregado ?? (row as any).b_voBoEntregado ?? (row as any).bVoBoEntregado);
+                      const keyVoBo = row.v_KeyVoBo || (row as any).v_keyVoBo || (row as any).vKeyVoBo || null;
+
+                      if (bAplicaVoBo) {
+                        if (bVoBoEntregado) {
+                          partes.push(
+                            <a
+                              key="vobo-entregado-link"
+                              href="#"
+                              style={{
+                                color: "#2B8FCC",
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                                fontWeight: 500,
+                                whiteSpace: "nowrap",
+                              }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (keyVoBo) {
+                                  VerDocumento(keyVoBo);
+                                } else {
+                                  onVerDetalle(row);
+                                }
+                              }}
+                              title="Ver visto bueno de la autoridad"
+                            >
+                              VoBo autoridad
+                            </a>
+                          );
+                        } else {
+                          partes.push(
+                            <span
+                              key="vobo-pendiente"
+                              style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }}
+                            >
+                              VoBo autoridad
+                            </span>
                           );
                         }
-                        return <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>Pendiente</span>;
                       }
-
-                      const entregados = list.filter((item) => item.b_Entregado);
-                      const pendientes = list.filter((item) => !item.b_Entregado);
-
-                      const gruposConKeyMap = new Map<string, string[]>();
-                      const entregadosSinKey: string[] = [];
-
-                      for (const item of entregados) {
-                        const key = item.v_Key && item.v_Key.trim() !== "" ? item.v_Key.trim() : null;
-                        if (key) {
-                          const actual = gruposConKeyMap.get(key) || [];
-                          actual.push(item.v_Nombre);
-                          gruposConKeyMap.set(key, actual);
-                        } else {
-                          entregadosSinKey.push(item.v_Nombre);
-                        }
-                      }
-
-                      const partes: React.ReactNode[] = [];
-
-                      // 1. Entregados con v_Key -> link <a> azul #2B8FCC con subrayado
-                      gruposConKeyMap.forEach((nombres, key) => {
-                        const labelText = nombres.join(", ");
-                        partes.push(
-                          <a
-                            key={`ent-group-${key}`}
-                            href="#"
-                            style={{
-                              color: "#2B8FCC",
-                              textDecoration: "underline",
-                              cursor: "pointer",
-                              fontSize: "12px",
-                              fontWeight: 500,
-                              whiteSpace: "nowrap",
-                            }}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              VerDocumento(key);
-                            }}
-                            title={`Ver documento: ${labelText}`}
-                          >
-                            {labelText}
-                          </a>
-                        );
-                      });
-
-                      // 2. Entregados sin v_Key -> texto plano
-                      entregadosSinKey.forEach((nombre, idx) => {
-                        partes.push(
-                          <span
-                            key={`ent-nokey-${idx}`}
-                            style={{ color: "#1e293b", fontSize: "12px", fontWeight: 400, whiteSpace: "nowrap" }}
-                          >
-                            {nombre}
-                          </span>
-                        );
-                      });
-
-                      // 3. Pendientes (b_Entregado = false) -> texto rojo sin link
-                      pendientes.forEach((item, idx) => {
-                        partes.push(
-                          <span
-                            key={`ent-pend-${idx}`}
-                            style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px", whiteSpace: "nowrap" }}
-                          >
-                            {item.v_Nombre}
-                          </span>
-                        );
-                      });
 
                       if (partes.length === 0) {
                         return <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>Pendiente</span>;

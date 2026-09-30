@@ -303,6 +303,22 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     });
   };
 
+const MESES_ABREV_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function formatearFechaVoBo(fechaIso: string | null | undefined): string {
+  if (!fechaIso) return "";
+  const parts = fechaIso.split("T")[0].split("-");
+  if (parts.length === 3) {
+    const year = parts[0];
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parts[2].padStart(2, "0");
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${day}/${MESES_ABREV_ES[monthIdx]}/${year}`;
+    }
+  }
+  return fechaIso;
+}
+
   // Resumen de Pendientes client-side
   const calcularPendientes = (): string[] => {
     if (!detalle) return [];
@@ -312,6 +328,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     if (!ordenCompra.trim()) p.push("No. OC cliente");
     if (entregables.some((e) => !e.b_Entregado)) p.push("Entregables");
     if (facturas.length === 0) p.push("Factura");
+    if (detalle.b_AplicaVoBo && !detalle.v_KeyVoBo) p.push("Visto bueno");
     return p;
   };
 
@@ -1339,8 +1356,8 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                             <div style={{ display: "flex", flexDirection: "column" }}>
                               <span style={{ fontWeight: 400, color: "#1e293b" }}>{ent.v_Nombre}</span>
                               {ent.b_Entregado ? (
-                                <span style={{ fontSize: "11px", color: "#64748b" }}>
-                                  Entregado: {ent.f_FechaEntregable ? formatearFechaCorta(ent.f_FechaEntregable) : "Fecha no especificada"}
+                                <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 500 }}>
+                                  Entregado el {formatearFechaVoBo(ent.f_FechaEntregable)}
                                 </span>
                               ) : (
                                 <span style={{ fontSize: "11px", color: "#dc3545", fontWeight: 500 }}>Pendiente</span>
@@ -1352,7 +1369,19 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                             <button
                               type="button"
                               className="btn-icon"
-                              style={{ padding: "4px", color: "#94a3b8" }}
+                              style={{
+                                padding: "4px 8px",
+                                color: "#2B8FCC",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                fontSize: "12px",
+                                fontWeight: 500,
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 VerDocumento(keyArchivo);
@@ -1360,6 +1389,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                               title={`Ver archivo de ${ent.v_Nombre}`}
                             >
                               <Paperclip size={14} />
+                              <span>Ver archivo</span>
                             </button>
                           )}
                         </div>
@@ -1368,6 +1398,70 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                   </div>
                 )}
               </div>
+
+              {/* Card nueva: Visto bueno de la autoridad (solo si b_AplicaVoBo === true) */}
+              {detalle.b_AplicaVoBo && (
+                <div>
+                  <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: "0 0 8px 0" }}>
+                    Visto bueno de la autoridad
+                  </h4>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 12px",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {detalle.v_KeyVoBo ? (
+                        <CheckCircle2 size={14} style={{ color: "#10b981", flexShrink: 0 }} />
+                      ) : (
+                        <Circle size={14} style={{ color: "#cbd5e1", flexShrink: 0 }} />
+                      )}
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontWeight: 400, color: "#1e293b" }}>Visto bueno de la autoridad</span>
+                        {detalle.v_KeyVoBo ? (
+                          <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 500 }}>
+                            Entregado el {formatearFechaVoBo(detalle.d_FechaVoBo)}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: "11px", color: "#dc3545", fontWeight: 500 }}>Pendiente</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {detalle.v_KeyVoBo && (
+                      <button
+                        type="button"
+                        className="btn-icon"
+                        style={{
+                          padding: "4px 8px",
+                          color: "#2B8FCC",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          fontSize: "12px",
+                          fontWeight: 500,
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          textDecoration: "underline",
+                        }}
+                        onClick={() => VerDocumento(detalle.v_KeyVoBo)}
+                        title="Ver visto bueno de la autoridad"
+                      >
+                        <Paperclip size={14} />
+                        <span>Ver archivo</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* BLOQUE 1.7 — Resumen de Pendientes (Banner Final) */}
               {pendientesList.length > 0 ? (

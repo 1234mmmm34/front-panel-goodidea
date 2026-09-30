@@ -36,6 +36,7 @@ export const ModalFormServicio: React.FC<Props> = ({
   const [nombreUnidadText, setNombreUnidadText] = useState<string>("");
   const [cveNorma, setCveNorma] = useState<number | null>(null);
   const [cantidad, setCantidad] = useState<number>(1);
+  const [bAplicaVoBo, setBAplicaVoBo] = useState<boolean>(false);
   const [entregablesSeleccionados, setEntregablesSeleccionados] = useState<number[]>([]);
 
   // Validation State
@@ -71,6 +72,7 @@ export const ModalFormServicio: React.FC<Props> = ({
       setNombreUnidadText(servicioEditar.v_Unidad || "");
       setCveNorma(servicioEditar.i_CveNorma || null);
       setCantidad(servicioEditar.i_Cantidad ?? 1);
+      setBAplicaVoBo(Boolean(servicioEditar.b_AplicaVoBo ?? (servicioEditar as any).b_aplicaVoBo ?? (servicioEditar as any).bAplicaVoBo));
       setEntregablesSeleccionados(servicioEditar.entregables || []);
     } else {
       setNombre("");
@@ -80,6 +82,7 @@ export const ModalFormServicio: React.FC<Props> = ({
       setNombreUnidadText("");
       setCveNorma(null);
       setCantidad(1);
+      setBAplicaVoBo(false);
       setEntregablesSeleccionados([]);
     }
     setShowErrors(false);
@@ -138,6 +141,7 @@ export const ModalFormServicio: React.FC<Props> = ({
         i_CveUnidad: cveUnidad,
         i_Cantidad: 1,
         i_CveNorma: cveNorma,
+        b_AplicaVoBo: bAplicaVoBo,
         entregables: entregablesSeleccionados,
       },
       Entregables: entregablesSeleccionados,
@@ -296,6 +300,29 @@ export const ModalFormServicio: React.FC<Props> = ({
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Renglón a ancho completo: Aplica visto bueno de la autoridad */}
+              <div className="form-group margin-0" style={{ gridColumn: "span 3", marginTop: "4px" }}>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    color: "#334155",
+                    userSelect: "none",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={bAplicaVoBo}
+                    onChange={(e) => setBAplicaVoBo(e.target.checked)}
+                    style={{ accentColor: "#188ae2", width: "15px", height: "15px" }}
+                  />
+                  <span>Aplica visto bueno de la autoridad</span>
+                </label>
               </div>
             </div>
           </div>

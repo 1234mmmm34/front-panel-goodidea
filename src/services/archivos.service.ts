@@ -72,20 +72,41 @@ export const ArchivosService = {
    * Endpoint: POST archivos/subir
    * Content-Type: multipart/form-data
    */
-  async subirArchivo(archivo: File, datos: SubirArchivoRequestDto): Promise<boolean> {
-    return httpDefensivo(async () => {
+  async subirArchivo(
+    archivo: File,
+    datos: SubirArchivoRequestDto
+  ): Promise<{ exito: boolean; mensaje?: string }> {
+    try {
       const formData = new FormData();
       formData.append("archivo", archivo, archivo.name);
       formData.append("datos", JSON.stringify(datos));
 
       const resp = await apiClient.post("archivos/subir", formData, {
         headers: {
-          "Content-Type": "multipart/form-data",
+          "Content-Type": undefined,
         },
       });
 
-      return resp.status >= 200 && resp.status < 300;
-    }, false);
+      return { exito: resp.status >= 200 && resp.status < 300 };
+    } catch (err: any) {
+      console.error("[ArchivosService.subirArchivo] Error response:", err?.response?.status, err?.response?.data);
+      const rawErrorData = err?.response?.data;
+      let mensaje = "Error al subir el archivo";
+
+      if (typeof rawErrorData === "string" && rawErrorData.trim()) {
+        mensaje = rawErrorData;
+      } else if (rawErrorData && typeof rawErrorData === "object") {
+        mensaje = rawErrorData.mensaje || rawErrorData.message || rawErrorData.title || rawErrorData.error || mensaje;
+        if (rawErrorData.errors && typeof rawErrorData.errors === "object") {
+          const det = Object.values(rawErrorData.errors).flat().join(" ");
+          if (det) mensaje += `: ${det}`;
+        }
+      } else if (err?.message) {
+        mensaje = err.message;
+      }
+
+      return { exito: false, mensaje };
+    }
   },
 
   /**
