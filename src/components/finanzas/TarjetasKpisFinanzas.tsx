@@ -143,25 +143,28 @@ export const TarjetasKpisFinanzas: React.FC<TarjetasKpisFinanzasProps> = ({ kpis
     },
   ];
 
-  // Fila 2: Ventas y Ganancia (sin IVA salvo Pendiente de facturar)
+  // Fila 2: Ventas y Ganancia
+  const ventaConIva = Math.round(kpis.d_VentaPeriodo * 1.16 * 100) / 100;
+  const costoConIva = Math.round(kpis.d_CostoProveedores * 1.16 * 100) / 100;
+
   const fila2 = [
     {
       id: "venta",
       label: "Servicios vendidos",
-      monto: formatMoneda(kpis.d_VentaPeriodo),
+      monto: formatMoneda(ventaConIva),
       subtexto: "Servicios iniciados en el periodo",
       colorMonto: "#1e3a5f",
-      badge: "sin IVA",
+      badge: "con IVA",
       tooltipText:
         "Precio de venta de los servicios cuya primera sesión cae en el periodo, se hayan facturado o no.",
     },
     {
       id: "costo",
       label: "Pago a externos",
-      monto: formatMoneda(kpis.d_CostoProveedores),
+      monto: formatMoneda(costoConIva),
       subtexto: "Servicios dados por terceros",
       colorMonto: "#1e3a5f",
-      badge: "sin IVA",
+      badge: "con IVA",
       tooltipText:
         "Lo que se paga a proveedores externos contratados para dar el servicio. Los servicios dados por el equipo interno no tienen costo aquí.",
     },
@@ -348,7 +351,7 @@ export const TarjetasKpisFinanzas: React.FC<TarjetasKpisFinanzasProps> = ({ kpis
       {renderFila(
         fila2,
         "VENTAS Y GANANCIA",
-        "Servicios que se dieron en el periodo, lo que se pagó a externos y lo que quedó de ganancia. Montos sin IVA."
+        "Servicios que se dieron en el periodo y lo que se pagó a externos, con IVA. La ganancia es sin IVA."
       )}
     </div>
   );

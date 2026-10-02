@@ -758,13 +758,21 @@ export const ModalAgendaServicio: React.FC<Props> = ({
     empresaSeleccionada &&
     plantaSeleccionadaId &&
     contactoSeleccionadoId &&
-    serviciosAgregados.length > 0
+    serviciosAgregados.length > 0 &&
+    serviciosAgregados.every((s) => Number(s.cantidad) >= 1)
   );
 
   const handleSiguiente = () => {
     if (pasoActual === 1) {
       if (serviciosAgregados.length === 0) {
         setErrorSinServicios(true);
+      }
+      const hayCantidadInvalida = serviciosAgregados.some(
+        (s) => !s.cantidad || Number(s.cantidad) < 1
+      );
+      if (hayCantidadInvalida) {
+        toast.error("La cantidad de todos los servicios debe ser mayor a 0.");
+        return;
       }
       if (sePuedeAvanzar) {
         setPasoActual(2);
@@ -1788,24 +1796,34 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                 <td style={{ padding: "8px 10px" }}>
                                   <input
                                     type="number"
-                                    min={0}
+                                    min={1}
                                     className="form-control"
                                     style={{
                                       height: "30px",
                                       padding: "2px 6px",
                                       fontSize: "12px",
                                       borderRadius: "6px",
-                                      border: "1px solid #d0dce8",
+                                      border: (!item.cantidad || Number(item.cantidad) < 1) ? "1px solid #dc2626" : "1px solid #d0dce8",
                                       width: "65px",
                                     }}
                                     value={item.cantidad}
                                     onChange={(e) => {
                                       const raw = e.target.value;
-                                      handleActualizarServicio(
-                                        item.idTemp,
-                                        "cantidad",
-                                        raw === "" ? "" : Math.max(0, Number(raw))
-                                      );
+                                      if (raw === "") {
+                                        handleActualizarServicio(item.idTemp, "cantidad", "");
+                                      } else {
+                                        const num = Number(raw);
+                                        handleActualizarServicio(
+                                          item.idTemp,
+                                          "cantidad",
+                                          num < 1 ? 1 : num
+                                        );
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      if (!item.cantidad || Number(item.cantidad) < 1) {
+                                        handleActualizarServicio(item.idTemp, "cantidad", 1);
+                                      }
                                     }}
                                   />
                                 </td>

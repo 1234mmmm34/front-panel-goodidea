@@ -5,6 +5,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { FacturaGetDto, FiltrosFacturasState, FacturasResumenDto } from "@/types/facturas";
 import { FacturasService } from "@/services/facturas.service";
+import { GastosService } from "@/services/gastos.service";
 import { FiltrosFacturas } from "@/components/facturas/FiltrosFacturas";
 import { TablaFacturas } from "@/components/facturas/TablaFacturas";
 import { TarjetasResumenFacturas } from "@/components/facturas/TarjetasResumenFacturas";
@@ -38,6 +39,7 @@ export default function FacturasPage() {
   // 3. Datos, Resumen y estado de carga
   const [datos, setDatos] = useState<FacturaGetDto[]>([]);
   const [resumen, setResumen] = useState<FacturasResumenDto | null>(null);
+  const [montoPendienteProveedor, setMontoPendienteProveedor] = useState<number | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
   const [cargandoResumen, setCargandoResumen] = useState<boolean>(true);
 
@@ -54,7 +56,7 @@ export default function FacturasPage() {
       setCargando(true);
       setCargandoResumen(true);
 
-      const [resFacturas, resResumen] = await Promise.all([
+      const [resFacturas, resResumen, resGastosResumen] = await Promise.all([
         FacturasService.getFacturas({
           estado: currentFiltros.estado,
           fechaInicio: currentFiltros.fechaInicio,
@@ -73,6 +75,9 @@ export default function FacturasPage() {
           fechaPagoFin: currentFiltros.fechaFin,
           searchTerm: currentFiltros.searchTerm,
         }),
+        GastosService.getGastosResumen({
+          estado: "Pendientes",
+        }),
       ]);
 
       setDatos(resFacturas.datos);
@@ -81,6 +86,7 @@ export default function FacturasPage() {
       setCargando(false);
 
       setResumen(resResumen);
+      setMontoPendienteProveedor(resGastosResumen.d_TotalPendiente);
       setCargandoResumen(false);
     },
     []
@@ -145,7 +151,11 @@ export default function FacturasPage() {
         </div>
 
         {/* Tarjetas de Resumen de Facturas */}
-        <TarjetasResumenFacturas resumen={resumen} cargando={cargandoResumen} />
+        <TarjetasResumenFacturas
+          resumen={resumen}
+          montoPendienteProveedor={montoPendienteProveedor}
+          cargando={cargandoResumen}
+        />
 
         {/* 1. Encabezado y barra de filtros */}
         <FiltrosFacturas

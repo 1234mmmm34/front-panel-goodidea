@@ -79,6 +79,8 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
   const [empresas, setEmpresas] = useState<EmpresaGetDto[]>([]);
   const [cargandoEmpresas, setCargandoEmpresas] = useState<boolean>(false);
   const [empresaSeleccionadaId, setEmpresaSeleccionadaId] = useState<string>("");
+  const [searchEmpresaText, setSearchEmpresaText] = useState<string>("");
+  const [dropdownEmpresaAbierto, setDropdownEmpresaAbierto] = useState<boolean>(false);
 
   const [searchServicioText, setSearchServicioText] = useState<string>("");
   const [serviciosBusqueda, setServiciosBusqueda] = useState<ServicioSinFacturaDto[]>([]);
@@ -93,6 +95,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
   const [dropdownAgruparAbierto, setDropdownAgruparAbierto] = useState<boolean>(false);
   const [nombreNuevoGrupo, setNombreNuevoGrupo] = useState<string>("");
 
+  const containerEmpresaRef = useRef<HTMLDivElement>(null);
   const containerServicioRef = useRef<HTMLDivElement>(null);
   const dropdownAgruparRef = useRef<HTMLDivElement>(null);
 
@@ -127,6 +130,8 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
       setPasoActual(1);
       setPasoMaximoAlcanzado(1);
       setEmpresaSeleccionadaId("");
+      setSearchEmpresaText("");
+      setDropdownEmpresaAbierto(false);
       setSearchServicioText("");
       setServiciosBusqueda([]);
       setServiciosIndividuales([]);
@@ -155,6 +160,17 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
     return empresas.find((e) => e.iD_Empresa.toString() === empresaSeleccionadaId) || null;
   }, [empresas, empresaSeleccionadaId]);
 
+  // Empresas filtradas por buscador
+  const empresasFiltradas = useMemo(() => {
+    if (!searchEmpresaText.trim()) return empresas;
+    const term = searchEmpresaText.toLowerCase().trim();
+    return empresas.filter(
+      (e) =>
+        (e.s_RazonSocial && e.s_RazonSocial.toLowerCase().includes(term)) ||
+        (e.s_RFC && e.s_RFC.toLowerCase().includes(term))
+    );
+  }, [empresas, searchEmpresaText]);
+
   // Búsqueda de servicios con Debounce
   useEffect(() => {
     if (!empresaSeleccionadaId) {
@@ -178,6 +194,12 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
   // Cerrar dropdowns al hacer clic afuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerEmpresaRef.current &&
+        !containerEmpresaRef.current.contains(event.target as Node)
+      ) {
+        setDropdownEmpresaAbierto(false);
+      }
       if (
         containerServicioRef.current &&
         !containerServicioRef.current.contains(event.target as Node)
@@ -1091,8 +1113,8 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                  {/* Select Empresa */}
-                  <div>
+                  {/* Select Empresa con Buscador */}
+                  <div style={{ position: "relative" }} ref={containerEmpresaRef}>
                     <label
                       style={{
                         fontSize: "12px",
@@ -1104,30 +1126,134 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                     >
                       Empresa<span style={{ color: "#dc2626" }}>*</span>
                     </label>
-                    <select
-                      className="form-select"
-                      style={{
-                        borderRadius: "8px",
-                        height: "36px",
-                        fontSize: "13px",
-                        border: !empresaSeleccionadaId && errorPaso1 ? "1px solid #dc3545" : "1px solid #d0dce8",
-                      }}
-                      value={empresaSeleccionadaId}
-                      onChange={(e) => {
-                        setEmpresaSeleccionadaId(e.target.value);
-                        setServiciosIndividuales([]);
-                        setGrupos([]);
-                        setErrorPaso1(null);
-                      }}
-                      disabled={cargandoEmpresas}
-                    >
-                      <option value="">-- Selecciona una empresa --</option>
-                      {empresas.map((emp) => (
-                        <option key={emp.iD_Empresa} value={emp.iD_Empresa}>
-                          {emp.s_RazonSocial} {emp.s_RFC ? `(${emp.s_RFC})` : ""}
-                        </option>
-                      ))}
-                    </select>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        disabled={cargandoEmpresas}
+                        style={{
+                          borderRadius: "8px",
+                          height: "36px",
+                          fontSize: "13px",
+                          paddingRight: searchEmpresaText ? "30px" : "12px",
+                          border: !empresaSeleccionadaId && errorPaso1 ? "1px solid #dc3545" : "1px solid #d0dce8",
+                        }}
+                        placeholder={cargandoEmpresas ? "Cargando empresas..." : "-- Selecciona una empresa --"}
+                        value={searchEmpresaText}
+                        onFocus={() => setDropdownEmpresaAbierto(true)}
+                        onChange={(e) => {
+                          setSearchEmpresaText(e.target.value);
+                          setDropdownEmpresaAbierto(true);
+                          if (empresaSeleccionadaId) {
+                            setEmpresaSeleccionadaId("");
+                            setServiciosIndividuales([]);
+                            setGrupos([]);
+                          }
+                        }}
+                      />
+                      {searchEmpresaText && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmpresaSeleccionadaId("");
+                            setSearchEmpresaText("");
+                            setServiciosIndividuales([]);
+                            setGrupos([]);
+                            setDropdownEmpresaAbierto(true);
+                          }}
+                          style={{
+                            position: "absolute",
+                            right: "8px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            background: "none",
+                            border: "none",
+                            color: "#94a3b8",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            lineHeight: 1,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {dropdownEmpresaAbierto && (
+                      <div
+                        className="no-scrollbar"
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          backgroundColor: "#ffffff",
+                          borderRadius: "10px",
+                          border: "1px solid #94a3b8",
+                          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)",
+                          maxHeight: "260px",
+                          overflowY: "auto",
+                          scrollbarWidth: "none",
+                          msOverflowStyle: "none",
+                          zIndex: 10000,
+                          marginTop: "4px",
+                        }}
+                      >
+                        {empresasFiltradas.length === 0 ? (
+                          <div
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: "12px",
+                              color: "#7a96b0",
+                              textAlign: "center",
+                            }}
+                          >
+                            Sin resultados
+                          </div>
+                        ) : (
+                          empresasFiltradas.map((emp) => (
+                            <div
+                              key={emp.iD_Empresa}
+                              onClick={() => {
+                                setEmpresaSeleccionadaId(emp.iD_Empresa.toString());
+                                setSearchEmpresaText(emp.s_RazonSocial || "");
+                                setDropdownEmpresaAbierto(false);
+                                setServiciosIndividuales([]);
+                                setGrupos([]);
+                                setErrorPaso1(null);
+                              }}
+                              style={{
+                                padding: "8px 12px",
+                                fontSize: "13px",
+                                cursor: "pointer",
+                                borderBottom: "1px solid #f1f5f9",
+                                backgroundColor:
+                                  empresaSeleccionadaId === emp.iD_Empresa.toString()
+                                    ? "#eaf4fb"
+                                    : "transparent",
+                                transition: "background-color 0.15s ease",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = "#f4f8fc";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor =
+                                  empresaSeleccionadaId === emp.iD_Empresa.toString()
+                                    ? "#eaf4fb"
+                                    : "transparent";
+                              }}
+                            >
+                              <div style={{ fontWeight: 600, color: "#1e3a5f" }}>
+                                {emp.s_RazonSocial}
+                              </div>
+                              <div style={{ fontSize: "11px", color: "#7a96b0" }}>
+                                {emp.s_RFC ? `RFC: ${emp.s_RFC}` : "Sin RFC"}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Autocomplete Buscador por Servicio / Cotización */}

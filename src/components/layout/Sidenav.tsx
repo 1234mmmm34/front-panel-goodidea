@@ -7,13 +7,12 @@ import {
   Home,
   Calendar,
   Folder,
-  Receipt,
   LogOut,
   ChevronDown,
   ChevronRight,
   PanelLeft,
   Settings,
-  LineChart,
+  Coins,
 } from "lucide-react";
 import { AuthService } from "@/services/auth.service";
 import { useToast } from "@/context/ToastContext";
@@ -27,6 +26,7 @@ interface Props {
 export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
   const pathname = usePathname();
   const router = useRouter();
+  const [finanzasAbiertas, setFinanzasAbiertas] = useState<boolean>(true);
   const [catalogosAbiertos, setCatalogosAbiertos] = useState<boolean>(true);
   const [configuracionAbierta, setConfiguracionAbierta] = useState<boolean>(true);
   const [emailUsuario, setEmailUsuario] = useState<string>("");
@@ -46,6 +46,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
   const esProgramacion = pathname.startsWith("/programacion");
   const esFacturas = pathname.startsWith("/facturas");
   const esFinanzas = pathname.startsWith("/finanzas");
+  const esGastos = pathname.startsWith("/gastos");
   const esEmpresas = pathname.startsWith("/empresas");
   const esServicios = pathname.startsWith("/servicios");
   const esInstructores = pathname.startsWith("/instructores");
@@ -161,30 +162,69 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
           {!collapsed && <span className="menu-text">Programación</span>}
         </Link>
 
-        {/* 3. Facturas, Catálogos y Configuración (Solo si no es usuario restringido) */}
+        {/* 3. Finanzas, Catálogos y Configuración (Solo si no es usuario restringido) */}
         {!esRestringido && (
           <>
-            <Link
-              href="/facturas"
-              className={`sidebar-nav-item ${esFacturas ? "active" : ""}`}
-              title="Facturas"
-            >
-              <div className="nav-icon-wrapper">
-                <Receipt size={18} className="nav-item-icon" />
-              </div>
-              {!collapsed && <span className="menu-text">Facturas</span>}
-            </Link>
+            {/* Submenú Finanzas */}
+            <div className="sidebar-section">
+              <button
+                className="sidebar-nav-item sidebar-header-btn"
+                onClick={() => {
+                  if (collapsed) {
+                    onToggleCollapse();
+                  } else {
+                    setFinanzasAbiertas(!finanzasAbiertas);
+                  }
+                }}
+                title="Finanzas"
+              >
+                <div className="nav-icon-wrapper">
+                  <Coins size={18} className="nav-item-icon" />
+                </div>
 
-            <Link
-              href="/finanzas"
-              className={`sidebar-nav-item ${esFinanzas ? "active" : ""}`}
-              title="Finanzas"
-            >
-              <div className="nav-icon-wrapper">
-                <LineChart size={18} className="nav-item-icon" />
-              </div>
-              {!collapsed && <span className="menu-text">Finanzas</span>}
-            </Link>
+                {!collapsed && (
+                  <>
+                    <span className="menu-text" style={{ flex: 1, textAlign: "left" }}>
+                      Finanzas
+                    </span>
+                    {finanzasAbiertas ? (
+                      <ChevronDown size={15} className="submenu-arrow" />
+                    ) : (
+                      <ChevronRight size={15} className="submenu-arrow" />
+                    )}
+                  </>
+                )}
+              </button>
+
+              {!collapsed && finanzasAbiertas && (
+                <div className="sidebar-subitems-container">
+                  <div className="sidebar-guide-line" />
+                  <div className="sidebar-subitems">
+                    <Link
+                      href="/finanzas"
+                      className={`sidebar-subitem ${esFinanzas ? "active-sub" : ""}`}
+                      title="Dashboard"
+                    >
+                      <span>Dashboard</span>
+                    </Link>
+                    <Link
+                      href="/facturas"
+                      className={`sidebar-subitem ${esFacturas ? "active-sub" : ""}`}
+                      title="Facturas"
+                    >
+                      <span>Facturas</span>
+                    </Link>
+                    <Link
+                      href="/gastos"
+                      className={`sidebar-subitem ${esGastos ? "active-sub" : ""}`}
+                      title="Gastos"
+                    >
+                      <span>Gastos</span>
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Divisor */}
             <div className="sidebar-divider" />
@@ -300,7 +340,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
         )}
       </nav>
 
-      {/* 5. Salir (Incondicional) */}
+      {/* Salir */}
       <div className="sidebar-footer">
         <button
           className="sidebar-nav-item nav-logout-btn"

@@ -1,22 +1,17 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
-import { FacturasResumenDto } from "@/types/facturas";
+import { FacturasProvResumen } from "@/types/gastos";
 
-interface TarjetasResumenFacturasProps {
-  resumen: FacturasResumenDto | null;
-  montoPendienteProveedor?: number | null;
+interface TarjetasResumenGastosProps {
+  resumen: FacturasProvResumen | null;
   cargando: boolean;
 }
 
-export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = ({
+export const TarjetasResumenGastos: React.FC<TarjetasResumenGastosProps> = ({
   resumen,
-  montoPendienteProveedor,
   cargando,
 }) => {
-  const router = useRouter();
-
   const formatMoneda = (val: number | null | undefined) => {
     if (val === null || val === undefined || isNaN(val)) return "$0.00";
     return new Intl.NumberFormat("es-MX", {
@@ -38,7 +33,7 @@ export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = (
       >
         {Array.from({ length: 4 }).map((_, i) => (
           <div
-            key={`sk-fact-${i}`}
+            key={`sk-gasto-${i}`}
             style={{
               backgroundColor: "#ffffff",
               borderRadius: "10px",
@@ -60,37 +55,38 @@ export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = (
 
   const cards = [
     {
-      id: "facturado",
-      label: "Total Facturado",
+      id: "monto_total",
+      label: "Monto total",
       monto: formatMoneda(resumen.d_TotalFacturado),
-      subtexto: `${resumen.i_TotalFacturas} ${resumen.i_TotalFacturas === 1 ? "factura" : "facturas"} en el periodo`,
+      subtexto: `${resumen.i_TotalFacturas} ${
+        resumen.i_TotalFacturas === 1 ? "gasto" : "gastos"
+      } en el periodo`,
       colorMonto: "#1e3a5f",
       badge: "con IVA",
     },
     {
-      id: "pagado",
-      label: "Total Pagado",
+      id: "total_pagado",
+      label: "Total pagado",
       monto: formatMoneda(resumen.d_TotalPagado),
-      subtexto: "Pagos recibidos en el periodo",
+      subtexto: "Pagos realizados",
       colorMonto: "#1e3a5f",
       badge: "con IVA",
     },
     {
-      id: "pendiente",
-      label: "Pendiente por cobrar",
+      id: "total_pendiente",
+      label: "Total pendiente",
       monto: formatMoneda(resumen.d_TotalPendiente),
-      subtexto: "Saldo pendiente por cobrar",
+      subtexto: "Saldo pendiente por pagar",
       colorMonto: "#1e3a5f",
       badge: "con IVA",
     },
     {
-      id: "pendiente_proveedor",
-      label: "Pendiente por pagar",
-      monto: formatMoneda(montoPendienteProveedor),
-      subtexto: "Saldo pendiente con proveedores",
+      id: "total_gastos",
+      label: "Total gastos",
+      monto: `${resumen.i_TotalFacturas}`,
+      subtexto: "Gastos registrados en el periodo",
       colorMonto: "#1e3a5f",
-      badge: "con IVA",
-      onClick: () => router.push("/gastos"),
+      badge: "conteo",
     },
   ];
 
@@ -105,7 +101,6 @@ export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = (
       {cards.map((card) => (
         <div
           key={card.id}
-          onClick={card.onClick}
           style={{
             backgroundColor: "#ffffff",
             borderRadius: "10px",
@@ -116,20 +111,6 @@ export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = (
             flexDirection: "column",
             justifyContent: "space-between",
             position: "relative",
-            cursor: card.onClick ? "pointer" : "default",
-            transition: "all 0.15s ease-in-out",
-          }}
-          onMouseEnter={(e) => {
-            if (card.onClick) {
-              e.currentTarget.style.borderColor = "#cbd5e1";
-              e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.05)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (card.onClick) {
-              e.currentTarget.style.borderColor = "#e2e8f0";
-              e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.02)";
-            }
           }}
         >
           {/* Header Tarjeta */}
@@ -145,7 +126,7 @@ export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = (
               {card.label}
             </span>
 
-            {/* Badge (con IVA / conteo) */}
+            {/* Badge */}
             <span
               style={{
                 fontSize: "10px",
@@ -185,5 +166,3 @@ export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = (
     </div>
   );
 };
-
-

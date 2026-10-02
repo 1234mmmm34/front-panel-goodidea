@@ -51,6 +51,51 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
   const [lineas, setLineas] = useState<LineaServicioFacturaDto[]>([]);
   const [abonos, setAbonos] = useState<AbonoFacturaDto[]>([]);
 
+  // Toggle "Ver costos"
+  const [verCostos, setVerCostos] = useState<boolean>(false);
+
+  const renderCostoCell = (costoSinIVA?: number | null, costoConIVA?: number | null) => {
+    const sinIva = Number(costoSinIVA || 0);
+    const conIva = Number(costoConIVA || 0);
+
+    if (sinIva === 0 && conIva === 0) {
+      return (
+        <td
+          style={{
+            padding: "6px 10px",
+            textAlign: "center",
+            color: "#94a3b8",
+            backgroundColor: "#f4f8fc",
+            borderRight: "1px solid #e2e8f0",
+          }}
+        >
+          —
+        </td>
+      );
+    }
+
+    return (
+      <td
+        style={{
+          padding: "6px 10px",
+          textAlign: "right",
+          backgroundColor: "#f4f8fc",
+          borderRight: "1px solid #e2e8f0",
+          lineHeight: "1.25",
+        }}
+      >
+        <div style={{ fontSize: "11px", color: "#334155" }}>
+          {formatearMonto(sinIva)}
+          <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 400, marginLeft: "4px" }}>s/IVA</span>
+        </div>
+        <div style={{ fontSize: "11px", fontWeight: 700, color: "#0f172a", marginTop: "1px" }}>
+          {formatearMonto(conIva)}
+          <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 400, marginLeft: "4px" }}>c/IVA</span>
+        </div>
+      </td>
+    );
+  };
+
   // Estado para expandir/colapsar carpetas de proyecto
   const [proyectosExpandidos, setProyectosExpandidos] = useState<Record<string, boolean>>({});
 
@@ -105,6 +150,7 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
     if (abierto && factura) {
       cargarDatosDetalle(factura.i_CveFacturas);
       setMostrandoFilaAgregar(false);
+      setVerCostos(false);
     }
   }, [abierto, factura, cargarDatosDetalle]);
 
@@ -360,7 +406,17 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
           padding: "16px",
         }}
       >
-        <div className="modal-content" style={{ maxWidth: "860px", width: "95%", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+        <div
+          className="modal-content"
+          style={{
+            maxWidth: verCostos ? "min(1100px, 95vw)" : "860px",
+            width: "95%",
+            maxHeight: "90vh",
+            display: "flex",
+            flexDirection: "column",
+            transition: "max-width 0.2s ease-in-out",
+          }}
+        >
           
           {/* Header del Modal */}
           <div className="modal-header" style={{ padding: "10px 18px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
@@ -445,9 +501,85 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
               <>
                 {/* 1. Tabla de líneas (servicios de la factura) */}
                 <div>
-                  <h4 style={{ fontSize: "13px", fontWeight: 600, color: "#334155", marginBottom: "4px" }}>
-                    Servicios de la factura
-                  </h4>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <h4
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#334155",
+                        margin: 0,
+                      }}
+                    >
+                      Servicios de la factura
+                    </h4>
+
+                    <div
+                      role="switch"
+                      aria-checked={verCostos}
+                      tabIndex={0}
+                      onClick={() => setVerCostos((prev) => !prev)}
+                      onKeyDown={(e) => {
+                        if (e.key === " " || e.key === "Enter") {
+                          e.preventDefault();
+                          setVerCostos((prev) => !prev);
+                        }
+                      }}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        outline: "none",
+                      }}
+                    >
+                      {/* Pista switch (36x20px) */}
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "20px",
+                          borderRadius: "9999px",
+                          backgroundColor: verCostos ? "#2B8FCC" : "#d0dce8",
+                          position: "relative",
+                          transition: "background-color 0.15s ease-in-out",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {/* Perilla blanca (16px) */}
+                        <div
+                          style={{
+                            width: "16px",
+                            height: "16px",
+                            borderRadius: "50%",
+                            backgroundColor: "#ffffff",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                            position: "absolute",
+                            top: "2px",
+                            left: "2px",
+                            transform: verCostos ? "translateX(16px)" : "translateX(0)",
+                            transition: "transform 0.15s ease-in-out",
+                          }}
+                        />
+                      </div>
+
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          color: "#4a6580",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Ver costos
+                      </span>
+                    </div>
+                  </div>
 
                   <div style={{ border: "1px solid #e2e8f0", borderRadius: "4px", overflowX: "auto", backgroundColor: "#ffffff" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
@@ -462,13 +594,18 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                           <th style={{ textAlign: "center", width: "90px", padding: "6px 10px", fontWeight: 600, color: "#475569", borderRight: "1px solid #e2e8f0" }}>
                             Unidad
                           </th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600, color: "#475569", borderRight: "1px solid #e2e8f0" }}>
+                          <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600, color: "#475569", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>
                             Precio unit s/IVA
                           </th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600, color: "#475569", borderRight: "1px solid #e2e8f0" }}>
+                          <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600, color: "#475569", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>
                             Impuesto (16%)
                           </th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600, color: "#475569" }}>
+                          {verCostos && (
+                            <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600, color: "#4a6580", backgroundColor: "#f4f8fc", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>
+                              Costo proveedor
+                            </th>
+                          )}
+                          <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600, color: "#475569", whiteSpace: "nowrap" }}>
                             Total s/IVA
                           </th>
                         </tr>
@@ -476,7 +613,7 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                       <tbody>
                         {gruposLineas.length === 0 ? (
                           <tr>
-                            <td colSpan={6} style={{ textAlign: "center", padding: "12px", color: "#94a3b8" }}>
+                            <td colSpan={verCostos ? 7 : 6} style={{ textAlign: "center", padding: "12px", color: "#94a3b8" }}>
                               Sin líneas de servicio registradas.
                             </td>
                           </tr>
@@ -486,6 +623,8 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                               const expandido = !!proyectosExpandidos[grupo.key];
                               const montoProj = grupo.montoProyecto || 0;
                               const ivaProj = montoProj * 0.16;
+                              const costoSinIVAGrupo = grupo.lineas.reduce((acc, l) => acc + (l.d_CostoProveedorSinIVA || 0), 0);
+                              const costoConIVAGrupo = grupo.lineas.reduce((acc, l) => acc + (l.d_CostoProveedorConIVA || 0), 0);
 
                               return (
                                 <React.Fragment key={grupo.key}>
@@ -500,7 +639,7 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                       userSelect: "none",
                                     }}
                                   >
-                                    {/* Servicio (Nombre del Proyecto + Iconos + Subtexto) */}
+                                    {/* Servicio */}
                                     <td style={{ padding: "6px 10px", borderRight: "1px solid #e2e8f0" }}>
                                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                         {expandido ? (
@@ -540,6 +679,9 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                       {formatearMonto(ivaProj)}
                                     </td>
 
+                                    {/* Costo proveedor (si verCostos) */}
+                                    {verCostos && renderCostoCell(costoSinIVAGrupo, costoConIVAGrupo)}
+
                                     {/* Total s/IVA: d_MontoProyecto */}
                                     <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "#0f172a" }}>
                                       {formatearMonto(montoProj)}
@@ -560,7 +702,7 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                             backgroundColor: "#fafcff",
                                           }}
                                         >
-                                          {/* Indentado con padding de 32px */}
+                                          {/* Servicio */}
                                           <td style={{ padding: "6px 10px 6px 32px", fontWeight: 600, color: "#475569", borderRight: "1px solid #e2e8f0" }}>
                                             {servicioNombre}
                                           </td>
@@ -584,6 +726,9 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                           <td style={{ padding: "6px 10px", textAlign: "right", color: "#94a3b8", borderRight: "1px solid #e2e8f0" }}>
                                             —
                                           </td>
+
+                                          {/* Costo proveedor (si verCostos) */}
+                                          {verCostos && renderCostoCell(linea.d_CostoProveedorSinIVA, linea.d_CostoProveedorConIVA)}
 
                                           {/* Total s/IVA: — */}
                                           <td style={{ padding: "6px 10px", textAlign: "right", color: "#94a3b8" }}>
@@ -620,6 +765,7 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                 <td style={{ padding: "6px 10px", textAlign: "right", color: "#475569", borderRight: "1px solid #e2e8f0" }}>
                                   {formatearMonto(ivaLinea)}
                                 </td>
+                                {verCostos && renderCostoCell(linea.d_CostoProveedorSinIVA, linea.d_CostoProveedorConIVA)}
                                 <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, color: "#334155" }}>
                                   {formatearMonto(subtotalLinea)}
                                 </td>
@@ -627,41 +773,108 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                             );
                           })
                         )}
-                      </tbody>
-                      <tfoot>
-                        <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
-                          <td colSpan={4} style={{ borderRight: "1px solid #e2e8f0" }}></td>
-                          <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "#334155", borderRight: "1px solid #e2e8f0" }}>
+
+                        {/* Fila Subtotal */}
+                        <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
+                          <td style={{ padding: "8px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "8px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "8px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "8px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              textAlign: "right",
+                              fontWeight: 700,
+                              color: "#334155",
+                              borderRight: "1px solid #e2e8f0",
+                            }}
+                          >
                             Subtotal
                           </td>
-                          <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "#334155" }}>
+                          {verCostos && (
+                            <td style={{ padding: "8px 12px", backgroundColor: "#f4f8fc", borderRight: "1px solid #e2e8f0" }}></td>
+                          )}
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              textAlign: "right",
+                              fontWeight: 700,
+                              color: "#334155",
+                            }}
+                          >
                             {formatearMonto(subtotalTabla)}
                           </td>
                         </tr>
-                        <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
-                          <td colSpan={4} style={{ borderRight: "1px solid #e2e8f0" }}></td>
-                          <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, color: "#475569", borderRight: "1px solid #e2e8f0" }}>
+
+                        {/* Fila IVA (16%) */}
+                        <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
+                          <td style={{ padding: "8px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "8px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "8px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "8px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              textAlign: "right",
+                              fontWeight: 600,
+                              color: "#475569",
+                              borderRight: "1px solid #e2e8f0",
+                            }}
+                          >
                             IVA (16%)
                           </td>
-                          <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, color: "#334155" }}>
+                          {verCostos && (
+                            <td style={{ padding: "8px 12px", backgroundColor: "#f4f8fc", borderRight: "1px solid #e2e8f0" }}></td>
+                          )}
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              textAlign: "right",
+                              fontWeight: 600,
+                              color: "#334155",
+                            }}
+                          >
                             {formatearMonto(ivaTabla)}
                           </td>
                         </tr>
-                        <tr>
-                          <td colSpan={4} style={{ borderRight: "1px solid #e2e8f0" }}></td>
-                          <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700, fontSize: "13px", color: "#1e293b", borderRight: "1px solid #e2e8f0" }}>
+
+                        {/* Fila Total */}
+                        <tr style={{ backgroundColor: "#ffffff" }}>
+                          <td style={{ padding: "9px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "9px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "9px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td style={{ padding: "9px 12px", borderRight: "1px solid #e2e8f0" }}></td>
+                          <td
+                            style={{
+                              padding: "9px 12px",
+                              textAlign: "right",
+                              fontWeight: 800,
+                              fontSize: "13px",
+                              color: "#0f172a",
+                              borderRight: "1px solid #e2e8f0",
+                            }}
+                          >
                             Total
                           </td>
-                          <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 800, fontSize: "14px", color: "#0f172a" }}>
+                          {verCostos && (
+                            <td style={{ padding: "9px 12px", backgroundColor: "#f4f8fc", borderRight: "1px solid #e2e8f0" }}></td>
+                          )}
+                          <td
+                            style={{
+                              padding: "9px 12px",
+                              textAlign: "right",
+                              fontWeight: 800,
+                              fontSize: "15px",
+                              color: "#0f172a",
+                            }}
+                          >
                             {formatearMonto(totalTabla)}
                           </td>
                         </tr>
-                      </tfoot>
+                      </tbody>
                     </table>
                   </div>
                 </div>
-
-                {/* 3. Historial de pagos (abonos) */}
                 <div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
                     <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
@@ -827,31 +1040,33 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
 
                           {/* Fila Editable Inline para agregar nuevo pago */}
                           {mostrandoFilaAgregar && pendientePagar > 0 && !factura.b_Cancelada && (
-                            <tr style={{ backgroundColor: "#f0f9ff" }}>
-                              <td style={{ padding: "4px 8px" }}>
+                            <tr style={{ backgroundColor: "#f0f9ff", borderBottom: "1px solid #e2e8f0" }}>
+                              <td style={{ padding: "8px 12px" }}>
                                 <input
                                   type="date"
                                   value={fechaAbonoProgramadaDraft}
                                   onChange={(e) => setFechaAbonoProgramadaDraft(e.target.value)}
                                   style={{
-                                    width: "100%",
-                                    padding: "3px 6px",
+                                    width: "140px",
+                                    padding: "5px 8px",
                                     fontSize: "12px",
                                     border: "1px solid #cbd5e1",
-                                    borderRadius: "4px",
+                                    borderRadius: "6px",
                                     backgroundColor: "#ffffff",
+                                    color: "#334155",
                                     outline: "none",
+                                    fontFamily: "inherit",
                                   }}
                                 />
                               </td>
-                              <td style={{ padding: "4px 8px" }}>
-                                <span style={{ color: "#dc2626", fontWeight: 700 }}>Pendiente</span>
+                              <td style={{ padding: "8px 12px" }}>
+                                <span style={{ color: "#dc2626", fontWeight: 700, fontSize: "12px" }}>Pendiente</span>
                               </td>
-                              <td style={{ padding: "4px 8px", textAlign: "center", color: "#94a3b8" }}>
+                              <td style={{ padding: "8px 12px", textAlign: "center", color: "#64748b" }}>
                                 —
                               </td>
-                              <td style={{ padding: "4px 8px", textAlign: "right" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "2px" }}>
+                              <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
                                   <span style={{ fontSize: "12px", fontWeight: 600, color: "#64748b" }}>$</span>
                                   <input
                                     type="number"
@@ -875,20 +1090,22 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                       }
                                     }}
                                     style={{
-                                      width: "100px",
-                                      padding: "3px 6px",
+                                      width: "110px",
+                                      padding: "5px 8px",
                                       fontSize: "12px",
                                       textAlign: "right",
                                       border: "1px solid #cbd5e1",
-                                      borderRadius: "4px",
+                                      borderRadius: "6px",
                                       backgroundColor: "#ffffff",
+                                      color: "#0f172a",
+                                      fontWeight: 600,
                                       outline: "none",
                                     }}
                                   />
                                 </div>
                               </td>
-                              <td style={{ padding: "4px 8px", textAlign: "center" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
                                   <button
                                     type="button"
                                     disabled={guardandoFilaAgregar}
@@ -899,12 +1116,12 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                       background: "transparent",
                                       border: "none",
                                       cursor: guardandoFilaAgregar ? "not-allowed" : "pointer",
-                                      padding: "2px",
+                                      padding: 0,
                                       display: "flex",
                                       alignItems: "center",
                                     }}
                                   >
-                                    <Check size={16} />
+                                    <Check size={18} />
                                   </button>
 
                                   <button
@@ -917,12 +1134,12 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                                       background: "transparent",
                                       border: "none",
                                       cursor: guardandoFilaAgregar ? "not-allowed" : "pointer",
-                                      padding: "2px",
+                                      padding: 0,
                                       display: "flex",
                                       alignItems: "center",
                                     }}
                                   >
-                                    <X size={16} />
+                                    <X size={18} />
                                   </button>
                                 </div>
                               </td>

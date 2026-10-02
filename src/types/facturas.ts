@@ -74,6 +74,10 @@ export interface LineaServicioFacturaDto {
   v_NombreProyecto?: string | null;
   d_MontoProyecto?: number | null;
   i_CveAgenda?: number | null;
+  v_Proveedor?: string | null;
+  d_DescuentoProveedor?: number;
+  d_CostoProveedorSinIVA?: number;
+  d_CostoProveedorConIVA?: number;
 }
 
 export interface FacturaDetalleDto extends FacturaGetDto {
