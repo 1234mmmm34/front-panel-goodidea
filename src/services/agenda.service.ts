@@ -12,6 +12,7 @@ import {
   AgendaInsertDto,
   ReprogramacionInsertDto,
   AgregarEntregablesDto,
+  CambiarProveedorDto,
 } from "@/types/servicios";
 
 export const AgendaService = {
@@ -263,6 +264,11 @@ export const AgendaService = {
 
       return {
         ...data,
+        i_CveProveedor: data.i_CveProveedor ?? data.iCveProveedor ?? data.iD_Proveedor ?? data.id_proveedor ?? null,
+        v_Proveedor: data.v_Proveedor ?? data.vProveedor ?? data.v_NombreProveedor ?? data.v_RazonSocial ?? null,
+        v_NoCotizacionProv: data.v_NoCotizacionProv ?? data.vNoCotizacionProv ?? null,
+        v_NoOrdenCompraProv: data.v_NoOrdenCompraProv ?? data.vNoOrdenCompraProv ?? null,
+        d_PrecioProveedor: data.d_PrecioProveedor ?? data.dPrecioProveedor ?? 0,
         b_AplicaVoBo: Boolean(data.b_AplicaVoBo ?? data.b_aplicaVoBo ?? data.bAplicaVoBo),
         d_FechaVoBo: data.d_FechaVoBo ?? data.d_fechaVoBo ?? data.dFechaVoBo ?? null,
         v_KeyVoBo: data.v_KeyVoBo ?? data.v_keyVoBo ?? data.vKeyVoBo ?? null,
@@ -355,6 +361,48 @@ export const AgendaService = {
         return respPost.status >= 200 && respPost.status < 300;
       }
     }, false);
+  },
+
+  /**
+   * Cambia o remueve el proveedor asignado a un servicio agendado.
+   * Endpoint: PUT agenda/CambiarProveedor
+   */
+  async cambiarProveedor(payload: CambiarProveedorDto): Promise<{ status: number; exito: boolean; mensaje?: string }> {
+    try {
+      const resp = await apiClient.put("agenda/CambiarProveedor", payload);
+      if (resp.status >= 200 && resp.status < 300) {
+        return { status: resp.status, exito: true };
+      }
+      return {
+        status: resp.status,
+        exito: false,
+        mensaje: resp.data?.mensaje || resp.data?.message || "Error al actualizar el proveedor",
+      };
+    } catch (err: any) {
+      const status = err?.response?.status || 500;
+      const data = err?.response?.data;
+      let msg = "";
+
+      if (data && typeof data === "object") {
+        if (data.errors && typeof data.errors === "object") {
+          const fieldErrors: string[] = [];
+          Object.entries(data.errors).forEach(([field, msgs]) => {
+            if (Array.isArray(msgs)) fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+            else if (typeof msgs === "string") fieldErrors.push(`${field}: ${msgs}`);
+          });
+          if (fieldErrors.length > 0) msg = fieldErrors.join(" | ");
+        }
+        if (!msg) {
+          msg = data.mensaje || data.message || data.error || (typeof data === "string" ? data : "");
+        }
+      } else if (typeof data === "string" && data.trim()) {
+        msg = data;
+      }
+      if (!msg) {
+        msg = err?.message || "Ocurrió un error al procesar la solicitud.";
+      }
+      return { status, exito: false, mensaje: msg };
+    }
   },
 
   /**

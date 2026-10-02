@@ -172,6 +172,21 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
             setNuevaFecha(new Date().toISOString().split("T")[0]);
           }
 
+          // Inicializar titular con la sesión original o null ("")
+          const cveTitularOrig =
+            encontrada?.i_CveTitular ??
+            encontrada?.iCveTitular ??
+            encontrada?.iD_Titular ??
+            encontrada?.id_titular ??
+            (data as any)?.i_CveTitular ??
+            (data as any)?.iCveTitular;
+
+          if (cveTitularOrig && Number(cveTitularOrig) > 0) {
+            setNuevoInstructorId(String(cveTitularOrig));
+          } else {
+            setNuevoInstructorId("");
+          }
+
           // Extraer ID de la Empresa defensivamente
           let empId =
             encontrada?.i_CveEmpresa ??
@@ -270,9 +285,35 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
     }
   }, [abierto, iCveAgenda, iCveServAgendaDet, iCveAgendaDetalle]);
 
-  // Consultar horas ocupadas cuando cambia instructor o fecha con switch activo
+  // Identificar si el servicio es de tipo Capacitación
+  const esCapacitacion = useMemo(() => {
+    const cveTipo =
+      sesionOriginal?.i_CveTipoServicio ??
+      sesionOriginal?.i_CveTServicio ??
+      sesionOriginal?.iCveTipoServicio ??
+      sesionOriginal?.iCveTServicio ??
+      (detalleAgenda as any)?.i_CveTipoServicio ??
+      (detalleAgenda as any)?.i_CveTServicio ??
+      (detalleAgenda as any)?.iCveTipoServicio ??
+      (detalleAgenda as any)?.iCveTServicio;
+
+    if (cveTipo !== undefined && cveTipo !== null) {
+      return Number(cveTipo) === 2;
+    }
+
+    const nomTipo =
+      sesionOriginal?.v_TipoServicio ||
+      sesionOriginal?.v_Servicio ||
+      (detalleAgenda as any)?.v_TipoServicio ||
+      (detalleAgenda as any)?.v_Servicio ||
+      "";
+
+    return nomTipo.toUpperCase().includes("CAPACITA");
+  }, [sesionOriginal, detalleAgenda]);
+
+  // Consultar horas ocupadas cuando cambia instructor o fecha en capacitaciones
   useEffect(() => {
-    if (cambiaInstructor && nuevoInstructorId && nuevaFecha) {
+    if (esCapacitacion && nuevoInstructorId && nuevaFecha) {
       setBuscandoHorasOcupadas(true);
       AgendaService.getHorasOcupadasInstructor(Number(nuevoInstructorId), nuevaFecha)
         .then((hList) => {
@@ -284,7 +325,7 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
     } else {
       setHorasOcupadasInstructor([]);
     }
-  }, [cambiaInstructor, nuevoInstructorId, nuevaFecha]);
+  }, [esCapacitacion, nuevoInstructorId, nuevaFecha]);
 
   // Nombre del instructor original consultado del backend o catálogo
   const nombreInstructorOriginal = useMemo(() => {
@@ -368,10 +409,6 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
       toast.error("Selecciona la nueva fecha de la sesión");
       return;
     }
-    if (cambiaInstructor && !nuevoInstructorId) {
-      toast.error("Selecciona el nuevo instructor titular");
-      return;
-    }
     if (cambiaProveedor && !nuevoApoyoValue) {
       toast.error("Selecciona el nuevo apoyo o proveedor");
       return;
@@ -428,46 +465,77 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
       sesionOriginal?.iOrden ??
       1;
 
-    let cveTitularOriginal =
+    // Extraer ID del titular original
+    let cveTitularOriginal: number | null =
       sesionOriginal?.i_CveTitular ??
       sesionOriginal?.iCveTitular ??
       sesionOriginal?.iD_Titular ??
       sesionOriginal?.id_titular ??
       (detalleAgenda as any)?.i_CveTitular ??
-      (detalleAgenda as any)?.iCveTitular;
+      (detalleAgenda as any)?.iCveTitular ??
+      null;
 
-    if (!cveTitularOriginal && instructores.length > 0) {
-      const match = instructores.find((ins: any) => {
-        const nom = ins.v_NombreCompleto || `${ins.v_Nombre || ""} ${ins.v_ApPaterno || ""}`.trim();
-        return nom === nombreInstructorOriginal;
-      });
-      if (match) {
-        cveTitularOriginal = (match as any).i_CveInstructor ?? (match as any).iD_Instructor ?? (match as any).id_instructor ?? (match as any).iCveInstructor;
-      }
+    if (cveTitularOriginal !== null) {
+      cveTitularOriginal = Number(cveTitularOriginal);
+      if (cveTitularOriginal <= 0) cveTitularOriginal = null;
     }
 
-    const idTitularFinal = cambiaInstructor
-      ? Number(nuevoInstructorId)
-      : (cveTitularOriginal ? Number(cveTitularOriginal) : (instructores[0] ? Number((instructores[0] as any).i_CveInstructor ?? (instructores[0] as any).iD_Instructor) : 1));
+    // Titular final: solo aplica si el servicio es de tipo Capacitación
+    let idTitularFinal: number | null = null;
+    if (esCapacitacion && nuevoInstructorId && Number(nuevoInstructorId) > 0) {
+      idTitularFinal = Number(nuevoInstructorId);
+    }
 
-    const bTipoProvInsTitularOriginal =
-      sesionOriginal?.b_TipoProvInsTitular ??
-      sesionOriginal?.bTipoProvInsTitular ??
-      (detalleAgenda as any)?.b_TipoProvInsTitular ??
-      false;
+    // CambiaInstructor solo va en true si el titular elegido es distinto al de la sesión original
+    const cambiaInstructorFinal = esCapacitacion && (idTitularFinal !== cveTitularOriginal);
 
-    const cveApoyoOriginal =
-      sesionOriginal?.i_CveApoyo ??
-      sesionOriginal?.iCveApoyo ??
-      sesionOriginal?.iD_Apoyo ??
-      sesionOriginal?.id_apoyo ??
-      (detalleAgenda as any)?.i_CveApoyo;
+    // b_TipoProvInsTitular: false si no hay titular
+    const bTipoProvInsTitularFinal = idTitularFinal !== null
+      ? Boolean(
+          sesionOriginal?.b_TipoProvInsTitular ??
+          sesionOriginal?.bTipoProvInsTitular ??
+          (detalleAgenda as any)?.b_TipoProvInsTitular ??
+          false
+        )
+      : false;
 
-    const bTipoProvInsApoyoOriginal =
-      sesionOriginal?.b_TipoProvInsApoyo ??
-      sesionOriginal?.bTipoProvInsApoyo ??
-      (detalleAgenda as any)?.b_TipoProvInsApoyo ??
-      false;
+    // Apoyo original y final
+    const cveApoyoOriginal: number | null = (() => {
+      const raw =
+        sesionOriginal?.i_CveApoyo ??
+        sesionOriginal?.iCveApoyo ??
+        sesionOriginal?.iD_Apoyo ??
+        sesionOriginal?.id_apoyo ??
+        (detalleAgenda as any)?.i_CveApoyo;
+      return raw && Number(raw) > 0 ? Number(raw) : null;
+    })();
+
+    let idApoyoFinal: number | null = null;
+    let bTipoProvInsApoyoFinal = false;
+
+    if (cambiaProveedor) {
+      if (nuevoApoyoIdParsed && Number(nuevoApoyoIdParsed) > 0) {
+        idApoyoFinal = Number(nuevoApoyoIdParsed);
+        bTipoProvInsApoyoFinal = nuevoApoyoEsProveedor;
+      } else {
+        idApoyoFinal = null;
+        bTipoProvInsApoyoFinal = false;
+      }
+    } else {
+      idApoyoFinal = cveApoyoOriginal;
+      bTipoProvInsApoyoFinal = idApoyoFinal !== null
+        ? Boolean(
+            sesionOriginal?.b_TipoProvInsApoyo ??
+            sesionOriginal?.bTipoProvInsApoyo ??
+            (detalleAgenda as any)?.b_TipoProvInsApoyo ??
+            false
+          )
+        : false;
+    }
+
+    const cambiaProveedorFinal = cambiaProveedor
+      ? idApoyoFinal !== cveApoyoOriginal
+      : false;
 
     const requestDto: ReprogramacionInsertDto = {
       i_CveAgendaDetalle: Number(cveAgendaDet || 0),
@@ -477,20 +545,14 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
       d_FechaHoraInicio: dFechaHoraInicio,
       d_FechaHoraFin: dFechaHoraFin,
       i_CveTitular: idTitularFinal,
-      b_TipoProvInsTitular: cambiaInstructor
-        ? false
-        : Boolean(bTipoProvInsTitularOriginal),
-      i_CveApoyo: cambiaProveedor
-        ? nuevoApoyoIdParsed
-        : (cveApoyoOriginal ? Number(cveApoyoOriginal) : null),
-      b_TipoProvInsApoyo: cambiaProveedor
-        ? nuevoApoyoEsProveedor
-        : Boolean(bTipoProvInsApoyoOriginal),
+      b_TipoProvInsTitular: bTipoProvInsTitularFinal,
+      i_CveApoyo: idApoyoFinal,
+      b_TipoProvInsApoyo: bTipoProvInsApoyoFinal,
       i_CveArea: areaId ? Number(areaId) : null,
       v_Observaciones: obsFinal,
       i_CveContactoReprograma: Number(contactoReprogramaId),
-      CambiaProveedor: cambiaProveedor,
-      CambiaInstructor: cambiaInstructor,
+      CambiaProveedor: cambiaProveedorFinal,
+      CambiaInstructor: cambiaInstructorFinal,
       d_NuevoPrecioProveedor:
         cambiaProveedor && nuevoApoyoEsProveedor
           ? Number(nuevoPrecioProveedor) || 0
@@ -1071,56 +1133,42 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
                       </div>
                     )}
 
-                    {/* SWITCH 1: ¿Cambia Instructor? */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          fontSize: "13px",
-                          fontWeight: 600,
-                          color: "#0f172a",
-                          cursor: "pointer",
-                          userSelect: "none",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          checked={cambiaInstructor}
-                          onChange={(e) => setCambiaInstructor(e.target.checked)}
-                          style={{ width: "16px", height: "16px", cursor: "pointer" }}
-                        />
-                        <span>¿Cambia instructor titular?</span>
-                      </label>
-
-                      {cambiaInstructor && (
-                        <div style={{ paddingLeft: "24px" }}>
-                          <select
-                            className="form-select"
-                            value={nuevoInstructorId}
-                            onChange={(e) => setNuevoInstructorId(e.target.value)}
-                            style={{ height: "38px", fontSize: "13px", borderRadius: "8px" }}
-                          >
-                            <option value="">-- Selecciona nuevo instructor --</option>
-                            {instructores.map((ins: any) => {
-                              const cve = ins.i_CveInstructor ?? ins.iD_Instructor ?? ins.id_instructor ?? ins.iCveInstructor;
-                              const nombre =
-                                ins.v_NombreCompleto ||
-                                ins.v_NombreTitular ||
-                                `${ins.v_Nombre || ""} ${ins.v_ApPaterno || ""}`.trim() ||
-                                `Instructor #${cve}`;
-                              return (
-                                <option key={cve} value={cve}>
-                                  {nombre}
-                                </option>
-                              );
-                            })}
-                          </select>
-                        </div>
-                      )}
-                    </div>
+                    {/* Instructor Titular (solo si el servicio es de tipo Capacitación) */}
+                    {esCapacitacion && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <label
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#334155",
+                            display: "block",
+                          }}
+                        >
+                          Instructor titular
+                        </label>
+                        <select
+                          className="form-select"
+                          value={nuevoInstructorId}
+                          onChange={(e) => setNuevoInstructorId(e.target.value)}
+                          style={{ height: "38px", fontSize: "13px", borderRadius: "8px" }}
+                        >
+                          <option value="">— Sin titular —</option>
+                          {instructores.map((ins: any) => {
+                            const cve = ins.i_CveInstructor ?? ins.iD_Instructor ?? ins.id_instructor ?? ins.iCveInstructor;
+                            const nombre =
+                              ins.v_NombreCompleto ||
+                              ins.v_NombreTitular ||
+                              `${ins.v_Nombre || ""} ${ins.v_ApPaterno || ""}`.trim() ||
+                              `Instructor #${cve}`;
+                            return (
+                              <option key={cve} value={cve}>
+                                {nombre}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
 
                     {/* SWITCH 2: ¿Cambia Apoyo / Proveedor? */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

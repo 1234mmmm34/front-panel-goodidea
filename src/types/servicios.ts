@@ -125,6 +125,10 @@ export interface AgendaDetalleGetDto {
   i_TotalSesiones: number;
   i_CveEmpresa: number | null;
   d_PrecioProveedor: number;
+  i_CveProveedor?: number | null;
+  v_Proveedor?: string | null;
+  v_NoCotizacionProv?: string | null;
+  v_NoOrdenCompraProv?: string | null;
   i_CvePlanta: number | null;
   i_CveArea: number | null;
   v_NombreArea: string | null;
@@ -136,6 +140,14 @@ export interface AgendaDetalleGetDto {
   b_AplicaVoBo?: boolean;
   d_FechaVoBo?: string | null;
   v_KeyVoBo?: string | null;
+}
+
+export interface CambiarProveedorDto {
+  i_CveServAgendaDet: number;
+  i_CveProveedor: number | null;
+  d_PrecioProveedor: number;
+  v_NoOrdenCompraProv: string | null;
+  v_NoCotizacionProv: string | null;
 }
 
 export interface FacturaUpdateDto {

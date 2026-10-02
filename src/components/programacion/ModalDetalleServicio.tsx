@@ -17,6 +17,7 @@ import {
   ChevronUp,
   RefreshCw,
   Ban,
+  Plus,
 } from "lucide-react";
 import { ModalReprogramarSesion } from "./ModalReprogramarSesion";
 import { ModalCancelarSesion } from "./ModalCancelarSesion";
@@ -27,6 +28,8 @@ import {
   EntregableDetalleDto,
   FacturaDetalleDto,
   SesionDetalleDto,
+  ProveedorGetDto,
+  CambiarProveedorDto,
 } from "@/types/servicios";
 import { AgendaService } from "@/services/agenda.service";
 import { AlumnosService } from "@/services/alumnos.service";
@@ -68,6 +71,15 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [modalCancelarAbierto, setModalCancelarAbierto] = useState<boolean>(false);
   const [sesionACancelar, setSesionACancelar] = useState<SesionDetalleDto | null>(null);
 
+  // Modal / Formulario Proveedor state
+  const [modalProveedorAbierto, setModalProveedorAbierto] = useState<boolean>(false);
+  const [proveedoresList, setProveedoresList] = useState<ProveedorGetDto[]>([]);
+  const [formCveProveedor, setFormCveProveedor] = useState<string>("");
+  const [formPrecioProveedor, setFormPrecioProveedor] = useState<string>("");
+  const [formNoCotizacionProv, setFormNoCotizacionProv] = useState<string>("");
+  const [formNoOrdenCompraProv, setFormNoOrdenCompraProv] = useState<string>("");
+  const [guardandoProveedor, setGuardandoProveedor] = useState<boolean>(false);
+
   // Estados locales editables
   const [cotizacionGI, setCotizacionGI] = useState<string>("");
   const [ordenCompra, setOrdenCompra] = useState<string>("");
@@ -92,6 +104,69 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [acordeonSesiones, setAcordeonSesiones] = useState<boolean>(true);
   const [acordeonAlumnos, setAcordeonAlumnos] = useState<boolean>(true);
   const [sesionAbiertaIdx, setSesionAbiertaIdx] = useState<number | null>(0);
+
+  const abrirModalProveedor = async () => {
+    if (proveedoresList.length === 0) {
+      const list = await AgendaService.getProveedores();
+      setProveedoresList(list || []);
+    }
+
+    if (detalle?.i_CveProveedor && Number(detalle.i_CveProveedor) > 0) {
+      setFormCveProveedor(String(detalle.i_CveProveedor));
+      setFormPrecioProveedor(detalle.d_PrecioProveedor ? String(detalle.d_PrecioProveedor) : "");
+      setFormNoCotizacionProv(detalle.v_NoCotizacionProv || "");
+      setFormNoOrdenCompraProv(detalle.v_NoOrdenCompraProv || "");
+    } else {
+      setFormCveProveedor("");
+      setFormPrecioProveedor("");
+      setFormNoCotizacionProv("");
+      setFormNoOrdenCompraProv("");
+    }
+    setModalProveedorAbierto(true);
+  };
+
+  const handleGuardarProveedor = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!detalle) return;
+
+    const isSinProveedor = !formCveProveedor || formCveProveedor === "";
+
+    if (!isSinProveedor) {
+      if (!formPrecioProveedor || isNaN(Number(formPrecioProveedor)) || Number(formPrecioProveedor) <= 0) {
+        toast.error("El costo unitario (sin IVA) debe ser mayor a 0");
+        return;
+      }
+    }
+
+    const payload: CambiarProveedorDto = {
+      i_CveServAgendaDet: detalle.i_CveServAgendaDet,
+      i_CveProveedor: isSinProveedor ? null : Number(formCveProveedor),
+      d_PrecioProveedor: isSinProveedor ? 0 : Number(formPrecioProveedor),
+      v_NoOrdenCompraProv: isSinProveedor ? null : (formNoOrdenCompraProv.trim() || null),
+      v_NoCotizacionProv: isSinProveedor ? null : (formNoCotizacionProv.trim() || null),
+    };
+
+    setGuardandoProveedor(true);
+    try {
+      const res = await AgendaService.cambiarProveedor(payload);
+      if (res.exito || res.status === 200) {
+        toast.success("Proveedor actualizado");
+        setModalProveedorAbierto(false);
+        await cargarDetalle();
+        if (onGuardadoExitoso) onGuardadoExitoso();
+      } else if (res.status === 409) {
+        toast.warning(res.mensaje || "Conflicto al actualizar el proveedor.");
+      } else if (res.status === 400) {
+        toast.error(res.mensaje || "Datos de proveedor no válidos.");
+      } else {
+        toast.error(res.mensaje || "Error al actualizar el proveedor.");
+      }
+    } catch (err: any) {
+      toast.error("Ocurrió un error al actualizar el proveedor.");
+    } finally {
+      setGuardandoProveedor(false);
+    }
+  };
 
   const cargarDetalle = async () => {
     if (!iCveAgenda || !iCveServAgendaDet) return;
@@ -1021,6 +1096,96 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                 )}
               </div>
 
+              {/* BLOQUE 1.4.2 — Información del Proveedor */}
+              <div style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
+                    Información del proveedor
+                  </h4>
+                  {detalle.i_CveProveedor && Number(detalle.i_CveProveedor) > 0 ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={abrirModalProveedor}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "12px",
+                        padding: "3px 10px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      <Edit2 size={13} />
+                      <span>Editar</span>
+                    </button>
+                  ) : null}
+                </div>
+
+                {!detalle.i_CveProveedor || Number(detalle.i_CveProveedor) <= 0 ? (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", paddingTop: "4px" }}>
+                    <span style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>
+                      Sin proveedor asignado
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={abrirModalProveedor}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "12px",
+                        padding: "4px 12px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      <Plus size={14} />
+                      <span>Agregar proveedor</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px" }}>
+                    <div>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>proveedor</span>
+                      <p style={{ fontSize: "13px", fontWeight: 500, color: "#1e293b", margin: 0 }}>
+                        {detalle.v_Proveedor || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>costo unitario s/IVA</span>
+                      <p style={{ fontSize: "13px", fontFamily: "var(--font-mono)", fontWeight: 400, color: "#1e293b", margin: 0 }}>
+                        ${(detalle.d_PrecioProveedor ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>costo total s/IVA</span>
+                      <p style={{ fontSize: "13px", fontFamily: "var(--font-mono)", fontWeight: 400, color: "#1e293b", margin: 0 }}>
+                        ${((detalle.d_PrecioProveedor ?? 0) * (detalle.i_Cantidad ?? 1)).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>costo final c/IVA</span>
+                      <p style={{ fontSize: "14px", fontFamily: "var(--font-mono)", fontWeight: 500, color: "#2B8FCC", margin: 0 }}>
+                        ${(((detalle.d_PrecioProveedor ?? 0) * (detalle.i_Cantidad ?? 1)) * (1 + IVA)).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>no. cotización</span>
+                      <p style={{ fontSize: "13px", fontWeight: 400, color: "#1e293b", margin: 0 }}>
+                        {detalle.v_NoCotizacionProv || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>orden de compra</span>
+                      <p style={{ fontSize: "13px", fontWeight: 400, color: "#1e293b", margin: 0 }}>
+                        {detalle.v_NoOrdenCompraProv || "—"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* BLOQUE 1.5 — Datos de Venta (Con Card/Contenedor diferenciado) */}
               <div style={{ border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
                 <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
@@ -1570,6 +1735,165 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
           if (onGuardadoExitoso) onGuardadoExitoso();
         }}
       />
+      {/* Modal Agregar / Editar Proveedor */}
+      {modalProveedorAbierto && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(3px)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "12px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              width: "100%",
+              maxWidth: "480px",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "16px 20px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: "#f8fafc",
+              }}
+            >
+              <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#0f172a", margin: 0 }}>
+                {detalle?.i_CveProveedor && Number(detalle.i_CveProveedor) > 0
+                  ? "Editar información del proveedor"
+                  : "Agregar proveedor"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalProveedorAbierto(false)}
+                disabled={guardandoProveedor}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body Form */}
+            <form onSubmit={handleGuardarProveedor} style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                  Proveedor <span style={{ color: "#dc3545" }}>*</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={formCveProveedor}
+                  onChange={(e) => setFormCveProveedor(e.target.value)}
+                  disabled={guardandoProveedor}
+                  style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                >
+                  <option value="">— Sin proveedor —</option>
+                  {proveedoresList.map((p: any) => {
+                    const cve = p.i_CveProveedor ?? p.iD_Proveedor ?? p.id_proveedor;
+                    const nombre = p.v_RazonSocial || p.v_Nombre || p.s_RazonSocial || `Proveedor #${cve}`;
+                    return (
+                      <option key={cve} value={cve}>
+                        {nombre}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {formCveProveedor !== "" && (
+                <>
+                  <div>
+                    <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                      Costo unitario (sin IVA) <span style={{ color: "#dc3545" }}>*</span>
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#64748b", fontSize: "13px" }}>$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        className="form-control"
+                        placeholder="0.00"
+                        value={formPrecioProveedor}
+                        onChange={(e) => setFormPrecioProveedor(e.target.value)}
+                        disabled={guardandoProveedor}
+                        style={{ fontSize: "13px", height: "38px", borderRadius: "8px", paddingLeft: "24px" }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                      No. cotización
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ej. COT-PROV-001"
+                      value={formNoCotizacionProv}
+                      onChange={(e) => setFormNoCotizacionProv(e.target.value)}
+                      disabled={guardandoProveedor}
+                      style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                      Orden de compra
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ej. OC-PROV-99"
+                      value={formNoOrdenCompraProv}
+                      onChange={(e) => setFormNoOrdenCompraProv(e.target.value)}
+                      disabled={guardandoProveedor}
+                      style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Footer acciones */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setModalProveedorAbierto(false)}
+                  disabled={guardandoProveedor}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  style={{ backgroundColor: "#2B8FCC" }}
+                  disabled={guardandoProveedor}
+                >
+                  {guardandoProveedor ? "Guardando..." : "Guardar cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
