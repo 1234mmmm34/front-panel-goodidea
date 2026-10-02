@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Building2, Plus, Search, Edit2, Trash2, RefreshCw, ChevronRight } from "lucide-react";
+import { Building2, Plus, Search, Edit2, Trash2, RefreshCw, ChevronRight, Users } from "lucide-react";
 import { EmpresaGetDto } from "@/types/empresas";
 import { EmpresasService } from "@/services/empresas.service";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -201,6 +201,13 @@ export default function EmpresasPage() {
                   </td>
                   <td className="text-center">
                     <div className="flex items-center justify-center gap-1">
+                      <Link
+                        href={`/catalogos/empresas/${row.iD_Empresa}/personal?razonSocial=${encodeURIComponent(row.s_RazonSocial || "")}`}
+                        className="btn-icon"
+                        title="Personal"
+                      >
+                        <Users size={16} />
+                      </Link>
                       <Link
                         href={`/empresas/editar/${row.iD_Empresa}`}
                         className="btn-icon"

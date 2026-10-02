@@ -1179,6 +1179,14 @@ textarea:focus {
   color: var(--text-secondary);
 }
 
+.alegra-table-container .paginador-container {
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-top: 1px solid #e2e8f0;
+  border-radius: 0;
+}
+
 .paginador-controls {
   display: flex;
   align-items: center;
