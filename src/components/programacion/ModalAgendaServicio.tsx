@@ -73,6 +73,8 @@ export interface ProgramacionItemState {
   d_PrecioProveedor: number;
   d_FechaInicioEntrega: string;
   sesiones: SesionProgramacionState[];
+  cantidadAplicada: number;
+  sesionesAplicadas: number;
 }
 
 
@@ -121,6 +123,18 @@ function sumarMinutosAHorario(horaInicioStr: string, minutosASumar: number): str
   const strHH = finHH.toString().padStart(2, "0");
   const strMM = finMM.toString().padStart(2, "0");
   return `${strHH}:${strMM}`;
+}
+
+function calcularDiferenciaMinutos(horaInicioStr: string, horaFinStr: string): number {
+  if (!horaInicioStr || !horaFinStr || !horaInicioStr.includes(":") || !horaFinStr.includes(":")) {
+    return 120;
+  }
+  const [h1, m1] = horaInicioStr.split(":").map(Number);
+  const [h2, m2] = horaFinStr.split(":").map(Number);
+  const total1 = (h1 || 0) * 60 + (m1 || 0);
+  const total2 = (h2 || 0) * 60 + (m2 || 0);
+  const diff = total2 - total1;
+  return diff > 0 ? diff : 120;
 }
 
 const GROUP_CONFIG: Record<
@@ -468,46 +482,60 @@ export const ModalAgendaServicio: React.FC<Props> = ({
     setServiciosAgregados((prev) =>
       prev.map((s) => {
         if (s.idTemp !== idTemp) return s;
-        const nuevoItem = { ...s, [campo]: valor };
-
-        if (campo === "cantidad" || campo === "sesiones") {
-          const numSes = Math.max(1, nuevoItem.sesiones || 1);
-          const duraciones = calcularMinutosPorSesion(nuevoItem.cantidad || 1, numSes);
-
-          setProgramacionMap((prevProg) => {
-            const currentProg = prevProg[idTemp];
-            if (!currentProg) return prevProg;
-
-            const todayStr = new Date().toISOString().split("T")[0];
-            const prevSes = currentProg.sesiones || [];
-
-            const nuevasSesiones: SesionProgramacionState[] = Array.from({ length: numSes }).map((_, idx) => {
-              const existing = prevSes[idx];
-              const fecha = existing?.fecha || todayStr;
-              const horaInicio = existing?.horaInicio || "09:00";
-              const horaFin = sumarMinutosAHorario(horaInicio, duraciones[idx]);
-              return {
-                fecha,
-                horaInicio,
-                horaFin,
-                areaSalaId: existing?.areaSalaId || "1",
-              };
-            });
-
-            return {
-              ...prevProg,
-              [idTemp]: {
-                ...currentProg,
-                sesiones: nuevasSesiones,
-              },
-            };
-          });
-        }
-
-        return nuevoItem;
+        return { ...s, [campo]: valor };
       })
     );
   };
+
+  // Reconciliación automática de programacionMap cuando cambia cantidad o sesiones de serviciosAgregados
+  useEffect(() => {
+    setProgramacionMap((prev) => {
+      let huboCambios = false;
+      const nuevoMapa = { ...prev };
+
+      serviciosAgregados.forEach((item) => {
+        const itemState = prev[item.idTemp];
+        if (!itemState) return;
+
+        const cantidad = item.cantidad || 1;
+        const numSes = Math.max(1, item.sesiones || 1);
+
+        if (
+          itemState.cantidadAplicada !== cantidad ||
+          itemState.sesionesAplicadas !== numSes
+        ) {
+          huboCambios = true;
+          const duraciones = calcularMinutosPorSesion(cantidad, numSes);
+          const todayStr = new Date().toISOString().split("T")[0];
+          const prevSes = itemState.sesiones || [];
+
+          const nuevasSesiones: SesionProgramacionState[] = Array.from({
+            length: numSes,
+          }).map((_, idx) => {
+            const existing = prevSes[idx];
+            const fecha = existing?.fecha || todayStr;
+            const horaInicio = existing?.horaInicio || "09:00";
+            const horaFin = sumarMinutosAHorario(horaInicio, duraciones[idx]);
+            return {
+              fecha,
+              horaInicio,
+              horaFin,
+              areaSalaId: existing?.areaSalaId || "1",
+            };
+          });
+
+          nuevoMapa[item.idTemp] = {
+            ...itemState,
+            sesiones: nuevasSesiones,
+            cantidadAplicada: cantidad,
+            sesionesAplicadas: numSes,
+          };
+        }
+      });
+
+      return huboCambios ? nuevoMapa : prev;
+    });
+  }, [serviciosAgregados]);
 
   // Toggle compartir Cotización GI
   const handleToggleCompartirCotizacion = (activo: boolean) => {
@@ -587,6 +615,8 @@ export const ModalAgendaServicio: React.FC<Props> = ({
       d_PrecioProveedor: 0,
       d_FechaInicioEntrega: todayStr,
       sesiones: sesionesInit,
+      cantidadAplicada: item.cantidad || 1,
+      sesionesAplicadas: numSesiones,
     };
   };
 
@@ -594,30 +624,14 @@ export const ModalAgendaServicio: React.FC<Props> = ({
     idTemp: string,
     updates: Partial<ProgramacionItemState>
   ) => {
+    const itemServ = serviciosAgregados.find((s) => s.idTemp === idTemp);
+    if (!itemServ) return;
+
     setProgramacionMap((prev) => {
-      const current = prev[idTemp] || {
-        b_ProgramarDespues: false,
-        v_TipoCupo: "Abierto",
-        i_CupoAlumnos: 20,
-        v_Titular: "ins_1",
-        v_Apoyo: "NA",
-        v_TipoApoyo: "Ninguno",
-        v_NoCotProveedor: "",
-        v_NoOCProveedor: "",
-        d_PrecioProveedor: 0,
-        d_FechaInicioEntrega: new Date().toISOString().split("T")[0],
-        sesiones: [
-          {
-            fecha: new Date().toISOString().split("T")[0],
-            horaInicio: "09:00",
-            horaFin: "13:00",
-            areaSalaId: "1",
-          },
-        ],
-      };
+      const base = prev[idTemp] ?? getProgState(itemServ);
       return {
         ...prev,
-        [idTemp]: { ...current, ...updates },
+        [idTemp]: { ...base, ...updates },
       };
     });
   };
@@ -629,49 +643,23 @@ export const ModalAgendaServicio: React.FC<Props> = ({
     value: string
   ) => {
     const itemServ = serviciosAgregados.find((s) => s.idTemp === idTemp);
-    const cantidadHoras = itemServ?.cantidad || 1;
-    const numSes = Math.max(1, itemServ?.sesiones || 1);
-    const duraciones = calcularMinutosPorSesion(cantidadHoras, numSes);
+    if (!itemServ) return;
 
     setProgramacionMap((prev) => {
-      const itemState = prev[idTemp] || {
-        b_ProgramarDespues: false,
-        v_TipoCupo: "Abierto",
-        i_CupoAlumnos: 20,
-        v_Titular: "ins_1",
-        v_Apoyo: "NA",
-        v_TipoApoyo: "Ninguno",
-        v_NoCotProveedor: "",
-        v_NoOCProveedor: "",
-        d_PrecioProveedor: 0,
-        d_FechaInicioEntrega: new Date().toISOString().split("T")[0],
-        sesiones: [],
-      };
-      const newSesiones = [...itemState.sesiones];
-      if (!newSesiones[sesionIdx]) {
-        newSesiones[sesionIdx] = {
-          fecha: new Date().toISOString().split("T")[0],
-          horaInicio: "09:00",
-          horaFin: "13:00",
-          areaSalaId: "1",
-        };
-      }
+      const base = prev[idTemp] ?? getProgState(itemServ);
+      const newSesiones = base.sesiones.map((s, i) => {
+        if (i !== sesionIdx) return s;
+        const updated = { ...s, [field]: value };
+        if (field === "horaInicio") {
+          const duracionMins = calcularDiferenciaMinutos(s.horaInicio, s.horaFin);
+          updated.horaFin = sumarMinutosAHorario(value, duracionMins);
+        }
+        return updated;
+      });
 
-      const prevSesion = newSesiones[sesionIdx];
-      const updatedSesion = {
-        ...prevSesion,
-        [field]: value,
-      };
-
-      if (field === "horaInicio") {
-        const duracion = duraciones[sesionIdx] || 120;
-        updatedSesion.horaFin = sumarMinutosAHorario(value, duracion);
-      }
-
-      newSesiones[sesionIdx] = updatedSesion;
       return {
         ...prev,
-        [idTemp]: { ...itemState, sesiones: newSesiones },
+        [idTemp]: { ...base, sesiones: newSesiones },
       };
     });
   };
@@ -2474,19 +2462,9 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                                 </tr>
                                               </thead>
                                               <tbody>
-                                                {Array.from({
-                                                  length: item.sesiones || 1,
-                                                }).map((_, sIdx) => {
-                                                  const sesion =
-                                                    progState.sesiones[sIdx] || {
-                                                      fecha: new Date()
-                                                        .toISOString()
-                                                        .split("T")[0],
-                                                      horaInicio: "09:00",
-                                                      horaFin: "13:00",
-                                                      areaSalaId: "1",
-                                                    };
-
+                                                {progState.sesiones
+                                                  .slice(0, item.sesiones || 1)
+                                                  .map((sesion, sIdx) => {
                                                   return (
                                                     <tr
                                                       key={sIdx}

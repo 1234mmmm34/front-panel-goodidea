@@ -295,10 +295,6 @@ export default function ProgramacionPage() {
         onGuardadoExitoso={() => {
           cargarServicios();
         }}
-        onProgramar={() => {
-          setItemDetalle(null);
-          setModalFormAbierto(true);
-        }}
       />
 
       {/* Modal Formulario de Servicio (Vista Servicios) */}

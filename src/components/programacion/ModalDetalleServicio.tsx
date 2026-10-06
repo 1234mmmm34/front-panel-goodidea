@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { ModalReprogramarSesion } from "./ModalReprogramarSesion";
 import { ModalCancelarSesion } from "./ModalCancelarSesion";
+import { ModalEditarInstructorSesion } from "./ModalEditarInstructorSesion";
+import { ModalProgramarServicio } from "./ModalProgramarServicio";
 import {
   AgendaDetalleGetDto,
   AgendaDetalleUpdateDto,
@@ -70,6 +72,13 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   // Cancelar sesión modal state
   const [modalCancelarAbierto, setModalCancelarAbierto] = useState<boolean>(false);
   const [sesionACancelar, setSesionACancelar] = useState<SesionDetalleDto | null>(null);
+
+  // Editar instructor modal state
+  const [modalEditarInstructorAbierto, setModalEditarInstructorAbierto] = useState<boolean>(false);
+  const [sesionAEditarInstructor, setSesionAEditarInstructor] = useState<SesionDetalleDto | null>(null);
+
+  // Programar servicio modal state
+  const [modalProgramarAbierto, setModalProgramarAbierto] = useState<boolean>(false);
 
   // Modal / Formulario Proveedor state
   const [modalProveedorAbierto, setModalProveedorAbierto] = useState<boolean>(false);
@@ -322,10 +331,23 @@ export const ModalDetalleServicio: React.FC<Props> = ({
 
   if (!abierto) return null;
 
-  // Lógica de Cupos y Alumnos
-  const esCapacitacion = detalle?.v_TipoServicio
-    ? detalle.v_TipoServicio.toUpperCase().includes("CAPACITACI")
-    : false;
+  // Lógica de Cupos y Alumnos (2 = Capacitación)
+  const esCapacitacion = detalle?.i_CveTipoServicio !== undefined && detalle?.i_CveTipoServicio !== null
+    ? Number(detalle.i_CveTipoServicio) === 2
+    : (detalle?.v_TipoServicio ? detalle.v_TipoServicio.toUpperCase().includes("CAPACITACI") : false);
+
+  const obtenerTextoInstructoresSesion = (sesion: SesionDetalleDto): string => {
+    const titular = sesion.v_Titular?.trim();
+    // Si b_TipoProvInsApoyo es true, es proveedor, por lo que no se muestra como instructor de apoyo
+    const esProveedorApoyo = Boolean(sesion.b_TipoProvInsApoyo);
+    const apoyo = !esProveedorApoyo ? sesion.v_Apoyo?.trim() : null;
+
+    const personas = [titular, apoyo].filter((p): p is string => Boolean(p && p.trim()));
+    if (personas.length > 0) {
+      return personas.join(", ");
+    }
+    return esCapacitacion ? "Sin instructor" : (esProveedorApoyo ? "" : "Sin apoyo");
+  };
 
   const cupos = detalle?.i_NumAlumnos ?? 0;
   const inscritos = alumnos.length;
@@ -575,6 +597,14 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
     ? detalle.Sesiones || (detalle as any).sesiones || (detalle as any).Detalles || (detalle as any).detalles || []
     : [];
 
+  const tieneSesionConInstructorApoyo = listaSesiones.some((s) => {
+    const bCanc = Boolean(s.b_Cancelada || (s as any).b_cancelada || (s as any).bCancelada);
+    const iCveReprog = s.i_CveReprograma ?? (s as any).i_cveReprograma;
+    const esReprog = iCveReprog != null && Number(iCveReprog) > 0;
+    const esVig = !bCanc && !esReprog;
+    return esVig && s.i_CveApoyo != null && Number(s.i_CveApoyo) > 0 && s.b_TipoProvInsApoyo === false;
+  });
+
   return (
     <div
       className="modal-overlay"
@@ -713,16 +743,14 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                         Este servicio está <strong>pendiente de programar</strong> — falta definir fecha, hora e instructor.
                       </span>
                     </div>
-                    {onProgramar && (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        style={{ height: "30px", padding: "0 12px", fontSize: "12px", backgroundColor: "#2B8FCC", flexShrink: 0 }}
-                        onClick={() => onProgramar(detalle)}
-                      >
-                        Programar
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ height: "30px", padding: "0 12px", fontSize: "12px", backgroundColor: "#2B8FCC", flexShrink: 0 }}
+                      onClick={() => setModalProgramarAbierto(true)}
+                    >
+                      Programar
+                    </button>
                   </div>
                 )}
               </div>
@@ -777,13 +805,10 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
 
                           const esExpandible = esReprogramada || (bCancelada && Boolean(sesion.v_MotivoCancelacion));
                           const estaAbierto = sesionAbiertaIdx === sIdx;
+                          const esVigente = !esReprogramada && !bCancelada;
                           const sesionNueva = esReprogramada
                             ? listaSesiones.find((s) => s.i_CveAgendaDetalle === iCveReprograma)
                             : null;
-
-                          const personas = [sesion.v_Titular, sesion.v_Apoyo]
-                            .filter((p) => Boolean(p && typeof p === "string" && p.trim()))
-                            .join(", ");
 
                           return (
                             <div key={`det-sesion-${sesion.i_CveAgendaDetalle || 'det'}-${sIdx}`} style={{ border: "1px solid #e2e8f0", borderRadius: "6px", overflow: "hidden" }}>
@@ -797,6 +822,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                                   justifyContent: "space-between",
                                   cursor: esExpandible ? "pointer" : "default",
                                   gap: "12px",
+                                  flexWrap: "nowrap",
                                 }}
                                 onClick={() => {
                                   if (esExpandible) {
@@ -804,7 +830,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                                   }
                                 }}
                               >
-                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", fontSize: "13px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, fontSize: "13px", whiteSpace: "nowrap" }}>
                                   <span style={{ fontWeight: 500, color: "#1e293b" }}>
                                     Sesión {sesion.i_Orden || sIdx + 1}
                                   </span>
@@ -829,37 +855,77 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                                   )}
                                 </div>
 
-                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                                  {personas && (
-                                    <span style={{ fontSize: "12px", color: "#475569", fontWeight: 400 }}>
-                                      {personas}
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                                  {obtenerTextoInstructoresSesion(sesion) ? (
+                                    <span
+                                      style={{
+                                        fontSize: "12px",
+                                        color: "#64748b",
+                                        fontWeight: 400,
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        flex: "0 1 auto",
+                                        minWidth: 0,
+                                        textAlign: "right",
+                                      }}
+                                      title={obtenerTextoInstructoresSesion(sesion)}
+                                    >
+                                      {obtenerTextoInstructoresSesion(sesion)}
                                     </span>
-                                  )}
-                                  {renderBadgeSesion(sesion)}
-                                  {!esReprogramada && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className="btn-icon"
-                                        title="Reprogramar esta sesión"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSesionAReprogramarId(sesion.i_CveAgendaDetalle);
-                                          setModalReprogramarAbierto(true);
-                                        }}
-                                        style={{
-                                          padding: "4px",
-                                          border: "none",
-                                          background: "transparent",
-                                          color: "#d97706",
-                                          cursor: "pointer",
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                        }}
-                                      >
-                                        <RefreshCw size={15} />
-                                      </button>
+                                  ) : null}
+
+                                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0, whiteSpace: "nowrap" }}>
+                                    {renderBadgeSesion(sesion)}
+                                    {!esReprogramada && (
+                                      <>
+                                        {esVigente && (
+                                          <button
+                                            type="button"
+                                            className="btn-icon"
+                                            title="Editar sesión"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSesionAEditarInstructor(sesion);
+                                              setModalEditarInstructorAbierto(true);
+                                            }}
+                                            style={{
+                                              padding: "4px",
+                                              border: "none",
+                                              background: "transparent",
+                                              color: "#2B8FCC",
+                                              cursor: "pointer",
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                            }}
+                                          >
+                                            <Edit2 size={15} />
+                                          </button>
+                                        )}
+
+                                        <button
+                                          type="button"
+                                          className="btn-icon"
+                                          title="Reprogramar esta sesión"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSesionAReprogramarId(sesion.i_CveAgendaDetalle);
+                                            setModalReprogramarAbierto(true);
+                                          }}
+                                          style={{
+                                            padding: "4px",
+                                            border: "none",
+                                            background: "transparent",
+                                            color: "#d97706",
+                                            cursor: "pointer",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                          }}
+                                        >
+                                          <RefreshCw size={15} />
+                                        </button>
 
                                       {bCancelada ? (
                                         <button
@@ -911,6 +977,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                                   {esExpandible && (
                                     estaAbierto ? <ChevronUp size={14} style={{ color: "#94a3b8" }} /> : <ChevronDown size={14} style={{ color: "#94a3b8" }} />
                                   )}
+                                  </div>
                                 </div>
                               </div>
 
@@ -1105,44 +1172,63 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   {detalle.i_CveProveedor && Number(detalle.i_CveProveedor) > 0 ? (
                     <button
                       type="button"
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={abrirModalProveedor}
                       style={{
+                        color: "#64748b",
+                        padding: "2px 4px",
+                        cursor: "pointer",
+                        background: "none",
+                        border: "none",
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: "6px",
+                        gap: "4px",
                         fontSize: "12px",
-                        padding: "3px 10px",
-                        borderRadius: "6px",
+                        fontWeight: 400,
                       }}
+                      onClick={abrirModalProveedor}
+                      title="Editar información del proveedor"
                     >
-                      <Edit2 size={13} />
+                      <Edit2 size={12} style={{ color: "#94a3b8" }} />
                       <span>Editar</span>
                     </button>
                   ) : null}
                 </div>
 
                 {!detalle.i_CveProveedor || Number(detalle.i_CveProveedor) <= 0 ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", paddingTop: "4px" }}>
-                    <span style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>
-                      Sin proveedor asignado
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-primary"
-                      onClick={abrirModalProveedor}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        fontSize: "12px",
-                        padding: "4px 12px",
-                        borderRadius: "6px",
-                      }}
-                    >
-                      <Plus size={14} />
-                      <span>Agregar proveedor</span>
-                    </button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "4px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+                      <span style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>
+                        Sin proveedor asignado
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={abrirModalProveedor}
+                        disabled={tieneSesionConInstructorApoyo}
+                        title={
+                          tieneSesionConInstructorApoyo
+                            ? "Quita el instructor de apoyo de las sesiones para poder agregar un proveedor."
+                            : "Agregar proveedor"
+                        }
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "12px",
+                          padding: "4px 12px",
+                          borderRadius: "6px",
+                          opacity: tieneSesionConInstructorApoyo ? 0.5 : 1,
+                          cursor: tieneSesionConInstructorApoyo ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <Plus size={14} />
+                        <span>Agregar proveedor</span>
+                      </button>
+                    </div>
+                    {tieneSesionConInstructorApoyo && (
+                      <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                        Quita el instructor de apoyo de las sesiones para poder agregar un proveedor.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px" }}>
@@ -1731,6 +1817,35 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
         onConfirmarExito={() => {
           setModalCancelarAbierto(false);
           setSesionACancelar(null);
+          cargarDetalle();
+          if (onGuardadoExitoso) onGuardadoExitoso();
+        }}
+      />
+      {/* Modal Editar Instructor Sesión */}
+      <ModalEditarInstructorSesion
+        abierto={modalEditarInstructorAbierto}
+        sesion={sesionAEditarInstructor}
+        iCveTipoServicio={detalle?.i_CveTipoServicio}
+        bTipoDato={detalle?.b_TipoDato}
+        cantidadTotal={detalle?.i_Cantidad}
+        unidad={detalle?.v_Unidad}
+        todasLasSesiones={listaSesiones}
+        onCerrar={() => {
+          setModalEditarInstructorAbierto(false);
+          setSesionAEditarInstructor(null);
+        }}
+        onGuardadoExitoso={() => {
+          cargarDetalle();
+          if (onGuardadoExitoso) onGuardadoExitoso();
+        }}
+      />
+      {/* Modal Programar Servicio (Pendiente de programar) */}
+      <ModalProgramarServicio
+        abierto={modalProgramarAbierto}
+        detalle={detalle}
+        onCerrar={() => setModalProgramarAbierto(false)}
+        onGuardadoExitoso={() => {
+          setModalProgramarAbierto(false);
           cargarDetalle();
           if (onGuardadoExitoso) onGuardadoExitoso();
         }}

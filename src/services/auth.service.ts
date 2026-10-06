@@ -19,24 +19,30 @@ export const AuthService = {
         password: payload.password,
       });
 
-      if (resp.data && resp.data.id_usuario) {
-        const raw = resp.data;
-        const tokenReal = raw.password || ""; // El token JWT viene en el campo "password"
+      const raw: any = resp.data;
+      console.log("[AuthService.login] Respuesta del servidor:", raw);
+
+      if (raw && (raw.id_usuario || raw.IdUsuario || raw.idUsuario || raw.token || raw.Token || raw.password)) {
+        const tokenReal = raw.token || raw.Token || raw.password || raw.jwtToken || "";
 
         const sesion: SesionAlmacenada = {
-          id_usuario: raw.id_usuario ?? 0,
-          username: raw.username || raw.v_email,
-          email: raw.v_email,
-          tenant: raw.v_Nombre || "STPS",
+          id_usuario: raw.id_usuario ?? raw.IdUsuario ?? raw.idUsuario ?? 0,
+          username: raw.username ?? raw.Username ?? raw.v_email ?? raw.email ?? "",
+          email: raw.v_email ?? raw.email ?? raw.Email ?? "",
+          tenant: raw.v_Nombre ?? raw.tenant ?? raw.Tenant ?? "STPS",
           token: tokenReal,
-          id_perfil: raw.i_CvePerfil || 1,
-          id_tenant: raw.i_CveTenant || 1,
+          id_perfil: raw.i_CvePerfil ?? raw.IdPerfil ?? raw.id_perfil ?? 1,
+          id_tenant: raw.i_CveTenant ?? raw.IdTenant ?? raw.id_tenant ?? 1,
         };
 
         if (typeof window !== "undefined") {
           // Guardar en formato "userData" (legacy Blazor) y "sesion_stps"
           localStorage.setItem("userData", JSON.stringify(raw));
           localStorage.setItem("sesion_stps", JSON.stringify(sesion));
+          console.log("[AuthService.login] Sesión guardada con éxito:", {
+            id_usuario: sesion.id_usuario,
+            hasToken: Boolean(sesion.token),
+          });
         }
 
         return { exito: true, sesion };

@@ -22,7 +22,7 @@ export function obtenerSesionActual(): SesionAlmacenada | null {
     const rawUserData = localStorage.getItem("userData");
     if (rawUserData) {
       const parsed = JSON.parse(rawUserData);
-      const token = parsed.token || parsed.password || "";
+      const token = parsed.token || parsed.Token || parsed.password || parsed.jwtToken || "";
       if (token) {
         return {
           id_usuario: parsed.id_usuario ?? parsed.IdUsuario ?? 0,
@@ -67,6 +67,10 @@ apiClient.interceptors.request.use(
     if (sesion?.token) {
       config.headers.Authorization = `Bearer ${sesion.token}`;
     }
+    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
+      hasToken: Boolean(sesion?.token),
+      tokenPrefix: sesion?.token ? `${sesion.token.substring(0, 15)}...` : "NONE",
+    });
     return config;
   },
   (error) => Promise.reject(error)
@@ -76,9 +80,14 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (typeof window !== "undefined" && error.response?.status === 401) {
-      // Limpiar sesión y redirigir a login si no estamos en /login
-      if (!window.location.pathname.startsWith("/login")) {
+    const url = error.config?.url || "";
+    const status = error.response?.status;
+    console.warn(`[API Error] ${status} en ${url}:`, error.response?.data || error.message);
+
+    if (typeof window !== "undefined" && status === 401) {
+      // No limpiar ni redirigir si el 401 viene del propio intento de login
+      if (!url.includes("login") && !window.location.pathname.startsWith("/login")) {
+        console.warn("[Auth] 401 no autorizado en", url, "-> Limpiando sesión");
         localStorage.removeItem("userData");
         localStorage.removeItem("sesion_stps");
         window.location.href = "/login";

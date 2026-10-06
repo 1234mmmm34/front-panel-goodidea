@@ -152,30 +152,47 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                   {/* 6. Titular / Apoyo */}
                   <td>
                     {(() => {
-                      const titularVal =
-                        row.v_Titular &&
-                        row.v_Titular.trim() !== "" &&
-                        row.v_Titular.trim() !== "-" &&
-                        row.v_Titular.trim() !== "—"
-                          ? row.v_Titular.trim()
-                          : null;
+                      const fuentes = [
+                        row.v_Titular,
+                        (row as any).v_Titulares,
+                        (row as any).v_Instructores,
+                        row.v_Apoyo,
+                        (row as any).v_Apoyos,
+                        (row as any).v_Proveedor,
+                        (row as any).v_Proveedores,
+                        (row as any).v_NombreProveedor,
+                      ];
 
-                      const apoyoVal =
-                        row.v_Apoyo &&
-                        row.v_Apoyo.trim() !== "" &&
-                        row.v_Apoyo.trim() !== "-" &&
-                        row.v_Apoyo.trim() !== "—"
-                          ? row.v_Apoyo.trim()
-                          : null;
+                      const nombresSet = new Set<string>();
+                      const nombresLista: string[] = [];
 
-                      if (!titularVal && !apoyoVal) {
-                        return null;
+                      for (const f of fuentes) {
+                        if (!f || typeof f !== "string") continue;
+                        const partes = f.split(",").map((s) => s.trim()).filter(Boolean);
+                        for (const p of partes) {
+                          if (
+                            p === "-" ||
+                            p === "—" ||
+                            p.toLowerCase() === "sin instructor" ||
+                            p.toLowerCase() === "sin apoyo"
+                          ) {
+                            continue;
+                          }
+                          const keyLower = p.toLowerCase();
+                          if (!nombresSet.has(keyLower)) {
+                            nombresSet.add(keyLower);
+                            nombresLista.push(p);
+                          }
+                        }
+                      }
+
+                      if (nombresLista.length === 0) {
+                        return <span className="text-slate-400">—</span>;
                       }
 
                       return (
-                        <div>
-                          {titularVal && <div className="font-medium">{titularVal}</div>}
-                          {apoyoVal && <span className="subtext">Apoyo: {apoyoVal}</span>}
+                        <div className="font-medium" style={{ fontSize: "13px", color: "#1e3a5f" }}>
+                          {nombresLista.join(", ")}
                         </div>
                       );
                     })()}

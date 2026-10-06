@@ -13,6 +13,8 @@ import {
   ReprogramacionInsertDto,
   AgregarEntregablesDto,
   CambiarProveedorDto,
+  CambiarTitularesSesionDto,
+  ProgramarServicioDto,
 } from "@/types/servicios";
 
 export const AgendaService = {
@@ -262,6 +264,17 @@ export const AgendaService = {
         v_Key: item.v_Key ?? item.v_key ?? item.key ?? null,
       }));
 
+      const sesionesParsed = (Array.isArray(sesiones) ? sesiones : []).map((s: any) => ({
+        ...s,
+        i_CveAgendaDetalle: s.i_CveAgendaDetalle ?? s.I_CveAgendaDetalle ?? s.iCveAgendaDetalle ?? s.iD_AgendaDetalle ?? s.id_agendaDetalle ?? s.id ?? 0,
+        i_CveTitular: s.i_CveTitular ?? s.I_CveTitular ?? s.iCveTitular ?? s.iD_Titular ?? s.id_titular ?? null,
+        i_CveApoyo: s.i_CveApoyo ?? s.I_CveApoyo ?? s.iCveApoyo ?? s.iD_Apoyo ?? s.id_apoyo ?? null,
+        b_TipoProvInsApoyo: Boolean(s.b_TipoProvInsApoyo ?? s.B_TipoProvInsApoyo ?? s.bTipoProvInsApoyo),
+        b_TipoProvInsTitular: Boolean(s.b_TipoProvInsTitular ?? s.B_TipoProvInsTitular ?? s.bTipoProvInsTitular),
+        b_Cancelada: Boolean(s.b_Cancelada ?? s.B_Cancelada ?? s.bCancelada),
+        i_CveReprograma: s.i_CveReprograma ?? s.I_CveReprograma ?? s.iCveReprograma ?? null,
+      }));
+
       return {
         ...data,
         i_CveProveedor: data.i_CveProveedor ?? data.iCveProveedor ?? data.iD_Proveedor ?? data.id_proveedor ?? null,
@@ -272,7 +285,8 @@ export const AgendaService = {
         b_AplicaVoBo: Boolean(data.b_AplicaVoBo ?? data.b_aplicaVoBo ?? data.bAplicaVoBo),
         d_FechaVoBo: data.d_FechaVoBo ?? data.d_fechaVoBo ?? data.dFechaVoBo ?? null,
         v_KeyVoBo: data.v_KeyVoBo ?? data.v_keyVoBo ?? data.vKeyVoBo ?? null,
-        Sesiones: Array.isArray(sesiones) ? sesiones : [],
+        i_CveTipoServicio: data.i_CveTipoServicio ?? data.i_cveTipoServicio ?? data.iCveTipoServicio ?? data.i_CveTServicio ?? data.iCveTServicio ?? null,
+        Sesiones: sesionesParsed,
         Alumnos: Array.isArray(alumnos) ? alumnos : [],
         Facturas: Array.isArray(facturas) ? facturas : [],
         Entregables: entregablesParsed,
@@ -377,6 +391,90 @@ export const AgendaService = {
         status: resp.status,
         exito: false,
         mensaje: resp.data?.mensaje || resp.data?.message || "Error al actualizar el proveedor",
+      };
+    } catch (err: any) {
+      const status = err?.response?.status || 500;
+      const data = err?.response?.data;
+      let msg = "";
+
+      if (data && typeof data === "object") {
+        if (data.errors && typeof data.errors === "object") {
+          const fieldErrors: string[] = [];
+          Object.entries(data.errors).forEach(([field, msgs]) => {
+            if (Array.isArray(msgs)) fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+            else if (typeof msgs === "string") fieldErrors.push(`${field}: ${msgs}`);
+          });
+          if (fieldErrors.length > 0) msg = fieldErrors.join(" | ");
+        }
+        if (!msg) {
+          msg = data.mensaje || data.message || data.error || (typeof data === "string" ? data : "");
+        }
+      } else if (typeof data === "string" && data.trim()) {
+        msg = data;
+      }
+      if (!msg) {
+        msg = err?.message || "Ocurrió un error al procesar la solicitud.";
+      }
+      return { status, exito: false, mensaje: msg };
+    }
+  },
+
+  /**
+   * Cambia los instructores (titular y/o apoyo) de una sesión.
+   * Endpoint: PUT agenda/CambiarTitularesSesion
+   */
+  async cambiarTitularesSesion(payload: CambiarTitularesSesionDto): Promise<{ status: number; exito: boolean; mensaje?: string }> {
+    try {
+      const resp = await apiClient.put("agenda/CambiarTitularesSesion", payload);
+      if (resp.status >= 200 && resp.status < 300) {
+        return { status: resp.status, exito: true };
+      }
+      return {
+        status: resp.status,
+        exito: false,
+        mensaje: resp.data?.mensaje || resp.data?.message || "Error al actualizar los instructores",
+      };
+    } catch (err: any) {
+      const status = err?.response?.status || 500;
+      const data = err?.response?.data;
+      let msg = "";
+
+      if (data && typeof data === "object") {
+        if (data.errors && typeof data.errors === "object") {
+          const fieldErrors: string[] = [];
+          Object.entries(data.errors).forEach(([field, msgs]) => {
+            if (Array.isArray(msgs)) fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+            else if (typeof msgs === "string") fieldErrors.push(`${field}: ${msgs}`);
+          });
+          if (fieldErrors.length > 0) msg = fieldErrors.join(" | ");
+        }
+        if (!msg) {
+          msg = data.mensaje || data.message || data.error || (typeof data === "string" ? data : "");
+        }
+      } else if (typeof data === "string" && data.trim()) {
+        msg = data;
+      }
+      if (!msg) {
+        msg = err?.message || "Ocurrió un error al procesar la solicitud.";
+      }
+      return { status, exito: false, mensaje: msg };
+    }
+  },
+
+  /**
+   * Programa un servicio que estaba pendiente de programar.
+   * Endpoint: POST agenda/ProgramarServicio
+   */
+  async programarServicio(payload: ProgramarServicioDto): Promise<{ status: number; exito: boolean; mensaje?: string }> {
+    try {
+      const resp = await apiClient.post("agenda/ProgramarServicio", payload);
+      if (resp.status >= 200 && resp.status < 300) {
+        return { status: resp.status, exito: true };
+      }
+      return {
+        status: resp.status,
+        exito: false,
+        mensaje: resp.data?.mensaje || resp.data?.message || "Error al programar el servicio",
       };
     } catch (err: any) {
       const status = err?.response?.status || 500;

@@ -138,8 +138,40 @@ export interface AgendaDetalleGetDto {
   d_MontoProyecto: number | null;     // solo relevante si v_TipoVenta === "proyecto"
   d_PrecioUnitario: number;
   b_AplicaVoBo?: boolean;
+  i_CveTipoServicio?: number | null;
   d_FechaVoBo?: string | null;
   v_KeyVoBo?: string | null;
+}
+
+export interface CambiarTitularesSesionDto {
+  i_CveAgendaDetalle: number;
+  i_CveTitular: number | null;   // solo capacitación; null en los demás
+  i_CveApoyo: number | null;     // solo instructores
+  d_FechaHoraInicio: string;    // "2026-10-06T09:00:00", hora local, sin zona ni "Z"
+  d_FechaHoraFin: string;
+}
+
+export interface ProgramarSesionItemDto {
+  i_Orden: number;
+  d_FechaHoraInicio: string; // "2026-10-06T09:00:00", hora local, sin "Z"
+  d_FechaHoraFin: string;
+  i_CveArea: number | null;
+}
+
+export interface ProgramarServicioDto {
+  i_CveServAgendaDet: number;
+  i_CveAgenda: number;
+  i_CveTitular: number | null; // solo capacitación
+  i_CveApoyo: number | null;
+  b_TipoProvInsApoyo: boolean; // false = instructor, true = proveedor
+  i_NumAlumnos: number | null; // null = cupo abierto
+  v_NoCotizacionGI: string | null;
+  v_NoOrdenCompraCliente: string | null;
+  d_PrecioUnitario: number | null;
+  d_PrecioProveedor: number | null; // unitario sin IVA; solo si el apoyo es proveedor
+  v_NoCotizacionProv: string | null;
+  v_NoOrdenCompraProv: string | null;
+  Sesiones: ProgramarSesionItemDto[];
 }
 
 export interface CambiarProveedorDto {
