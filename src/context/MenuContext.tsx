@@ -9,6 +9,7 @@ import { useToast } from "@/context/ToastContext";
 interface MenuContextType {
   rutasNavBar: RutaDto[];
   cargandoMenu: boolean;
+  haCargadoExitoso: boolean;
   refrescarMenu: (forzarSegundoPlano?: boolean) => Promise<void>;
   limpiarMenuCache: () => void;
 }
@@ -17,46 +18,6 @@ const MenuContext = createContext<MenuContextType | undefined>(undefined);
 
 export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast();
-  const [rutasNavBar, setRutasNavBar] = useState<RutaDto[]>(() => {
-    // Inicialización síncrona inmediata desde sessionStorage para evitar esqueleto en F5
-    if (typeof window !== "undefined") {
-      try {
-        const sesion = obtenerSesionActual();
-        const cvePerfil = sesion?.id_perfil ?? 1;
-        const raw = sessionStorage.getItem(`menu_${cvePerfil}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
-          }
-        }
-      } catch (e) {
-        console.warn("Error al leer cache inicial del menú:", e);
-      }
-    }
-    return [];
-  });
-
-  const [cargandoMenu, setCargandoMenu] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const sesion = obtenerSesionActual();
-        const cvePerfil = sesion?.id_perfil ?? 1;
-        const raw = sessionStorage.getItem(`menu_${cvePerfil}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return false;
-          }
-        }
-      } catch {
-        // fallback
-      }
-    }
-    return true;
-  });
-
-  const perfilCargadoRef = useRef<number | null>(null);
 
   const getCacheKey = (cvePerfil: number) => `menu_${cvePerfil}`;
 
@@ -66,7 +27,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const raw = sessionStorage.getItem(getCacheKey(cvePerfil));
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       }
@@ -85,26 +46,85 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Inicialización síncrona inmediata desde sessionStorage para evitar esqueleto en F5
+  const [rutasNavBar, setRutasNavBar] = useState<RutaDto[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const sesion = obtenerSesionActual();
+        if (sesion?.token && sesion?.id_perfil) {
+          const enCache = leerCache(sesion.id_perfil);
+          if (enCache) {
+            return enCache;
+          }
+        }
+      } catch (e) {
+        console.warn("Error al leer cache inicial del menú:", e);
+      }
+    }
+    return [];
+  });
+
+  const [cargandoMenu, setCargandoMenu] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const sesion = obtenerSesionActual();
+        if (sesion?.token && sesion?.id_perfil) {
+          const enCache = leerCache(sesion.id_perfil);
+          if (enCache) {
+            return false; // Ya está disponible de inmediato
+          }
+          return true; // Hay sesión pero falta cargar el menú
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return false; // Sin sesión (ej. login) no mostramos esqueleto
+  });
+
+  const [haCargadoExitoso, setHaCargadoExitoso] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const sesion = obtenerSesionActual();
+        if (sesion?.token && sesion?.id_perfil) {
+          const enCache = leerCache(sesion.id_perfil);
+          if (enCache) {
+            return true;
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return false;
+  });
+
+  const perfilCargadoRef = useRef<number | null>(null);
+
   const cargarMenuPerfil = useCallback(
     async (cvePerfil: number, forzarSegundoPlano: boolean = false) => {
-      // 1. Si no es forzado y existe en cache de sessionStorage, cargar de inmediato sin esqueleto ni petición
+      const sesion = obtenerSesionActual();
+      if (!sesion?.token) {
+        setCargandoMenu(false);
+        return;
+      }
+
+      // 1. Si no es forzado y existe en cache de sessionStorage, cargar de inmediato
       if (!forzarSegundoPlano) {
         const enCache = leerCache(cvePerfil);
         if (enCache) {
           setRutasNavBar(enCache);
           setCargandoMenu(false);
+          setHaCargadoExitoso(true);
           perfilCargadoRef.current = cvePerfil;
           return;
         }
-      }
-
-      // 2. Si no hay cache y no es en segundo plano, mostrar esqueleto
-      if (!forzarSegundoPlano) {
         setCargandoMenu(true);
       }
 
       try {
         const data = await RutasService.getRutasNavBar(cvePerfil);
+        // Filtrar elementos vacíos o dummy
         const validas = (data || []).filter(
           (r) =>
             r &&
@@ -115,6 +135,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         guardarCache(cvePerfil, validas);
         setRutasNavBar(validas);
+        setHaCargadoExitoso(true);
         perfilCargadoRef.current = cvePerfil;
       } catch (err) {
         console.error("Error cargando menú del usuario:", err);
@@ -126,21 +147,30 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [toast]
   );
 
+  // Efecto que detecta cuando la sesión está lista o cambia de perfil
   useEffect(() => {
     const sesion = obtenerSesionActual();
-    const cvePerfil = sesion?.id_perfil ?? 1;
-
-    // Cargar solo si no se ha cargado para este perfil
-    if (perfilCargadoRef.current !== cvePerfil) {
-      cargarMenuPerfil(cvePerfil, false);
+    if (sesion?.token && sesion?.id_perfil) {
+      if (perfilCargadoRef.current !== sesion.id_perfil) {
+        cargarMenuPerfil(sesion.id_perfil, false);
+      }
+    } else {
+      // Sesión no disponible o cerrada
+      if (perfilCargadoRef.current !== null) {
+        perfilCargadoRef.current = null;
+        setRutasNavBar([]);
+        setHaCargadoExitoso(false);
+        setCargandoMenu(false);
+      }
     }
   }, [cargarMenuPerfil]);
 
   const refrescarMenu = useCallback(
     async (forzarSegundoPlano: boolean = true) => {
       const sesion = obtenerSesionActual();
-      const cvePerfil = sesion?.id_perfil ?? 1;
-      await cargarMenuPerfil(cvePerfil, forzarSegundoPlano);
+      if (sesion?.token && sesion?.id_perfil) {
+        await cargarMenuPerfil(sesion.id_perfil, forzarSegundoPlano);
+      }
     },
     [cargarMenuPerfil]
   );
@@ -159,6 +189,10 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn("Error limpiando cache de menú:", e);
     }
+    perfilCargadoRef.current = null;
+    setRutasNavBar([]);
+    setHaCargadoExitoso(false);
+    setCargandoMenu(false);
   }, []);
 
   return (
@@ -166,6 +200,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         rutasNavBar,
         cargandoMenu,
+        haCargadoExitoso,
         refrescarMenu,
         limpiarMenuCache,
       }}

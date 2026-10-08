@@ -119,18 +119,13 @@ export const RutasService = {
    * GET rutas/navBar/{i_CvePerfil}
    */
   async getRutasNavBar(i_CvePerfil: number): Promise<RutaDto[]> {
-    return httpDefensivo(
-      async () => {
-        const resp = await apiClient.get<any>(`rutas/navBar/${i_CvePerfil}`);
-        const raw =
-          resp.data?.data ||
-          resp.data?.datos ||
-          resp.data?.Data ||
-          resp.data?.Datos ||
-          (Array.isArray(resp.data) ? resp.data : []);
-        return Array.isArray(raw) ? raw : [];
-      },
-      []
-    );
+    const resp = await apiClient.get<any>(`rutas/navBar/${i_CvePerfil}`);
+    const raw =
+      resp.data?.data ||
+      resp.data?.datos ||
+      resp.data?.Data ||
+      resp.data?.Datos ||
+      (Array.isArray(resp.data) ? resp.data : []);
+    return Array.isArray(raw) ? raw : [];
   },
 };

@@ -3,12 +3,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LogOut,
-  ChevronDown,
-  ChevronRight,
-  PanelLeft,
-} from "lucide-react";
 import { AuthService } from "@/services/auth.service";
 import { RutaDto } from "@/types/rutas";
 import { useToast } from "@/context/ToastContext";
@@ -29,16 +23,18 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
   const pathname = usePathname();
   const router = useRouter();
   const { confirmModal, toast } = useToast();
-  const { rutasNavBar, cargandoMenu } = useMenu();
+  const { rutasNavBar, cargandoMenu, haCargadoExitoso } = useMenu();
 
   const [gruposAbiertos, setGruposAbiertos] = useState<Record<string, boolean>>({});
 
-  // Agrupar rutas por v_RutaRaiz conservando el orden de llegada
+  // 1. Agrupar rutas por v_RutaRaiz conservando el orden exacto de llegada
   const gruposMenu = useMemo(() => {
     const map = new Map<string, GrupoMenu>();
 
     rutasNavBar.forEach((item) => {
-      const raiz = item.v_RutaRaiz.trim();
+      const raiz = item.v_RutaRaiz?.trim() || "";
+      if (!raiz) return;
+
       if (!map.has(raiz)) {
         map.set(raiz, {
           v_RutaRaiz: raiz,
@@ -52,7 +48,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
     return Array.from(map.values());
   }, [rutasNavBar]);
 
-  // Separar grupos superiores del grupo Configuración (fijo abajo)
+  // 2. Separar grupos superiores del grupo Configuración (fijo abajo)
   const esGrupoConfiguracion = (nombre: string) => {
     const n = nombre.trim().toLowerCase();
     return n === "configuración" || n === "configuracion";
@@ -73,35 +69,32 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
     return { gruposSuperiores: superiores, grupoConfig: config };
   }, [gruposMenu]);
 
-  // Función para evaluar si una ruta está activa
+  // 3. Función para evaluar si una ruta está activa
   const isRutaActiva = (ruta: string): boolean => {
     if (!ruta) return false;
     const cleanRuta = ruta.trim();
-    if (cleanRuta === "/" || cleanRuta === "/calendario") {
-      return pathname === "/" || pathname === "/calendario" || pathname.startsWith("/calendario/");
+    if (!cleanRuta) return false;
+
+    const current = pathname || "/";
+    if (cleanRuta === "/") {
+      return current === "/";
     }
-    return pathname === cleanRuta || pathname.startsWith(cleanRuta + "/");
+
+    return current === cleanRuta || current.startsWith(cleanRuta + "/");
   };
 
-  // Mantener abiertos automáticamente los grupos que contengan la opción activa
+  // 4. Mantener abiertos automáticamente los grupos que contengan la opción activa
   useEffect(() => {
     if (gruposMenu.length === 0) return;
 
     setGruposAbiertos((prev) => {
       const actualizados = { ...prev };
       gruposMenu.forEach((grupo) => {
-        const esEnlaceDirecto =
-          grupo.opciones.length === 1 &&
-          grupo.opciones[0].v_RutaHija.trim().toLowerCase() ===
-            grupo.v_RutaRaiz.trim().toLowerCase();
-
-        if (!esEnlaceDirecto) {
-          const tieneActiva = grupo.opciones.some((opt) => isRutaActiva(opt.v_Ruta));
-          if (tieneActiva && actualizados[grupo.v_RutaRaiz] === undefined) {
-            actualizados[grupo.v_RutaRaiz] = true;
-          } else if (actualizados[grupo.v_RutaRaiz] === undefined) {
-            actualizados[grupo.v_RutaRaiz] = true;
-          }
+        const tieneHijaActiva = grupo.opciones.some((opt) => isRutaActiva(opt.v_Ruta));
+        if (tieneHijaActiva) {
+          actualizados[grupo.v_RutaRaiz] = true;
+        } else if (actualizados[grupo.v_RutaRaiz] === undefined) {
+          actualizados[grupo.v_RutaRaiz] = true;
         }
       });
       return actualizados;
@@ -198,11 +191,10 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
               <span className="menu-text" style={{ flex: 1, textAlign: "left" }}>
                 {grupo.v_RutaRaiz}
               </span>
-              {abierto ? (
-                <ChevronDown size={15} className="submenu-arrow" />
-              ) : (
-                <ChevronRight size={15} className="submenu-arrow" />
-              )}
+              <i
+                className={`bi bi-chevron-${abierto ? "down" : "right"} submenu-arrow`}
+                style={{ fontSize: "12px", color: "var(--sidebar-arrow-default, #a0b2c6)" }}
+              />
             </>
           )}
         </button>
@@ -282,11 +274,12 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
 
         {!collapsed && (
           <button
+            type="button"
             className="btn-toggle-sidebar"
             onClick={onToggleCollapse}
             title="Colapsar menú"
           >
-            <PanelLeft size={18} />
+            <i className="bi bi-layout-sidebar-inset" style={{ fontSize: "16px" }} />
           </button>
         )}
       </div>
@@ -301,9 +294,11 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
             <div className="skeleton-box" style={{ height: "34px", borderRadius: "6px" }} />
           </div>
         ) : gruposMenu.length === 0 ? (
-          <div style={{ padding: "20px 8px", textAlign: "center", color: "#94a3b8", fontSize: "12px" }}>
-            {!collapsed && <span>Sin opciones disponibles</span>}
-          </div>
+          haCargadoExitoso ? (
+            <div style={{ padding: "20px 8px", textAlign: "center", color: "#94a3b8", fontSize: "12px" }}>
+              {!collapsed && <span>Sin opciones disponibles</span>}
+            </div>
+          ) : null
         ) : (
           <>
             {/* 1. Grupos superiores en su orden original */}
@@ -311,7 +306,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
 
             {/* 2. Grupo Configuración (fijo abajo, arriba de Salir) */}
             {grupoConfig && (
-              <div className="sidebar-config-container mt-auto" style={{ marginTop: "auto" }}>
+              <div className="sidebar-config-container mt-auto">
                 {gruposSuperiores.length > 0 && <div className="sidebar-divider" />}
                 {renderizarGrupo(grupoConfig)}
               </div>
@@ -329,7 +324,7 @@ export const Sidenav: React.FC<Props> = ({ collapsed, onToggleCollapse }) => {
           title="Salir"
         >
           <div className="nav-icon-wrapper">
-            <LogOut size={18} className="nav-item-icon" />
+            <i className="bi bi-box-arrow-right nav-item-icon" style={{ fontSize: "17px" }} />
           </div>
           {!collapsed && <span className="menu-text">Salir</span>}
         </button>
