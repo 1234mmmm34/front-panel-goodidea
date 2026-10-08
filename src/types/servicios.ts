@@ -92,6 +92,16 @@ export interface AlumnoAgendaDto {
   f_FechaInscripcion: string | null;
 }
 
+export interface AlumnoInscrito {
+  i_CveAlumnoAgenda: number;
+  v_Nomina: string;
+  f_FechaInscripcion: string | null;
+  i_CveAlumno: number | null;
+  v_Nombre: string | null;
+  v_CURP: string | null;
+  v_Puesto: string | null;
+}
+
 export interface FacturaDetalleDto {
   i_CveFacturas: number;
   v_NoFactura: string | null;

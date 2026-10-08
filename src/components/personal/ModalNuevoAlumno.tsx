@@ -2,16 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, User, Plus } from "lucide-react";
-import { AlumnoPersonal, plantasMock } from "@/mocks/personalMock";
+import { X, User, AlertCircle } from "lucide-react";
+import { AlumnoCatalogo, AlumnoPostDto } from "@/types/alumnosCatalogo";
+import { AlumnosCatalogoService } from "@/services/alumnosCatalogo.service";
 import { useToast } from "@/context/ToastContext";
 
 interface ModalNuevoAlumnoProps {
   abierto: boolean;
   idEmpresa: number;
-  alumnosExistentes: AlumnoPersonal[];
+  alumnoEditar?: AlumnoCatalogo | null;
   onCerrar: () => void;
-  onGuardar: (nuevoAlumno: AlumnoPersonal) => void;
+  onGuardadoExitoso: () => void;
 }
 
 const CURP_REGEX = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
@@ -19,9 +20,9 @@ const CURP_REGEX = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
 export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
   abierto,
   idEmpresa,
-  alumnosExistentes,
+  alumnoEditar,
   onCerrar,
-  onGuardar,
+  onGuardadoExitoso,
 }) => {
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
@@ -30,10 +31,13 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
   const [nombre, setNombre] = useState("");
   const [curp, setCurp] = useState("");
   const [puesto, setPuesto] = useState("");
-  const [planta, setPlanta] = useState(plantasMock[0] || "");
 
   const [errores, setErrores] = useState<Record<string, string>>({});
+  const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const [seIntentoGuardar, setSeIntentoGuardar] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  const esEdicion = Boolean(alumnoEditar && alumnoEditar.i_CveAlumno > 0);
 
   useEffect(() => {
     setMounted(true);
@@ -41,15 +45,23 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
 
   useEffect(() => {
     if (abierto) {
-      setNomina("");
-      setNombre("");
-      setCurp("");
-      setPuesto("");
-      setPlanta(plantasMock[0] || "");
+      if (alumnoEditar) {
+        setNomina(alumnoEditar.v_Nomina || "");
+        setNombre(alumnoEditar.v_Nombre || "");
+        setCurp(alumnoEditar.v_CURP || "");
+        setPuesto(alumnoEditar.v_Puesto || "");
+      } else {
+        setNomina("");
+        setNombre("");
+        setCurp("");
+        setPuesto("");
+      }
       setErrores({});
+      setErrorServidor(null);
       setSeIntentoGuardar(false);
+      setGuardando(false);
     }
-  }, [abierto]);
+  }, [abierto, alumnoEditar]);
 
   if (!abierto || !mounted) return null;
 
@@ -60,8 +72,6 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
     const nomClean = nomina.trim();
     if (!nomClean) {
       nuevosErrores.nomina = "La nómina es obligatoria.";
-    } else if (alumnosExistentes.some((a) => a.v_Nomina.trim().toLowerCase() === nomClean.toLowerCase())) {
-      nuevosErrores.nomina = "Esta nómina ya está registrada en la empresa.";
     }
 
     // Nombre
@@ -76,8 +86,6 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
       nuevosErrores.curp = "La CURP es obligatoria.";
     } else if (curpClean.length !== 18 || !CURP_REGEX.test(curpClean)) {
       nuevosErrores.curp = "La CURP no tiene un formato válido (18 caracteres).";
-    } else if (alumnosExistentes.some((a) => a.v_CURP.trim().toUpperCase() === curpClean)) {
-      nuevosErrores.curp = "Esta CURP ya está registrada en la empresa.";
     }
 
     // Puesto
@@ -85,34 +93,78 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
       nuevosErrores.puesto = "El puesto es obligatorio.";
     }
 
-    // Planta
-    if (!planta.trim()) {
-      nuevosErrores.planta = "La planta es obligatoria.";
-    }
-
     setErrores(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSeIntentoGuardar(true);
+    setErrorServidor(null);
 
     if (!validarCampos()) return;
 
-    const nuevoAlumno: AlumnoPersonal = {
-      i_CveAlumno: Date.now(),
+    const dto: AlumnoPostDto = {
       i_CveEmpresa: idEmpresa,
       v_Nomina: nomina.trim(),
       v_Nombre: nombre.trim().toUpperCase(),
       v_CURP: curp.trim().toUpperCase(),
       v_Puesto: puesto.trim(),
-      v_Planta: planta,
     };
 
-    onGuardar(nuevoAlumno);
-    toast.success("Alumno agregado");
-    onCerrar();
+    setGuardando(true);
+
+    try {
+      if (esEdicion && alumnoEditar) {
+        // PUT
+        const res = await AlumnosCatalogoService.putAlumnoCatalogo(alumnoEditar.i_CveAlumno, dto);
+
+        if (res.exito) {
+          toast.success("Alumno actualizado");
+          onGuardadoExitoso();
+          onCerrar();
+        } else if (res.status === 404) {
+          toast.error(res.error || "Alumno no encontrado.");
+          onGuardadoExitoso();
+          onCerrar();
+        } else if (res.status === 409) {
+          const errMsg = res.error || "La nómina o CURP ya está registrada en la empresa.";
+          if (errMsg.toLowerCase().includes("nómina") || errMsg.toLowerCase().includes("nomina")) {
+            setErrores((prev) => ({ ...prev, nomina: errMsg }));
+          } else if (errMsg.toLowerCase().includes("curp")) {
+            setErrores((prev) => ({ ...prev, curp: errMsg }));
+          } else {
+            setErrorServidor(errMsg);
+          }
+        } else {
+          setErrorServidor(res.error || "Ocurrió un error al actualizar el alumno.");
+        }
+      } else {
+        // POST
+        const res = await AlumnosCatalogoService.postAlumnoCatalogo(dto);
+
+        if (res.exito) {
+          toast.success("Alumno agregado");
+          onGuardadoExitoso();
+          onCerrar();
+        } else if (res.status === 409) {
+          const errMsg = res.error || "La nómina o CURP ya está registrada en la empresa.";
+          if (errMsg.toLowerCase().includes("nómina") || errMsg.toLowerCase().includes("nomina")) {
+            setErrores((prev) => ({ ...prev, nomina: errMsg }));
+          } else if (errMsg.toLowerCase().includes("curp")) {
+            setErrores((prev) => ({ ...prev, curp: errMsg }));
+          } else {
+            setErrorServidor(errMsg);
+          }
+        } else {
+          setErrorServidor(res.error || "Ocurrió un error al registrar el alumno.");
+        }
+      }
+    } catch {
+      setErrorServidor("Error inesperado al procesar la solicitud.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return createPortal(
@@ -176,14 +228,16 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
             </div>
             <div>
               <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                Nuevo alumno
+                {esEdicion ? "Editar alumno" : "Nuevo alumno"}
               </h3>
               <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
-                Ingresa los datos para registrar a un alumno.
+                {esEdicion
+                  ? "Modifica los datos del alumno registrado."
+                  : "Ingresa los datos para registrar a un alumno."}
               </p>
             </div>
           </div>
-          <button className="btn-icon" onClick={onCerrar} title="Cerrar">
+          <button className="btn-icon" onClick={onCerrar} disabled={guardando} title="Cerrar">
             <X size={18} />
           </button>
         </div>
@@ -191,6 +245,25 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
         {/* Body / Form */}
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
           <div style={{ padding: "24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+            {errorServidor && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  backgroundColor: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "8px",
+                  color: "#b91c1c",
+                  fontSize: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{errorServidor}</span>
+              </div>
+            )}
+
             {/* Nómina */}
             <div>
               <label className="form-label" style={{ fontSize: "12px", fontWeight: 600, color: "#334155" }}>
@@ -198,16 +271,17 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
               </label>
               <input
                 type="text"
-                className={`form-control ${seIntentoGuardar && errores.nomina ? "border-red-500" : ""}`}
+                className={`form-control ${errores.nomina ? "border-red-500" : ""}`}
                 style={{ height: "38px", fontSize: "13px", borderRadius: "8px" }}
                 placeholder="Ej. 10234"
                 value={nomina}
                 onChange={(e) => {
                   setNomina(e.target.value);
                   if (errores.nomina) setErrores((prev) => ({ ...prev, nomina: "" }));
+                  if (errorServidor) setErrorServidor(null);
                 }}
               />
-              {seIntentoGuardar && errores.nomina && (
+              {errores.nomina && (
                 <span style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px", display: "block" }}>
                   {errores.nomina}
                 </span>
@@ -221,16 +295,17 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
               </label>
               <input
                 type="text"
-                className={`form-control ${seIntentoGuardar && errores.nombre ? "border-red-500" : ""}`}
+                className={`form-control ${errores.nombre ? "border-red-500" : ""}`}
                 style={{ height: "38px", fontSize: "13px", borderRadius: "8px" }}
                 placeholder="Ej. JUAN CARLOS HERNÁNDEZ LÓPEZ"
                 value={nombre}
                 onChange={(e) => {
                   setNombre(e.target.value.toUpperCase());
                   if (errores.nombre) setErrores((prev) => ({ ...prev, nombre: "" }));
+                  if (errorServidor) setErrorServidor(null);
                 }}
               />
-              {seIntentoGuardar && errores.nombre && (
+              {errores.nombre && (
                 <span style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px", display: "block" }}>
                   {errores.nombre}
                 </span>
@@ -245,16 +320,17 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
               <input
                 type="text"
                 maxLength={18}
-                className={`form-control font-mono ${seIntentoGuardar && errores.curp ? "border-red-500" : ""}`}
+                className={`form-control font-mono ${errores.curp ? "border-red-500" : ""}`}
                 style={{ height: "38px", fontSize: "13px", borderRadius: "8px", textTransform: "uppercase" }}
                 placeholder="Ej. HELJ850312HNLRPN04"
                 value={curp}
                 onChange={(e) => {
                   setCurp(e.target.value.toUpperCase());
                   if (errores.curp) setErrores((prev) => ({ ...prev, curp: "" }));
+                  if (errorServidor) setErrorServidor(null);
                 }}
               />
-              {seIntentoGuardar && errores.curp && (
+              {errores.curp && (
                 <span style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px", display: "block" }}>
                   {errores.curp}
                 </span>
@@ -268,45 +344,19 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
               </label>
               <input
                 type="text"
-                className={`form-control ${seIntentoGuardar && errores.puesto ? "border-red-500" : ""}`}
+                className={`form-control ${errores.puesto ? "border-red-500" : ""}`}
                 style={{ height: "38px", fontSize: "13px", borderRadius: "8px" }}
                 placeholder="Ej. Operador de montacargas"
                 value={puesto}
                 onChange={(e) => {
                   setPuesto(e.target.value);
                   if (errores.puesto) setErrores((prev) => ({ ...prev, puesto: "" }));
+                  if (errorServidor) setErrorServidor(null);
                 }}
               />
-              {seIntentoGuardar && errores.puesto && (
+              {errores.puesto && (
                 <span style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px", display: "block" }}>
                   {errores.puesto}
-                </span>
-              )}
-            </div>
-
-            {/* Planta */}
-            <div>
-              <label className="form-label" style={{ fontSize: "12px", fontWeight: 600, color: "#334155" }}>
-                Planta <span style={{ color: "#ef4444" }}>*</span>
-              </label>
-              <select
-                className={`form-select ${seIntentoGuardar && errores.planta ? "border-red-500" : ""}`}
-                style={{ height: "38px", fontSize: "13px", borderRadius: "8px" }}
-                value={planta}
-                onChange={(e) => {
-                  setPlanta(e.target.value);
-                  if (errores.planta) setErrores((prev) => ({ ...prev, planta: "" }));
-                }}
-              >
-                {plantasMock.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              {seIntentoGuardar && errores.planta && (
-                <span style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px", display: "block" }}>
-                  {errores.planta}
                 </span>
               )}
             </div>
@@ -324,11 +374,11 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
               background: "#ffffff",
             }}
           >
-            <button type="button" className="btn btn-secondary" onClick={onCerrar}>
+            <button type="button" className="btn btn-secondary" onClick={onCerrar} disabled={guardando}>
               Cancelar
             </button>
-            <button type="submit" className="btn btn-primary">
-              Guardar
+            <button type="submit" className="btn btn-primary" disabled={guardando}>
+              {guardando ? "Guardando..." : "Guardar"}
             </button>
           </div>
         </form>

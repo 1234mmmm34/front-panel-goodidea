@@ -18,6 +18,8 @@ import {
   RefreshCw,
   Ban,
   Plus,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { ModalReprogramarSesion } from "./ModalReprogramarSesion";
 import { ModalCancelarSesion } from "./ModalCancelarSesion";
@@ -27,6 +29,7 @@ import {
   AgendaDetalleGetDto,
   AgendaDetalleUpdateDto,
   AlumnoAgendaDto,
+  AlumnoInscrito,
   EntregableDetalleDto,
   FacturaDetalleDto,
   SesionDetalleDto,
@@ -97,7 +100,10 @@ export const ModalDetalleServicio: React.FC<Props> = ({
 
   const [facturas, setFacturas] = useState<FacturaDetalleDto[]>([]);
   const [entregables, setEntregables] = useState<EntregableDetalleDto[]>([]);
-  const [alumnos, setAlumnos] = useState<AlumnoAgendaDto[]>([]);
+  const [alumnosInscritos, setAlumnosInscritos] = useState<AlumnoInscrito[]>([]);
+  const [cargandoAlumnos, setCargandoAlumnos] = useState<boolean>(false);
+  const [errorAlumnos, setErrorAlumnos] = useState<string | null>(null);
+  const [descargandoNomina, setDescargandoNomina] = useState<boolean>(false);
 
   // Estados para panel de Agregar Entregables
   const [panelAgregarAbierto, setPanelAgregarAbierto] = useState<boolean>(false);
@@ -177,6 +183,25 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     }
   };
 
+  const cargarAlumnosInscritos = async (idServAgendaDet: number) => {
+    setCargandoAlumnos(true);
+    setErrorAlumnos(null);
+    try {
+      const data = await AlumnosService.getAlumnosInscritos(idServAgendaDet);
+      setAlumnosInscritos(data);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.mensaje ||
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Error al cargar los alumnos inscritos";
+      setErrorAlumnos(msg);
+      toast.error(msg);
+    } finally {
+      setCargandoAlumnos(false);
+    }
+  };
+
   const cargarDetalle = async () => {
     if (!iCveAgenda || !iCveServAgendaDet) return;
     setCargando(true);
@@ -188,12 +213,13 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       setOrdenCompra(data.v_NoOrdenCompraCliente || (data as any).v_noOrdenCompraCliente || "");
       const fArr = data.Facturas || (data as any).facturas || [];
       const eArr = data.Entregables || (data as any).entregables || [];
-      const aArr = data.Alumnos || (data as any).alumnos || [];
       setFacturas(Array.isArray(fArr) ? [...fArr] : []);
       setEntregables(Array.isArray(eArr) ? [...eArr] : []);
-      setAlumnos(Array.isArray(aArr) ? [...aArr] : []);
     }
     setCargando(false);
+
+    // Cargar alumnos inscritos desde el endpoint específico
+    cargarAlumnosInscritos(iCveServAgendaDet);
   };
 
   useEffect(() => {
@@ -209,6 +235,10 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       setCatalogoCargado(false);
     } else {
       setDetalle(null);
+      setAlumnosInscritos([]);
+      setErrorAlumnos(null);
+      setCargandoAlumnos(false);
+      setDescargandoNomina(false);
       setPanelAgregarAbierto(false);
       setBusquedaEntregable("");
       setSeleccionadosIds(new Set());
@@ -350,7 +380,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   };
 
   const cupos = detalle?.i_NumAlumnos ?? 0;
-  const inscritos = alumnos.length;
+  const inscritos = alumnosInscritos.length;
   const sinLimite = cupos === 0;
 
   const getBadgeColorAlumnos = () => {
@@ -359,29 +389,41 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     return "bg-emerald-50 text-emerald-700 border-emerald-200";
   };
 
-  const handleEliminarAlumno = async (idAlumnoAgenda: number) => {
+  const handleEliminarAlumno = async (idAlumnoAgenda: number, identificador?: string) => {
     confirmModal({
-      title: "Eliminar alumno",
-      message: "¿Deseas eliminar este alumno de la nómina?",
-      confirmText: "Eliminar",
+      title: "Quitar alumno",
+      message: identificador
+        ? `¿Deseas quitar a "${identificador}" de este servicio?`
+        : "¿Deseas quitar este alumno de este servicio?",
+      confirmText: "Quitar",
       cancelText: "Cancelar",
       onConfirm: async () => {
         const ok = await AgendaService.deleteAlumno(idAlumnoAgenda);
         if (ok) {
-          toast.success("Alumno eliminado de la nómina exitosamente");
-          setAlumnos((prev) => prev.filter((a) => a.i_CveAlumnoAgenda !== idAlumnoAgenda));
+          toast.success("Alumno quitado del servicio exitosamente");
+          if (iCveServAgendaDet) {
+            await cargarAlumnosInscritos(iCveServAgendaDet);
+          }
+          if (onGuardadoExitoso) onGuardadoExitoso();
         } else {
-          toast.error("No se pudo eliminar el alumno.");
+          toast.error("No se pudo quitar al alumno del servicio.");
         }
       },
     });
   };
 
   const handleDescargarNomina = async () => {
-    if (!detalle) return;
-    const ok = await AlumnosService.descargarNomina(detalle.i_CveServAgendaDet);
-    if (!ok) {
-      toast.error("Ocurrió un problema al generar o descargar el archivo de nómina.");
+    if (!detalle || descargandoNomina) return;
+    setDescargandoNomina(true);
+    try {
+      const ok = await AlumnosService.descargarNomina(detalle.i_CveServAgendaDet);
+      if (!ok) {
+        toast.error("Ocurrió un problema al generar o descargar el archivo de nómina.");
+      }
+    } catch {
+      toast.error("Ocurrió un problema al descargar el archivo de nómina.");
+    } finally {
+      setDescargandoNomina(false);
     }
   };
 
@@ -1040,12 +1082,20 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                         <button
                           type="button"
                           className="btn-icon"
-                          style={{ padding: "4px", color: "#64748b", cursor: "pointer" }}
+                          style={{
+                            padding: "4px",
+                            color: descargandoNomina ? "#2B8FCC" : "#64748b",
+                            cursor: descargandoNomina || inscritos === 0 ? "not-allowed" : "pointer",
+                          }}
                           onClick={handleDescargarNomina}
-                          disabled={inscritos === 0}
-                          title="Descargar Nómina en Excel"
+                          disabled={inscritos === 0 || descargandoNomina}
+                          title={descargandoNomina ? "Descargando nómina..." : "Descargar Nómina en Excel"}
                         >
-                          <FileSpreadsheet size={16} />
+                          {descargandoNomina ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <FileSpreadsheet size={16} />
+                          )}
                         </button>
 
                         <button
@@ -1060,39 +1110,177 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                     </div>
 
                     {acordeonAlumnos && (
-                      <div style={{ padding: "12px", backgroundColor: "#ffffff", borderTop: "1px solid #e2e8f0" }}>
-                        {alumnos.length === 0 ? (
-                          <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>No hay alumnos inscritos en este servicio.</p>
+                      <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderTop: "1px solid #e2e8f0" }}>
+                        {cargandoAlumnos ? (
+                          <div style={{ padding: "20px 0", textAlign: "center", color: "#64748b" }}>
+                            <div className="spinner-border text-primary mb-2" style={{ width: "20px", height: "20px" }}></div>
+                            <p style={{ fontSize: "12px", margin: 0 }}>Cargando alumnos inscritos...</p>
+                          </div>
+                        ) : errorAlumnos ? (
+                          <div style={{ padding: "12px 14px", backgroundColor: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#991b1b" }}>
+                              <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                              <span>{errorAlumnos}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline"
+                              onClick={() => iCveServAgendaDet && cargarAlumnosInscritos(iCveServAgendaDet)}
+                              style={{ fontSize: "11px", height: "26px", padding: "0 10px", flexShrink: 0 }}
+                            >
+                              Reintentar
+                            </button>
+                          </div>
+                        ) : alumnosInscritos.length === 0 ? (
+                          <p style={{ fontSize: "12px", color: "#64748b", margin: 0, padding: "8px 0" }}>No hay alumnos inscritos en este servicio.</p>
                         ) : (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                            {alumnos.map((alumno, aIdx) => (
-                              <div
-                                key={`alum-${alumno.i_CveAlumnoAgenda || 'x'}-${aIdx}`}
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "6px",
-                                  padding: "4px 10px",
-                                  backgroundColor: "#f1f5f9",
-                                  border: "1px solid #e2e8f0",
-                                  borderRadius: "16px",
-                                  fontSize: "12px",
-                                  color: "#1e293b",
-                                }}
-                                title={`Inscrito el: ${alumno.f_FechaInscripcion ? formatearFechaCorta(alumno.f_FechaInscripcion) : "—"}`}
-                              >
-                                <User size={12} style={{ color: "#94a3b8" }} />
-                                <span>{alumno.v_Nomina || "Sin nómina"}</span>
-                                <button
-                                  type="button"
-                                  style={{ background: "none", border: "none", color: "#94a3b8", fontWeight: "bold", cursor: "pointer", padding: "0 2px", fontSize: "14px" }}
-                                  onClick={() => handleEliminarAlumno(alumno.i_CveAlumnoAgenda)}
-                                  title="Eliminar alumno"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
+                          <div
+                            className="alegra-table-container"
+                            style={{
+                              maxHeight: "260px",
+                              overflowY: "auto",
+                              borderRadius: "6px",
+                              border: "1px solid #e2e8f0",
+                              scrollbarWidth: "thin",
+                              scrollbarColor: "#cbd5e1 transparent",
+                            }}
+                          >
+                            <table className="alegra-table alegra-table-compact" style={{ width: "100%", tableLayout: "fixed" }}>
+                              <thead style={{ position: "sticky", top: 0, zIndex: 2, backgroundColor: "#f8fafc" }}>
+                                <tr>
+                                  <th style={{ width: "18%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                    Nómina
+                                  </th>
+                                  <th style={{ width: "36%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                    Nombre
+                                  </th>
+                                  <th style={{ width: "23%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                    CURP
+                                  </th>
+                                  <th style={{ width: "23%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                    Puesto
+                                  </th>
+                                  <th
+                                    className="text-center"
+                                    style={{ width: "46px", minWidth: "46px", padding: "6px 6px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0", whiteSpace: "nowrap" }}
+                                  >
+                                    Acciones
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {alumnosInscritos.map((alumno) => {
+                                  const tieneRegistro = alumno.i_CveAlumno !== null && alumno.i_CveAlumno !== undefined;
+                                  return (
+                                    <tr
+                                      key={`inscrito-${alumno.i_CveAlumnoAgenda}`}
+                                      className="hover:bg-slate-50/60 transition-colors"
+                                      style={{ height: "30px" }}
+                                    >
+                                      <td
+                                        style={{
+                                          padding: "4px 10px",
+                                          fontSize: "12px",
+                                          fontWeight: 500,
+                                          color: "#1e293b",
+                                          whiteSpace: "nowrap",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          verticalAlign: "middle",
+                                        }}
+                                        title={alumno.v_Nomina || ""}
+                                      >
+                                        {alumno.v_Nomina || "—"}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "4px 10px",
+                                          fontSize: "12px",
+                                          whiteSpace: "nowrap",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          verticalAlign: "middle",
+                                        }}
+                                        title={tieneRegistro ? (alumno.v_Nombre || "") : "Sin registro en el catálogo"}
+                                      >
+                                        {tieneRegistro && alumno.v_Nombre ? (
+                                          <span style={{ fontWeight: 500, color: "#1e293b", textTransform: "uppercase" }}>
+                                            {alumno.v_Nombre}
+                                          </span>
+                                        ) : (
+                                          <span style={{ color: "#94a3b8", fontStyle: "italic", fontSize: "11px" }}>
+                                            Sin registro en el catálogo
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "4px 10px",
+                                          fontSize: "12px",
+                                          fontFamily: "var(--font-mono)",
+                                          whiteSpace: "nowrap",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          verticalAlign: "middle",
+                                        }}
+                                        title={tieneRegistro && alumno.v_CURP ? alumno.v_CURP : ""}
+                                      >
+                                        {tieneRegistro && alumno.v_CURP ? (
+                                          <span className="text-secondary text-xs">{alumno.v_CURP}</span>
+                                        ) : (
+                                          <span style={{ color: "#cbd5e1" }}>—</span>
+                                        )}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "4px 10px",
+                                          fontSize: "12px",
+                                          color: "#475569",
+                                          whiteSpace: "nowrap",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          verticalAlign: "middle",
+                                        }}
+                                        title={tieneRegistro && alumno.v_Puesto ? alumno.v_Puesto : ""}
+                                      >
+                                        {tieneRegistro && alumno.v_Puesto ? (
+                                          alumno.v_Puesto
+                                        ) : (
+                                          <span style={{ color: "#cbd5e1" }}>—</span>
+                                        )}
+                                      </td>
+                                      <td
+                                        className="text-center"
+                                        style={{
+                                          width: "46px",
+                                          minWidth: "46px",
+                                          padding: "4px 6px",
+                                          verticalAlign: "middle",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        <button
+                                          type="button"
+                                          className="btn-icon danger"
+                                          onClick={() => handleEliminarAlumno(alumno.i_CveAlumnoAgenda, alumno.v_Nombre || alumno.v_Nomina)}
+                                          title="Quitar alumno del servicio"
+                                          style={{
+                                            width: "24px",
+                                            height: "24px",
+                                            padding: "2px",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                          }}
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           </div>
                         )}
                       </div>
