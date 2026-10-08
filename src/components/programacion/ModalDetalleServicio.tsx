@@ -20,6 +20,7 @@ import {
   Plus,
   Trash2,
   Loader2,
+  Copy,
 } from "lucide-react";
 import { ModalReprogramarSesion } from "./ModalReprogramarSesion";
 import { ModalCancelarSesion } from "./ModalCancelarSesion";
@@ -104,6 +105,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [cargandoAlumnos, setCargandoAlumnos] = useState<boolean>(false);
   const [errorAlumnos, setErrorAlumnos] = useState<string | null>(null);
   const [descargandoNomina, setDescargandoNomina] = useState<boolean>(false);
+  const [copiadoAlumnos, setCopiadoAlumnos] = useState<boolean>(false);
 
   // Estados para panel de Agregar Entregables
   const [panelAgregarAbierto, setPanelAgregarAbierto] = useState<boolean>(false);
@@ -239,6 +241,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       setErrorAlumnos(null);
       setCargandoAlumnos(false);
       setDescargandoNomina(false);
+      setCopiadoAlumnos(false);
       setPanelAgregarAbierto(false);
       setBusquedaEntregable("");
       setSeleccionadosIds(new Set());
@@ -424,6 +427,47 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       toast.error("Ocurrió un problema al descargar el archivo de nómina.");
     } finally {
       setDescargandoNomina(false);
+    }
+  };
+
+  const handleCopiarTablaAlumnos = async () => {
+    if (alumnosInscritos.length === 0) {
+      toast.warning("No hay alumnos inscritos para copiar.");
+      return;
+    }
+
+    try {
+      const headers = ["Nómina", "Nombre", "CURP", "Puesto"];
+      const rows = alumnosInscritos.map((alumno) => {
+        const tieneRegistro = alumno.i_CveAlumno !== null && alumno.i_CveAlumno !== undefined;
+        const nomina = alumno.v_Nomina || "";
+        const nombre = tieneRegistro && alumno.v_Nombre ? alumno.v_Nombre.toUpperCase() : (alumno.v_Nombre || "");
+        const curp = tieneRegistro && alumno.v_CURP ? alumno.v_CURP : "";
+        const puesto = tieneRegistro && alumno.v_Puesto ? alumno.v_Puesto : "";
+        return [nomina, nombre, curp, puesto].join("\t");
+      });
+
+      const textToCopy = [headers.join("\t"), ...rows].join("\n");
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(textToCopy);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = textToCopy;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+
+      setCopiadoAlumnos(true);
+      toast.success("Tabla de alumnos copiada al portapapeles");
+      setTimeout(() => setCopiadoAlumnos(false), 2000);
+    } catch (err) {
+      console.error("Error al copiar tabla de alumnos:", err);
+      toast.error("No se pudo copiar la tabla al portapapeles.");
     }
   };
 
@@ -1079,6 +1123,26 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                       </button>
 
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          style={{
+                            padding: "4px",
+                            color: copiadoAlumnos ? "#10b981" : "#64748b",
+                            cursor: inscritos === 0 ? "not-allowed" : "pointer",
+                            transition: "color 0.15s ease",
+                          }}
+                          onClick={handleCopiarTablaAlumnos}
+                          disabled={inscritos === 0}
+                          title={copiadoAlumnos ? "¡Copiado!" : "Copiar tabla al portapapeles"}
+                        >
+                          {copiadoAlumnos ? (
+                            <Check size={16} style={{ color: "#10b981" }} />
+                          ) : (
+                            <Copy size={16} />
+                          )}
+                        </button>
+
                         <button
                           type="button"
                           className="btn-icon"

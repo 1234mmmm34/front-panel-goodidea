@@ -72,7 +72,7 @@ export const TablaTopClientes: React.FC<TablaTopClientesProps> = ({
             margin: 0,
           }}
         >
-          Clientes con mayor saldo
+          Saldo pendiente por cliente
         </h3>
         <span style={{ fontSize: "12px", color: "#64748b" }}>
           Top 10 saldos pendientes

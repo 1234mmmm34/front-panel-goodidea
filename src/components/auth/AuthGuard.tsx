@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { obtenerSesionActual } from "@/lib/api-client";
 
 import { ToastProvider } from "@/context/ToastContext";
+import { MenuProvider } from "@/context/MenuContext";
 
 interface Props {
   children: React.ReactNode;
@@ -40,5 +41,9 @@ export const AuthGuard: React.FC<Props> = ({ children }) => {
     );
   }
 
-  return <ToastProvider>{children}</ToastProvider>;
+  return (
+    <ToastProvider>
+      <MenuProvider>{children}</MenuProvider>
+    </ToastProvider>
+  );
 };

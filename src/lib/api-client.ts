@@ -90,6 +90,7 @@ apiClient.interceptors.response.use(
         console.warn("[Auth] 401 no autorizado en", url, "-> Limpiando sesión");
         localStorage.removeItem("userData");
         localStorage.removeItem("sesion_stps");
+        sessionStorage.clear();
         window.location.href = "/login";
       }
     }

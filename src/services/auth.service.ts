@@ -69,6 +69,7 @@ export const AuthService = {
     if (typeof window !== "undefined") {
       localStorage.removeItem("userData");
       localStorage.removeItem("sesion_stps");
+      sessionStorage.clear();
       window.location.href = "/login";
     }
   },

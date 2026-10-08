@@ -6,13 +6,11 @@ import { FacturasResumenDto } from "@/types/facturas";
 
 interface TarjetasResumenFacturasProps {
   resumen: FacturasResumenDto | null;
-  montoPendienteProveedor?: number | null;
   cargando: boolean;
 }
 
 export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = ({
   resumen,
-  montoPendienteProveedor,
   cargando,
 }) => {
   const router = useRouter();
@@ -86,8 +84,8 @@ export const TarjetasResumenFacturas: React.FC<TarjetasResumenFacturasProps> = (
     {
       id: "pendiente_proveedor",
       label: "Pendiente por pagar",
-      monto: formatMoneda(montoPendienteProveedor),
-      subtexto: "Saldo pendiente con proveedores",
+      monto: formatMoneda(resumen.d_PendientePorPagar),
+      subtexto: "Con proveedores, por los servicios de estas facturas",
       colorMonto: "#1e3a5f",
       badge: "con IVA",
       onClick: () => router.push("/gastos"),

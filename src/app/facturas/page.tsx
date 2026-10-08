@@ -5,7 +5,6 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { FacturaGetDto, FiltrosFacturasState, FacturasResumenDto } from "@/types/facturas";
 import { FacturasService } from "@/services/facturas.service";
-import { GastosService } from "@/services/gastos.service";
 import { FiltrosFacturas } from "@/components/facturas/FiltrosFacturas";
 import { TablaFacturas } from "@/components/facturas/TablaFacturas";
 import { TarjetasResumenFacturas } from "@/components/facturas/TarjetasResumenFacturas";
@@ -15,6 +14,7 @@ import {
   ModalTimbrado,
   ModalCancelarFacturas,
 } from "@/components/facturas/ModalesFacturas";
+import { useToast } from "@/context/ToastContext";
 
 export default function FacturasPage() {
   const ahora = new Date();
@@ -39,7 +39,6 @@ export default function FacturasPage() {
   // 3. Datos, Resumen y estado de carga
   const [datos, setDatos] = useState<FacturaGetDto[]>([]);
   const [resumen, setResumen] = useState<FacturasResumenDto | null>(null);
-  const [montoPendienteProveedor, setMontoPendienteProveedor] = useState<number | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
   const [cargandoResumen, setCargandoResumen] = useState<boolean>(true);
 
@@ -50,46 +49,50 @@ export default function FacturasPage() {
   const [modalTimbradoAbierto, setModalTimbradoAbierto] = useState<boolean>(false);
   const [modalCancelarAbierto, setModalCancelarAbierto] = useState<boolean>(false);
 
+  const { toast } = useToast();
+
   // Carga de datos y resumen de facturas
   const cargarFacturas = useCallback(
     async (pageToLoad: number, pageSizeToLoad: number, currentFiltros: FiltrosFacturasState) => {
       setCargando(true);
       setCargandoResumen(true);
 
-      const [resFacturas, resResumen, resGastosResumen] = await Promise.all([
-        FacturasService.getFacturas({
-          estado: currentFiltros.estado,
-          fechaInicio: currentFiltros.fechaInicio,
-          fechaFin: currentFiltros.fechaFin,
-          fechaPago: currentFiltros.fechaInicio,
-          fechaPagoFin: currentFiltros.fechaFin,
-          searchTerm: currentFiltros.searchTerm,
-          pagina: pageToLoad,
-          tamano: pageSizeToLoad,
-        }),
-        FacturasService.getFacturasResumen({
-          estado: currentFiltros.estado,
-          fechaInicio: currentFiltros.fechaInicio,
-          fechaFin: currentFiltros.fechaFin,
-          fechaPago: currentFiltros.fechaInicio,
-          fechaPagoFin: currentFiltros.fechaFin,
-          searchTerm: currentFiltros.searchTerm,
-        }),
-        GastosService.getGastosResumen({
-          estado: "Pendientes",
-        }),
-      ]);
+      try {
+        const [resFacturas, resResumen] = await Promise.all([
+          FacturasService.getFacturas({
+            estado: currentFiltros.estado,
+            fechaInicio: currentFiltros.fechaInicio,
+            fechaFin: currentFiltros.fechaFin,
+            fechaPago: currentFiltros.fechaInicio,
+            fechaPagoFin: currentFiltros.fechaFin,
+            searchTerm: currentFiltros.searchTerm,
+            pagina: pageToLoad,
+            tamano: pageSizeToLoad,
+          }),
+          FacturasService.getFacturasResumen({
+            estado: currentFiltros.estado,
+            fechaInicio: currentFiltros.fechaInicio,
+            fechaFin: currentFiltros.fechaFin,
+            fechaPago: currentFiltros.fechaInicio,
+            fechaPagoFin: currentFiltros.fechaFin,
+            searchTerm: currentFiltros.searchTerm,
+          }),
+        ]);
 
-      setDatos(resFacturas.datos);
-      setTotalRegistros(resFacturas.total);
-      setTotalPaginas(resFacturas.totalPaginas);
-      setCargando(false);
+        setDatos(resFacturas.datos);
+        setTotalRegistros(resFacturas.total);
+        setTotalPaginas(resFacturas.totalPaginas);
 
-      setResumen(resResumen);
-      setMontoPendienteProveedor(resGastosResumen.d_TotalPendiente);
-      setCargandoResumen(false);
+        setResumen(resResumen);
+      } catch (err: any) {
+        console.error("Error cargando facturas y resúmenes:", err);
+        toast.error("Ocurrió un error al cargar la información de facturas.");
+      } finally {
+        setCargando(false);
+        setCargandoResumen(false);
+      }
     },
-    []
+    [toast]
   );
 
   useEffect(() => {
@@ -153,7 +156,6 @@ export default function FacturasPage() {
         {/* Tarjetas de Resumen de Facturas */}
         <TarjetasResumenFacturas
           resumen={resumen}
-          montoPendienteProveedor={montoPendienteProveedor}
           cargando={cargandoResumen}
         />
 

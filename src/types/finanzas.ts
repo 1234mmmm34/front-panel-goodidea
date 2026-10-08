@@ -15,9 +15,11 @@ export interface DashboardKpis {
 }
 
 export interface DashboardMes {
-  d_Mes: string;                // primer día del mes
-  d_Facturado: number;
-  d_Cobrado: number;
+  d_Mes: string;           // primer día del mes del periodo actual, ej. "2026-10-01"
+  d_Facturado: number;     // se conserva; esta gráfica ya no lo usa
+  d_Cobrado: number;       // se conserva; esta gráfica ya no lo usa
+  d_Venta: number;         // ventas de ese mes, con IVA
+  d_VentaAnterior: number; // ventas del mismo mes del año anterior, con IVA
 }
 
 export interface DashboardAntiguedad {

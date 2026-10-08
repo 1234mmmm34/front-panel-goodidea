@@ -129,10 +129,15 @@ export const GastosService = {
     return httpDefensivo(
       async () => {
         const queryParams: Record<string, string | number> = {
-          searchTerm: params.searchTerm ?? "",
-          i_CveProveedor: params.i_CveProveedor ?? 0,
-          estado: params.estado ?? "",
+          estado: params.estado ?? "Pendientes",
         };
+
+        if (params.searchTerm && params.searchTerm.trim().length > 0) {
+          queryParams.searchTerm = params.searchTerm.trim();
+        }
+        if (params.i_CveProveedor && params.i_CveProveedor > 0) {
+          queryParams.i_CveProveedor = params.i_CveProveedor;
+        }
 
         const inicio = (params.fechaInicio || "").trim();
         const fin = (params.fechaFin || "").trim();

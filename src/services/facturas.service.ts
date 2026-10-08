@@ -197,12 +197,14 @@ export const FacturasService = {
         d_TotalPendiente: Number(data?.d_TotalPendiente ?? data?.TotalPendiente ?? 0),
         d_TotalFacturado: Number(data?.d_TotalFacturado ?? data?.TotalFacturado ?? 0),
         i_TotalFacturas: Number(data?.i_TotalFacturas ?? data?.TotalFacturas ?? 0),
+        d_PendientePorPagar: Number(data?.d_PendientePorPagar ?? data?.PendientePorPagar ?? 0),
       };
     }, {
       d_TotalPagado: 0,
       d_TotalPendiente: 0,
       d_TotalFacturado: 0,
       i_TotalFacturas: 0,
+      d_PendientePorPagar: 0,
     });
   },
 

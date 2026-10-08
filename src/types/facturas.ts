@@ -32,10 +32,11 @@ export interface ResultadoRespuestaApi {
 }
 
 export interface FacturasResumenDto {
-  d_TotalPagado: number;
-  d_TotalPendiente: number;
-  d_TotalFacturado: number;
-  i_TotalFacturas: number;
+  d_TotalPagado: number;       // → "Total Pagado"
+  d_TotalPendiente: number;    // → "Pendiente por cobrar"
+  d_TotalFacturado: number;    // → "Total Facturado"
+  i_TotalFacturas: number;     // → subtexto "X facturas en el periodo"
+  d_PendientePorPagar: number; // → "Pendiente por pagar"
 }
 
 export interface PagoPendienteMasivoDto {

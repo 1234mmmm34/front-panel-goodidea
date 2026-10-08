@@ -14,12 +14,12 @@ import { useToast } from "@/context/ToastContext";
 export default function FinanzasPage() {
   const { toast } = useToast();
 
-  const ahora = new Date();
-  const primerDiaMes = format(startOfMonth(ahora), "yyyy-MM-dd");
-  const hoyStr = format(ahora, "yyyy-MM-dd");
+  const anioActual = new Date().getFullYear();
+  const primerDiaAnio = `${anioActual}-01-01`;
+  const ultimoDiaAnio = `${anioActual}-12-31`;
 
-  const [fechaInicio, setFechaInicio] = useState<string>(primerDiaMes);
-  const [fechaFin, setFechaFin] = useState<string>(hoyStr);
+  const [fechaInicio, setFechaInicio] = useState<string>(primerDiaAnio);
+  const [fechaFin, setFechaFin] = useState<string>(ultimoDiaAnio);
   const [datos, setDatos] = useState<DashboardFinanzas | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
 
@@ -89,16 +89,17 @@ export default function FinanzasPage() {
         {/* Tarjetas KPIs (Cobranza y Rentabilidad) */}
         <TarjetasKpisFinanzas kpis={datos?.kpis ?? null} cargando={cargando} />
 
-        {/* Gráficas (Facturado vs Cobrado por mes & Antigüedad de Cartera) */}
+        {/* Gráficas (Total de ventas & Antigüedad de Cartera) */}
         <GraficasFinanzas
           serieMensual={datos?.serieMensual ?? []}
           antiguedad={datos?.antiguedad ?? []}
+          fechaInicio={datos?.kpis?.d_FechaInicio || fechaInicio}
+          fechaFin={datos?.kpis?.d_FechaFin || fechaFin}
           fechaCorte={datos?.kpis?.d_FechaCorte}
-          fechaFin={datos?.kpis?.d_FechaFin}
           cargando={cargando}
         />
 
-        {/* Tabla: Clientes con mayor saldo */}
+        {/* Tabla: Saldo pendiente por cliente */}
         <TablaTopClientes
           topClientes={datos?.topClientes ?? []}
           totalPorCobrar={datos?.kpis?.d_PorCobrar ?? 0}
