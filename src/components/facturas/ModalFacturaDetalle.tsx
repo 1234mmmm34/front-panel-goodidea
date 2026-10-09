@@ -12,6 +12,8 @@ import {
   ChevronRight,
   ChevronDown,
   Folder,
+  Eye,
+  ExternalLink,
 } from "lucide-react";
 import {
   FacturaGetDto,
@@ -19,6 +21,7 @@ import {
   LineaServicioFacturaDto,
 } from "@/types/facturas";
 import { FacturasService } from "@/services/facturas.service";
+import { VerDocumento } from "@/services/archivos.service";
 import { formatearFechaTexto, calcularDiasRetraso } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
 
@@ -875,6 +878,89 @@ export const ModalFacturaDetalle: React.FC<Props> = ({
                     </table>
                   </div>
                 </div>
+
+                {/* 1.1 Archivos adjuntos (PDF / XML) */}
+                <div
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "6px",
+                    padding: "10px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "10px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <FileText size={15} style={{ color: "#2B8FCC" }} />
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e3a5f" }}>
+                      Archivos de la factura:
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                    {factura.v_KeyPdf && (
+                      <button
+                        type="button"
+                        onClick={() => VerDocumento(factura.v_KeyPdf)}
+                        style={{
+                          backgroundColor: "#fef2f2",
+                          border: "1px solid #fecaca",
+                          borderRadius: "6px",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#dc2626",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          transition: "all 0.15s ease",
+                        }}
+                        title="Abrir PDF en pestaña nueva"
+                      >
+                        <FileText size={14} style={{ color: "#dc2626" }} />
+                        <span>Ver PDF</span>
+                        <ExternalLink size={12} />
+                      </button>
+                    )}
+
+                    {factura.v_KeyXml && (
+                      <button
+                        type="button"
+                        onClick={() => VerDocumento(factura.v_KeyXml)}
+                        style={{
+                          backgroundColor: "#eaf4fb",
+                          border: "1px solid #b5cfe8",
+                          borderRadius: "6px",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#2B8FCC",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          transition: "all 0.15s ease",
+                        }}
+                        title="Abrir XML en pestaña nueva"
+                      >
+                        <FileText size={14} style={{ color: "#2B8FCC" }} />
+                        <span>Ver XML (CFDI)</span>
+                        <ExternalLink size={12} />
+                      </button>
+                    )}
+
+                    {!factura.v_KeyPdf && !factura.v_KeyXml && (
+                      <span style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic" }}>
+                        Sin archivos adjuntos
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 <div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
                     <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a", margin: 0 }}>

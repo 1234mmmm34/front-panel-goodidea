@@ -24,6 +24,7 @@ import { FacturasService } from "@/services/facturas.service";
 import InputFechaTexto from "@/components/ui/InputFechaTexto";
 import { useToast } from "@/context/ToastContext";
 import { formatearFechaTexto, addDays, addMonths } from "@/lib/date-utils";
+import { leerCfdiXml } from "@/lib/cfdi-utils";
 
 interface ModalNuevaFacturaProps {
   abierto: boolean;
@@ -61,6 +62,8 @@ export interface FacturaVentaState {
   v_Descripcion: string;
   b_Timbrada: boolean;
   abonos: PagoProgramadoItem[];
+  archivoPdf?: File | null;
+  archivoXml?: File | null;
 }
 
 export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
@@ -452,6 +455,8 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
           v_Descripcion: "",
           b_Timbrada: false,
           abonos: [],
+          archivoPdf: null,
+          archivoXml: null,
         });
       }
     } else if (facturasExistentes.length > num) {
@@ -479,10 +484,96 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
         ...f,
         d_Monto: montoFactura,
         abonos: abonosFactura,
+        archivoPdf: f.archivoPdf ?? null,
+        archivoXml: f.archivoXml ?? null,
       };
     });
 
     setFacturas(facturasActualizadas);
+  };
+
+  // Handlers para archivos PDF y XML de cada factura
+  const handleSeleccionarPdf = (idx: number, file?: File | null) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      toast.error("El archivo PDF debe tener extensión .pdf");
+      return;
+    }
+    const currentXml = facturas[idx]?.archivoXml;
+    const totalSize = file.size + (currentXml ? currentXml.size : 0);
+    if (totalSize > 10 * 1024 * 1024) {
+      toast.error("El peso total de PDF y XML no debe superar los 10 MB.");
+      return;
+    }
+
+    setFacturas((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, archivoPdf: file } : item))
+    );
+    toast.success("Archivo PDF seleccionado.");
+  };
+
+  const handleQuitarPdf = (idx: number) => {
+    setFacturas((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, archivoPdf: null } : item))
+    );
+  };
+
+  const handleSeleccionarXml = async (idx: number, file?: File | null) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".xml")) {
+      toast.error("El archivo XML debe tener extensión .xml");
+      return;
+    }
+    const currentPdf = facturas[idx]?.archivoPdf;
+    const totalSize = file.size + (currentPdf ? currentPdf.size : 0);
+    if (totalSize > 10 * 1024 * 1024) {
+      toast.error("El peso total de PDF y XML no debe superar los 10 MB.");
+      return;
+    }
+
+    const resXml = await leerCfdiXml(file);
+    if (!resXml.exito) {
+      toast.error(resXml.error || "El archivo no es un XML válido o no contiene el nodo Comprobante.");
+      return;
+    }
+
+    setFacturas((prev) =>
+      prev.map((item, i) => {
+        if (i === idx) {
+          return {
+            ...item,
+            archivoXml: file,
+            v_NoFactura: resXml.noFactura || item.v_NoFactura,
+            d_FechaExpedicion: resXml.fecha || item.d_FechaExpedicion,
+            b_Timbrada: resXml.tieneTimbreFiscal ? true : item.b_Timbrada,
+          };
+        }
+        return item;
+      })
+    );
+
+    const fCurrent = facturas[idx];
+    if (
+      resXml.total !== undefined &&
+      typeof fCurrent?.d_Monto === "number" &&
+      fCurrent.d_Monto > 0 &&
+      Math.abs(resXml.total - fCurrent.d_Monto) > 0.01
+    ) {
+      toast.warning(
+        `El total del XML ($${resXml.total.toLocaleString("es-MX", {
+          minimumFractionDigits: 2,
+        })}) no coincide con el monto de la factura ($${Number(fCurrent.d_Monto).toLocaleString("es-MX", {
+          minimumFractionDigits: 2,
+        })})`
+      );
+    }
+    toast.success("XML cargado y datos de factura autocompletados.");
+  };
+
+  const handleQuitarXml = (idx: number) => {
+    setFacturas((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, archivoXml: null } : item))
+    );
   };
 
   // --- NAVEGACIÓN Y VALIDACIONES DEL WIZARD ---
@@ -711,14 +802,51 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
     };
 
     const res = await FacturasService.crearVentaFacturas(payload);
-    setGuardandoVenta(false);
 
     if (res.exito) {
-      toast.success("Factura(s) creada(s) correctamente.");
+      const facturasIds = res.facturasIds || res.datos?.facturasIds || [];
+      let huboErrorArchivos = false;
+      const erroresArchivos: string[] = [];
+
+      // Subir archivos por cada factura que tenga PDF y/o XML
+      for (let i = 0; i < facturas.length; i++) {
+        const fac = facturas[i];
+        if (fac.archivoPdf || fac.archivoXml) {
+          const idFactura = facturasIds[i];
+          if (idFactura) {
+            const resSubida = await FacturasService.subirArchivosFactura(
+              idFactura,
+              fac.archivoPdf,
+              fac.archivoXml
+            );
+            if (!resSubida.exito) {
+              huboErrorArchivos = true;
+              erroresArchivos.push(
+                `Factura ${fac.v_NoFactura || i + 1}: ${resSubida.mensaje || "Error al subir archivo"}`
+              );
+            }
+          }
+        }
+      }
+
+      setGuardandoVenta(false);
+
+      if (huboErrorArchivos) {
+        toast.error(
+          `La factura se creó pero no se pudo subir algún archivo (${erroresArchivos.join(
+            "; "
+          )}). Puedes adjuntarlos desde "Timbrado y edición".`
+        );
+      } else {
+        toast.success("Factura(s) creada(s) correctamente.");
+      }
+
       if (onGuardar) onGuardar();
       onCerrar();
     } else {
+      setGuardandoVenta(false);
       setErrorBackend(res.mensaje || "Ocurrió un error al guardar la venta de facturas.");
+      toast.error(res.mensaje || "Ocurrió un error al guardar la venta de facturas.");
     }
   };
 
@@ -2075,16 +2203,17 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
 
                 {/* Tabla de Facturas */}
                 <div className="alegra-table-container" style={{ overflowX: "auto" }}>
-                  <table className="alegra-table" style={{ minWidth: "1050px" }}>
+                  <table className="alegra-table" style={{ minWidth: "1150px" }}>
                     <thead>
                       <tr>
-                        <th style={{ width: "160px" }}>No. factura GI*</th>
-                        <th style={{ width: "150px" }}>Fecha expedición*</th>
-                        <th style={{ width: "160px" }}>Monto (c/IVA)*</th>
-                        <th>Descripción</th>
-                        <th style={{ textAlign: "center", width: "90px" }}>Timbrada</th>
-                        <th style={{ width: "200px" }}>Pagos</th>
-                        <th style={{ textAlign: "center", width: "70px" }}>Config</th>
+                        <th style={{ width: "150px" }}>No. factura GI*</th>
+                        <th style={{ width: "140px" }}>Fecha expedición*</th>
+                        <th style={{ width: "145px" }}>Monto (c/IVA)*</th>
+                        <th style={{ width: "160px" }}>Descripción</th>
+                        <th style={{ textAlign: "center", width: "80px" }}>Timbrada</th>
+                        <th style={{ width: "230px" }}>Archivos (PDF / XML)</th>
+                        <th style={{ width: "170px" }}>Pagos</th>
+                        <th style={{ textAlign: "center", width: "65px" }}>Config</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2216,6 +2345,165 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                 }}
                                 style={{ accentColor: "#2B8FCC", cursor: "pointer", width: "16px", height: "16px" }}
                               />
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                {/* Selector / Badge PDF */}
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                  {f.archivoPdf ? (
+                                    <div
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        backgroundColor: "#fef2f2",
+                                        border: "1px solid #fecaca",
+                                        borderRadius: "6px",
+                                        padding: "2px 6px",
+                                        fontSize: "11px",
+                                        color: "#991b1b",
+                                        maxWidth: "100%",
+                                      }}
+                                      title={f.archivoPdf.name}
+                                    >
+                                      <FileText size={12} style={{ flexShrink: 0, color: "#dc2626" }} />
+                                      <span
+                                        style={{
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                          maxWidth: "120px",
+                                        }}
+                                      >
+                                        {f.archivoPdf.name}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuitarPdf(idx)}
+                                        style={{
+                                          background: "none",
+                                          border: "none",
+                                          color: "#dc2626",
+                                          cursor: "pointer",
+                                          padding: 0,
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                        }}
+                                        title="Quitar PDF"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <label
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        padding: "2px 8px",
+                                        fontSize: "11px",
+                                        fontWeight: 600,
+                                        borderRadius: "6px",
+                                        border: "1px dashed #cbd5e1",
+                                        backgroundColor: "#f8fafc",
+                                        color: "#475569",
+                                        cursor: "pointer",
+                                      }}
+                                      title="Adjuntar archivo PDF"
+                                    >
+                                      <input
+                                        type="file"
+                                        accept=".pdf"
+                                        style={{ display: "none" }}
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleSeleccionarPdf(idx, file);
+                                          e.target.value = "";
+                                        }}
+                                      />
+                                      <Plus size={11} /> PDF
+                                    </label>
+                                  )}
+                                </div>
+
+                                {/* Selector / Badge XML */}
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                  {f.archivoXml ? (
+                                    <div
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        backgroundColor: "#eaf4fb",
+                                        border: "1px solid #b5cfe8",
+                                        borderRadius: "6px",
+                                        padding: "2px 6px",
+                                        fontSize: "11px",
+                                        color: "#1e3a5f",
+                                        maxWidth: "100%",
+                                      }}
+                                      title={f.archivoXml.name}
+                                    >
+                                      <FileText size={12} style={{ flexShrink: 0, color: "#2B8FCC" }} />
+                                      <span
+                                        style={{
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                          maxWidth: "120px",
+                                        }}
+                                      >
+                                        {f.archivoXml.name}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuitarXml(idx)}
+                                        style={{
+                                          background: "none",
+                                          border: "none",
+                                          color: "#2B8FCC",
+                                          cursor: "pointer",
+                                          padding: 0,
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                        }}
+                                        title="Quitar XML"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <label
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        padding: "2px 8px",
+                                        fontSize: "11px",
+                                        fontWeight: 600,
+                                        borderRadius: "6px",
+                                        border: "1px dashed #cbd5e1",
+                                        backgroundColor: "#f8fafc",
+                                        color: "#475569",
+                                        cursor: "pointer",
+                                      }}
+                                      title="Adjuntar archivo XML (CFDI)"
+                                    >
+                                      <input
+                                        type="file"
+                                        accept=".xml"
+                                        style={{ display: "none" }}
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleSeleccionarXml(idx, file);
+                                          e.target.value = "";
+                                        }}
+                                      />
+                                      <Plus size={11} /> XML
+                                    </label>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                             <td>
                               {f.abonos.length === 0 ? (
@@ -2469,6 +2757,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                         <th style={{ textAlign: "right" }}>Monto c/IVA</th>
                         <th>Descripción</th>
                         <th style={{ textAlign: "center" }}>Timbrada</th>
+                        <th>Archivos adjuntos</th>
                         <th>Pagos programados</th>
                       </tr>
                     </thead>
@@ -2487,6 +2776,43 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                             ) : (
                               <span style={{ fontSize: "12px", color: "#64748b" }}>No</span>
                             )}
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                              {f.archivoPdf ? (
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "#991b1b",
+                                    fontWeight: 600,
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                  }}
+                                >
+                                  <FileText size={12} style={{ color: "#dc2626" }} /> {f.archivoPdf.name}
+                                </span>
+                              ) : null}
+                              {f.archivoXml ? (
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "#1e3a5f",
+                                    fontWeight: 600,
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                  }}
+                                >
+                                  <FileText size={12} style={{ color: "#2B8FCC" }} /> {f.archivoXml.name}
+                                </span>
+                              ) : null}
+                              {!f.archivoPdf && !f.archivoXml && (
+                                <span style={{ fontSize: "11px", color: "#94a3b8", fontStyle: "italic" }}>
+                                  Sin archivos
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>

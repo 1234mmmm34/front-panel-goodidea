@@ -9,6 +9,8 @@ import {
   PagoPendienteMasivoDto,
   ResultadoRespuestaApi,
   FacturasResumenDto,
+  CrearVentaFacturasResponse,
+  SubirArchivosFacturaResponse,
 } from "@/types/facturas";
 import { PaginadoResponse } from "@/types/servicios";
 
@@ -298,22 +300,74 @@ export const FacturasService = {
   /**
    * POST facturas/CrearVentaFacturas
    */
-  async crearVentaFacturas(payload: any): Promise<ResultadoRespuestaApi> {
+  async crearVentaFacturas(payload: any): Promise<ResultadoRespuestaApi<CrearVentaFacturasResponse>> {
     try {
-      const resp = await apiClient.post("facturas/CrearVentaFacturas", payload);
+      const resp = await apiClient.post<any>("facturas/CrearVentaFacturas", payload);
       if (resp.status >= 200 && resp.status < 300) {
-        return { exito: true };
+        const ids = resp.data?.facturasIds || resp.data?.FacturasIds || [];
+        return {
+          exito: true,
+          facturasIds: Array.isArray(ids) ? ids : [],
+          datos: {
+            facturasIds: Array.isArray(ids) ? ids : [],
+          },
+        };
       }
       return {
         exito: false,
         mensaje: resp.data?.error || resp.data?.mensaje || "Error al crear la venta",
       };
     } catch (error: any) {
-      const msg =
-        error.response?.data?.error ||
-        error.response?.data?.mensaje ||
-        error.response?.data?.message ||
-        "Error al comunicarse con el servidor";
+      const msg = extraerMensajeError(error, "Error al comunicarse con el servidor");
+      return { exito: false, mensaje: msg };
+    }
+  },
+
+  /**
+   * POST facturas/SubirArchivosFactura
+   * Subir o reemplazar PDF y/o XML de una factura.
+   * Límite: 10 MB sumando ambos archivos.
+   */
+  async subirArchivosFactura(
+    i_CveFacturas: number,
+    pdf?: File | null,
+    xml?: File | null
+  ): Promise<ResultadoRespuestaApi<SubirArchivosFacturaResponse>> {
+    if (!pdf && !xml) {
+      return { exito: false, mensaje: "No se seleccionó ningún archivo." };
+    }
+    try {
+      const formData = new FormData();
+      formData.append("i_CveFacturas", i_CveFacturas.toString());
+      if (pdf) {
+        formData.append("pdf", pdf, pdf.name);
+      }
+      if (xml) {
+        formData.append("xml", xml, xml.name);
+      }
+
+      const resp = await apiClient.post<any>("facturas/SubirArchivosFactura", formData, {
+        headers: {
+          "Content-Type": undefined,
+        },
+      });
+
+      if (resp.status >= 200 && resp.status < 300) {
+        return {
+          exito: true,
+          datos: {
+            v_KeyPdf: resp.data?.v_KeyPdf ?? null,
+            v_KeyXml: resp.data?.v_KeyXml ?? null,
+          },
+        };
+      }
+      return {
+        exito: false,
+        mensaje: resp.data?.error || resp.data?.mensaje || "Error al subir archivos de la factura",
+      };
+    } catch (error: any) {
+      console.error("[FacturasService.subirArchivosFactura API ERROR]:", error.response?.status, error.response?.data || error.message);
+      const msg = extraerMensajeError(error, "Error al subir archivos de la factura");
       return { exito: false, mensaje: msg };
     }
   },

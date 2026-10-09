@@ -12,6 +12,8 @@ export interface FacturaGetDto {
   b_Cancelada: boolean;
   v_MotivoCancelacion?: string | null;
   v_Estado?: string;
+  v_KeyPdf?: string | null;
+  v_KeyXml?: string | null;
   total?: number;
   Total?: number;
   i_TotalRegistros?: number;
@@ -26,9 +28,20 @@ export interface FiltrosFacturasState {
   empresa?: string;
 }
 
-export interface ResultadoRespuestaApi {
+export interface CrearVentaFacturasResponse {
+  facturasIds: number[];
+}
+
+export interface SubirArchivosFacturaResponse {
+  v_KeyPdf: string | null;
+  v_KeyXml: string | null;
+}
+
+export interface ResultadoRespuestaApi<T = any> {
   exito: boolean;
   mensaje?: string;
+  datos?: T;
+  facturasIds?: number[];
 }
 
 export interface FacturasResumenDto {
