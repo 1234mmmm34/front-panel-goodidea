@@ -10,7 +10,7 @@ export default function Home() {
   useEffect(() => {
     const sesion = obtenerSesionActual();
     if (sesion?.token) {
-      router.replace("/calendario");
+      router.replace("/programacion");
     } else {
       router.replace("/login");
     }

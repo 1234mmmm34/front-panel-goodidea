@@ -24,7 +24,7 @@ export const AuthGuard: React.FC<Props> = ({ children }) => {
     if (!sesion && !esRutaPublica) {
       router.replace("/login");
     } else if (sesion && esRutaLogin) {
-      router.replace("/calendario");
+      router.replace("/programacion");
     } else {
       setVerificando(false);
     }

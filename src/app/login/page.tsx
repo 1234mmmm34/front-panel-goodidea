@@ -35,7 +35,7 @@ export default function LoginPage() {
     setCargando(false);
 
     if (resultado.exito) {
-      router.push("/calendario");
+      router.push("/programacion");
     } else {
       setErrorMensaje(
         resultado.mensaje || "El usuario no existe o credenciales incorrectas"
