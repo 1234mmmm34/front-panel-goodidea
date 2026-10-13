@@ -45,6 +45,7 @@ export interface AgendaServicioGetDto {
   v_EntregablesJson: string | null;
   v_Entregables?: string | null;
   entregablesParseados?: EntregableResumenDto[];
+  v_Notas?: string | null;
 }
 
 export interface SesionDetalleDto {
@@ -142,7 +143,7 @@ export interface AgendaDetalleGetDto {
   i_CvePlanta: number | null;
   i_CveArea: number | null;
   v_NombreArea: string | null;
-  i_NumAlumnos: number;               // 0 = sin límite de cupo
+  i_NumAlumnos: number | null;               // 0 o null = sin límite de cupo
   Alumnos: AlumnoAgendaDto[];
   b_SinProgramar: boolean;
   d_MontoProyecto: number | null;     // solo relevante si v_TipoVenta === "proyecto"
@@ -151,6 +152,7 @@ export interface AgendaDetalleGetDto {
   i_CveTipoServicio?: number | null;
   d_FechaVoBo?: string | null;
   v_KeyVoBo?: string | null;
+  v_Notas?: string | null;
 }
 
 export interface CambiarTitularesSesionDto {
@@ -331,6 +333,7 @@ export interface ServicioAgendaDetalleInsertDto {
   b_SinProgramar: boolean;
   i_CanTotal?: number | null;
   b_Cancelado?: boolean;
+  v_Notas?: string | null;
 }
 
 export interface SesionInsertDto {

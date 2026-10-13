@@ -33,6 +33,7 @@ export interface ServicioAgregadoItemConfirmation {
   noCotizacionGI: string;
   noOCCliente: string;
   costo: number;
+  v_Notas?: string;
 }
 
 export interface SesionProgramacionConfirmation {

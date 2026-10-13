@@ -101,6 +101,17 @@ export const ModalDetalleServicio: React.FC<Props> = ({
 
   const [facturas, setFacturas] = useState<FacturaDetalleDto[]>([]);
   const [entregables, setEntregables] = useState<EntregableDetalleDto[]>([]);
+
+  // Estados de notas del servicio
+  const [notas, setNotas] = useState<string>("");
+  const [notasBase, setNotasBase] = useState<string>("");
+  const [guardandoNotas, setGuardandoNotas] = useState<boolean>(false);
+
+  // Estados de edición de cupo de alumnos
+  const [editandoCupo, setEditandoCupo] = useState<boolean>(false);
+  const [tipoCupoEdicion, setTipoCupoEdicion] = useState<"Abierto" | "Limitado">("Abierto");
+  const [cupoEdicion, setCupoEdicion] = useState<number | string>("");
+  const [guardandoCupo, setGuardandoCupo] = useState<boolean>(false);
   const [alumnosInscritos, setAlumnosInscritos] = useState<AlumnoInscrito[]>([]);
   const [cargandoAlumnos, setCargandoAlumnos] = useState<boolean>(false);
   const [errorAlumnos, setErrorAlumnos] = useState<string | null>(null);
@@ -213,6 +224,9 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     if (data) {
       setCotizacionGI(data.v_NoCotizacionGI || (data as any).v_noCotizacionGI || "");
       setOrdenCompra(data.v_NoOrdenCompraCliente || (data as any).v_noOrdenCompraCliente || "");
+      const valNotas = data.v_Notas || (data as any).v_notas || "";
+      setNotas(valNotas);
+      setNotasBase(valNotas);
       const fArr = data.Facturas || (data as any).facturas || [];
       const eArr = data.Entregables || (data as any).entregables || [];
       setFacturas(Array.isArray(fArr) ? [...fArr] : []);
@@ -237,6 +251,11 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       setCatalogoCargado(false);
     } else {
       setDetalle(null);
+      setNotas("");
+      setNotasBase("");
+      setGuardandoNotas(false);
+      setEditandoCupo(false);
+      setGuardandoCupo(false);
       setAlumnosInscritos([]);
       setErrorAlumnos(null);
       setCargandoAlumnos(false);
@@ -516,6 +535,102 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
   };
 
   const pendientesList = calcularPendientes();
+
+  // Guardar notas del servicio
+  const handleGuardarNotas = async () => {
+    if (!detalle?.i_CveServAgendaDet) return;
+    setGuardandoNotas(true);
+    try {
+      const valorAEnviar = notas.trim() === "" ? null : notas.trim();
+      await AgendaService.actualizarNotasServicio(detalle.i_CveServAgendaDet, valorAEnviar);
+      toast.success("Notas guardadas exitosamente");
+      const nuevoBase = valorAEnviar ?? "";
+      setNotas(nuevoBase);
+      setNotasBase(nuevoBase);
+      setDetalle((prev) => (prev ? { ...prev, v_Notas: valorAEnviar } : null));
+      if (onGuardadoExitoso) onGuardadoExitoso();
+    } catch (err: any) {
+      console.error("Error al actualizar notas:", err);
+      const msg =
+        err?.response?.data?.mensaje ||
+        err?.response?.data?.message ||
+        "Error al guardar las notas";
+      toast.error(msg);
+    } finally {
+      setGuardandoNotas(false);
+    }
+  };
+
+  const notasHanCambiado = (notas.trim() || "") !== (notasBase.trim() || "");
+  const deshabilitarGuardarNotas = !notasHanCambiado || guardandoNotas;
+
+  // Lógica y validación de Cupo
+  const esAbiertoOriginal = !detalle?.i_NumAlumnos || Number(detalle.i_NumAlumnos) === 0;
+  const cupoOriginal = esAbiertoOriginal ? 0 : Number(detalle?.i_NumAlumnos);
+
+  const iniciarEdicionCupo = () => {
+    if (esAbiertoOriginal) {
+      setTipoCupoEdicion("Abierto");
+      setCupoEdicion(Math.max(1, inscritos));
+    } else {
+      setTipoCupoEdicion("Limitado");
+      setCupoEdicion(cupoOriginal);
+    }
+    setEditandoCupo(true);
+  };
+
+  const cancelarEdicionCupo = () => {
+    setEditandoCupo(false);
+  };
+
+  const valorCupoNum =
+    typeof cupoEdicion === "string"
+      ? (cupoEdicion.trim() === "" ? NaN : Number(cupoEdicion))
+      : cupoEdicion;
+
+  let errorCupoTexto: string | null = null;
+  let cupoEsInvalido = false;
+
+  if (tipoCupoEdicion === "Limitado") {
+    if (isNaN(valorCupoNum) || valorCupoNum < 1) {
+      errorCupoTexto = "El cupo debe ser al menos 1";
+      cupoEsInvalido = true;
+    } else if (valorCupoNum < inscritos) {
+      const diff = inscritos - valorCupoNum;
+      errorCupoTexto = `Hay ${inscritos} alumnos inscritos. Para reducir el cupo a ${valorCupoNum}, primero elimina ${diff} alumno(s) de la lista.`;
+      cupoEsInvalido = true;
+    }
+  }
+
+  const sinCambiosCupo =
+    (tipoCupoEdicion === "Abierto" && esAbiertoOriginal) ||
+    (tipoCupoEdicion === "Limitado" && !esAbiertoOriginal && valorCupoNum === cupoOriginal);
+
+  const deshabilitarGuardarCupo = cupoEsInvalido || sinCambiosCupo || guardandoCupo;
+
+  const handleGuardarCupo = async () => {
+    if (!detalle?.i_CveServAgendaDet) return;
+    if (cupoEsInvalido || deshabilitarGuardarCupo) return;
+
+    setGuardandoCupo(true);
+    try {
+      const valorAEnviar = tipoCupoEdicion === "Abierto" ? null : Number(cupoEdicion);
+      await AgendaService.actualizarCupoServicio(detalle.i_CveServAgendaDet, valorAEnviar);
+      toast.success("Cupo actualizado exitosamente");
+      setDetalle((prev) => (prev ? { ...prev, i_NumAlumnos: valorAEnviar } : null));
+      setEditandoCupo(false);
+      if (onGuardadoExitoso) onGuardadoExitoso();
+    } catch (err: any) {
+      console.error("Error al actualizar cupo:", err);
+      const msg =
+        err?.response?.data?.mensaje ||
+        err?.response?.data?.message ||
+        "Ocurrió un error al actualizar el cupo.";
+      toast.error(msg);
+    } finally {
+      setGuardandoCupo(false);
+    }
+  };
 
   // Guardar cambios
   const handleGuardar = async () => {
@@ -839,6 +954,71 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                     </button>
                   </div>
                 )}
+
+                {/* Sección Notas del servicio */}
+                <div style={{ marginTop: "16px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 400,
+                        color: "#64748b",
+                        display: "block",
+                      }}
+                    >
+                      notas
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={handleGuardarNotas}
+                      disabled={deshabilitarGuardarNotas}
+                      style={{
+                        fontSize: "12px",
+                        height: "28px",
+                        padding: "0 12px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        backgroundColor: deshabilitarGuardarNotas ? "#e2e8f0" : "#2B8FCC",
+                        color: deshabilitarGuardarNotas ? "#94a3b8" : "#ffffff",
+                        borderColor: "transparent",
+                        cursor: deshabilitarGuardarNotas ? "not-allowed" : "pointer",
+                        borderRadius: "6px",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {guardandoNotas && <Loader2 size={13} className="animate-spin" />}
+                      Guardar notas
+                    </button>
+                  </div>
+                  <textarea
+                    rows={2}
+                    className="form-control"
+                    placeholder="Sin notas"
+                    value={notas}
+                    onChange={(e) => setNotas(e.target.value)}
+                    style={{
+                      width: "100%",
+                      fontSize: "13px",
+                      borderRadius: "8px",
+                      border: "1px solid #d0dce8",
+                      padding: "8px 12px",
+                      resize: "vertical",
+                      minHeight: "56px",
+                      backgroundColor: "#ffffff",
+                      color: "#0f172a",
+                      fontFamily: "inherit",
+                    }}
+                  />
+                </div>
               </div>
 
               {/* BLOQUE 1.2 — Sesiones (Sin caja contenedora exterior) */}
@@ -1102,13 +1282,116 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
               {/* BLOQUE 1.3 — Alumnos Inscritos (Sin caja contenedora exterior) */}
               {esCapacitacion && (
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                    <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
-                      Alumnos inscritos
-                    </h4>
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${getBadgeColorAlumnos()}`}>
-                      {inscritos} / {sinLimite ? "∞" : cupos}
-                    </span>
+                  <div style={{ marginBottom: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                      <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
+                        Alumnos inscritos
+                      </h4>
+                      {!editandoCupo ? (
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${getBadgeColorAlumnos()}`}>
+                          {inscritos} / {sinLimite ? "∞" : cupos}
+                        </span>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                          <select
+                            className="form-select"
+                            value={tipoCupoEdicion}
+                            onChange={(e) => {
+                              const nuevoTipo = e.target.value as "Abierto" | "Limitado";
+                              setTipoCupoEdicion(nuevoTipo);
+                              if (nuevoTipo === "Limitado") {
+                                const actual = Number(detalle?.i_NumAlumnos) || 0;
+                                setCupoEdicion(actual > 0 ? actual : Math.max(1, inscritos));
+                              }
+                            }}
+                            style={{
+                              height: "28px",
+                              fontSize: "12px",
+                              borderRadius: "6px",
+                              border: "1px solid #d0dce8",
+                              padding: "2px 8px",
+                              color: "#1e3a5f",
+                              backgroundColor: "#ffffff",
+                              width: "95px",
+                            }}
+                          >
+                            <option value="Abierto">Abierto</option>
+                            <option value="Limitado">Limitado</option>
+                          </select>
+
+                          {tipoCupoEdicion === "Limitado" && (
+                            <input
+                              type="number"
+                              min={Math.max(1, inscritos)}
+                              className="form-control"
+                              placeholder="Cupo"
+                              value={cupoEdicion}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setCupoEdicion(val === "" ? "" : Number(val));
+                              }}
+                              style={{
+                                height: "28px",
+                                width: "72px",
+                                fontSize: "12px",
+                                borderRadius: "6px",
+                                border: cupoEsInvalido ? "1px solid #dc2626" : "1px solid #d0dce8",
+                                padding: "2px 8px",
+                                color: "#1e3a5f",
+                              }}
+                            />
+                          )}
+
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={handleGuardarCupo}
+                            disabled={deshabilitarGuardarCupo}
+                            style={{
+                              height: "28px",
+                              fontSize: "12px",
+                              padding: "0 10px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              backgroundColor: deshabilitarGuardarCupo ? "#e2e8f0" : "#2B8FCC",
+                              color: deshabilitarGuardarCupo ? "#94a3b8" : "#ffffff",
+                              borderColor: "transparent",
+                              cursor: deshabilitarGuardarCupo ? "not-allowed" : "pointer",
+                              borderRadius: "6px",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {guardandoCupo && <Loader2 size={12} className="animate-spin" />}
+                            Guardar
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            onClick={cancelarEdicionCupo}
+                            disabled={guardandoCupo}
+                            style={{
+                              height: "28px",
+                              fontSize: "12px",
+                              padding: "0 10px",
+                              border: "1px solid #d0dce8",
+                              backgroundColor: "#ffffff",
+                              color: "#64748b",
+                              borderRadius: "6px",
+                              cursor: guardandoCupo ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {editandoCupo && errorCupoTexto && (
+                      <div style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px", textAlign: "right" }}>
+                        {errorCupoTexto}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>
@@ -1123,6 +1406,29 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                       </button>
 
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        {esCapacitacion && !editandoCupo && (
+                          <button
+                            type="button"
+                            className="btn-icon"
+                            title="Editar cupo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              iniciarEdicionCupo();
+                            }}
+                            style={{
+                              padding: "4px",
+                              border: "none",
+                              background: "transparent",
+                              color: "#2B8FCC",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn-icon"

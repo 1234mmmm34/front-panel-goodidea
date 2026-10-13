@@ -52,6 +52,7 @@ interface ServicioAgregadoItem {
   noCotizacionGI: string;
   noOCCliente: string;
   costo: number;
+  v_Notas: string;
 }
 
 export interface SesionProgramacionState {
@@ -464,6 +465,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
       noCotizacionGI: compartirCotizacion ? noCotizacionGlobal : "",
       noOCCliente: compartirOC ? noOCGlobal : "",
       costo: 0,
+      v_Notas: "",
     };
     setServiciosAgregados((prev) => [...prev, nuevo]);
     setSearchServicioText("");
@@ -882,6 +884,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
         b_SinProgramar: Boolean(progState.b_ProgramarDespues),
         i_CanTotal: null,
         b_Cancelado: false,
+        v_Notas: item.v_Notas.trim() === "" ? null : item.v_Notas.trim(),
       };
 
       const sesiones: SesionInsertDto[] = [];
@@ -1765,150 +1768,175 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                             const subtotal = cantNum * precioNum;
 
                             return (
-                              <tr
-                                key={item.idTemp}
-                                style={{ borderBottom: "1px solid #f0f4f8" }}
-                              >
-                                <td style={{ padding: "8px 12px", fontWeight: 700, color: "#1e3a5f" }}>
-                                  {item.v_Nombre}
-                                </td>
-                                <td style={{ padding: "8px 10px" }}>
-                                  {renderBadgeTipo(item.i_CveTipoServicio, item.v_TipoServicio)}
-                                </td>
-                                <td style={{ padding: "8px 10px", color: "#64748b" }}>
-                                  {item.v_Rubro}
-                                </td>
-                                <td style={{ padding: "8px 10px", color: "#64748b" }}>
-                                  {item.v_Unidad}
-                                </td>
-                                <td style={{ padding: "8px 10px" }}>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    className="form-control"
-                                    style={{
-                                      height: "30px",
-                                      padding: "2px 6px",
-                                      fontSize: "12px",
-                                      borderRadius: "6px",
-                                      border: (!item.cantidad || Number(item.cantidad) < 1) ? "1px solid #dc2626" : "1px solid #d0dce8",
-                                      width: "65px",
-                                    }}
-                                    value={item.cantidad}
-                                    onChange={(e) => {
-                                      const raw = e.target.value;
-                                      if (raw === "") {
-                                        handleActualizarServicio(item.idTemp, "cantidad", "");
-                                      } else {
-                                        const num = Number(raw);
+                              <React.Fragment key={item.idTemp}>
+                                <tr
+                                  style={{ borderBottom: "none" }}
+                                >
+                                  <td style={{ padding: "8px 12px", fontWeight: 700, color: "#1e3a5f" }}>
+                                    {item.v_Nombre}
+                                  </td>
+                                  <td style={{ padding: "8px 10px" }}>
+                                    {renderBadgeTipo(item.i_CveTipoServicio, item.v_TipoServicio)}
+                                  </td>
+                                  <td style={{ padding: "8px 10px", color: "#64748b" }}>
+                                    {item.v_Rubro}
+                                  </td>
+                                  <td style={{ padding: "8px 10px", color: "#64748b" }}>
+                                    {item.v_Unidad}
+                                  </td>
+                                  <td style={{ padding: "8px 10px" }}>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      className="form-control"
+                                      style={{
+                                        height: "30px",
+                                        padding: "2px 6px",
+                                        fontSize: "12px",
+                                        borderRadius: "6px",
+                                        border: (!item.cantidad || Number(item.cantidad) < 1) ? "1px solid #dc2626" : "1px solid #d0dce8",
+                                        width: "65px",
+                                      }}
+                                      value={item.cantidad}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        if (raw === "") {
+                                          handleActualizarServicio(item.idTemp, "cantidad", "");
+                                        } else {
+                                          const num = Number(raw);
+                                          handleActualizarServicio(
+                                            item.idTemp,
+                                            "cantidad",
+                                            num < 1 ? 1 : num
+                                          );
+                                        }
+                                      }}
+                                      onBlur={() => {
+                                        if (!item.cantidad || Number(item.cantidad) < 1) {
+                                          handleActualizarServicio(item.idTemp, "cantidad", 1);
+                                        }
+                                      }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: "8px 10px" }}>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      className="form-control"
+                                      style={{
+                                        height: "30px",
+                                        padding: "2px 6px",
+                                        fontSize: "12px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d0dce8",
+                                        width: "90px",
+                                      }}
+                                      value={item.precioUnitario}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
                                         handleActualizarServicio(
                                           item.idTemp,
-                                          "cantidad",
-                                          num < 1 ? 1 : num
+                                          "precioUnitario",
+                                          raw === "" ? "" : Math.max(0, Number(raw))
                                         );
+                                      }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: "8px 10px" }}>
+                                    <input
+                                      type="text"
+                                      readOnly
+                                      disabled
+                                      className="form-control"
+                                      style={{
+                                        height: "30px",
+                                        padding: "2px 6px",
+                                        fontSize: "12px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d0dce8",
+                                        backgroundColor: "#e9ecef",
+                                        color: "#1e3a5f",
+                                        fontWeight: 600,
+                                        width: "95px",
+                                      }}
+                                      value={`$${formatearMoneda(subtotal)}`}
+                                    />
+                                  </td>
+                                  <td style={{ padding: "8px 10px" }}>
+                                    <select
+                                      className="form-select"
+                                      disabled={!esCapacitacion}
+                                      style={{
+                                        height: "30px",
+                                        padding: "2px 6px",
+                                        fontSize: "12px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d0dce8",
+                                        backgroundColor: !esCapacitacion ? "#f0f5fa" : "#ffffff",
+                                        color: !esCapacitacion ? "#94a3b8" : "#1e3a5f",
+                                        width: "75px",
+                                      }}
+                                      value={item.sesiones}
+                                      onChange={(e) =>
+                                        handleActualizarServicio(
+                                          item.idTemp,
+                                          "sesiones",
+                                          Number(e.target.value)
+                                        )
                                       }
-                                    }}
-                                    onBlur={() => {
-                                      if (!item.cantidad || Number(item.cantidad) < 1) {
-                                        handleActualizarServicio(item.idTemp, "cantidad", 1);
+                                    >
+                                      <option value={1}>1</option>
+                                      <option value={2}>2</option>
+                                      <option value={3}>3</option>
+                                      <option value={4}>4</option>
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEliminarServicio(item.idTemp)}
+                                      style={{
+                                        background: "none",
+                                        border: "1px solid #fca5a5",
+                                        borderRadius: "6px",
+                                        color: "#dc3545",
+                                        padding: "4px",
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                      }}
+                                      title="Quitar servicio"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                                <tr style={{ borderBottom: "1px solid #f0f4f8" }}>
+                                  <td colSpan={9} style={{ padding: "0 12px 10px 12px" }}>
+                                    <textarea
+                                      rows={2}
+                                      className="form-control"
+                                      placeholder="Notas del servicio…"
+                                      value={item.v_Notas || ""}
+                                      onChange={(e) =>
+                                        handleActualizarServicio(item.idTemp, "v_Notas", e.target.value)
                                       }
-                                    }}
-                                  />
-                                </td>
-                                <td style={{ padding: "8px 10px" }}>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    className="form-control"
-                                    style={{
-                                      height: "30px",
-                                      padding: "2px 6px",
-                                      fontSize: "12px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #d0dce8",
-                                      width: "90px",
-                                    }}
-                                    value={item.precioUnitario}
-                                    onChange={(e) => {
-                                      const raw = e.target.value;
-                                      handleActualizarServicio(
-                                        item.idTemp,
-                                        "precioUnitario",
-                                        raw === "" ? "" : Math.max(0, Number(raw))
-                                      );
-                                    }}
-                                  />
-                                </td>
-                                <td style={{ padding: "8px 10px" }}>
-                                  <input
-                                    type="text"
-                                    readOnly
-                                    disabled
-                                    className="form-control"
-                                    style={{
-                                      height: "30px",
-                                      padding: "2px 6px",
-                                      fontSize: "12px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #d0dce8",
-                                      backgroundColor: "#e9ecef",
-                                      color: "#1e3a5f",
-                                      fontWeight: 600,
-                                      width: "95px",
-                                    }}
-                                    value={`$${formatearMoneda(subtotal)}`}
-                                  />
-                                </td>
-                                <td style={{ padding: "8px 10px" }}>
-                                  <select
-                                    className="form-select"
-                                    disabled={!esCapacitacion}
-                                    style={{
-                                      height: "30px",
-                                      padding: "2px 6px",
-                                      fontSize: "12px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #d0dce8",
-                                      backgroundColor: !esCapacitacion ? "#f0f5fa" : "#ffffff",
-                                      color: !esCapacitacion ? "#94a3b8" : "#1e3a5f",
-                                      width: "75px",
-                                    }}
-                                    value={item.sesiones}
-                                    onChange={(e) =>
-                                      handleActualizarServicio(
-                                        item.idTemp,
-                                        "sesiones",
-                                        Number(e.target.value)
-                                      )
-                                    }
-                                  >
-                                    <option value={1}>1</option>
-                                    <option value={2}>2</option>
-                                    <option value={3}>3</option>
-                                    <option value={4}>4</option>
-                                  </select>
-                                </td>
-                                <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEliminarServicio(item.idTemp)}
-                                    style={{
-                                      background: "none",
-                                      border: "1px solid #fca5a5",
-                                      borderRadius: "6px",
-                                      color: "#dc3545",
-                                      padding: "4px",
-                                      cursor: "pointer",
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                    title="Quitar servicio"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </td>
-                              </tr>
+                                      style={{
+                                        width: "100%",
+                                        fontSize: "12px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d0dce8",
+                                        padding: "6px 10px",
+                                        resize: "vertical",
+                                        backgroundColor: "#fdfefe",
+                                        color: "#1e3a5f",
+                                        fontFamily: "inherit",
+                                      }}
+                                    />
+                                  </td>
+                                </tr>
+                              </React.Fragment>
                             );
                           })}
                         </tbody>

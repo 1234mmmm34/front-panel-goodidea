@@ -286,6 +286,7 @@ export const AgendaService = {
         d_FechaVoBo: data.d_FechaVoBo ?? data.d_fechaVoBo ?? data.dFechaVoBo ?? null,
         v_KeyVoBo: data.v_KeyVoBo ?? data.v_keyVoBo ?? data.vKeyVoBo ?? null,
         i_CveTipoServicio: data.i_CveTipoServicio ?? data.i_cveTipoServicio ?? data.iCveTipoServicio ?? data.i_CveTServicio ?? data.iCveTServicio ?? null,
+        v_Notas: data.v_Notas ?? data.v_notas ?? null,
         Sesiones: sesionesParsed,
         Alumnos: Array.isArray(alumnos) ? alumnos : [],
         Facturas: Array.isArray(facturas) ? facturas : [],
@@ -736,6 +737,24 @@ export const AgendaService = {
       console.error("Error al cancelar sesión:", err);
       return false;
     }
+  },
+
+  /**
+   * Actualiza el campo Notas de un servicio agendado.
+   * Endpoint: PUT agenda/servicio/{i_CveServAgendaDet}/notas
+   * Body: { v_Notas: string | null }
+   */
+  async actualizarNotasServicio(i_CveServAgendaDet: number, v_Notas: string | null): Promise<void> {
+    await apiClient.put(`agenda/servicio/${i_CveServAgendaDet}/notas`, { v_Notas });
+  },
+
+  /**
+   * Actualiza el cupo de alumnos de un servicio agendado.
+   * Endpoint: PUT agenda/servicio/{i_CveServAgendaDet}/cupo
+   * Body: { i_NumAlumnos: number | null }
+   */
+  async actualizarCupoServicio(i_CveServAgendaDet: number, i_NumAlumnos: number | null): Promise<void> {
+    await apiClient.put(`agenda/servicio/${i_CveServAgendaDet}/cupo`, { i_NumAlumnos });
   },
 };
 
