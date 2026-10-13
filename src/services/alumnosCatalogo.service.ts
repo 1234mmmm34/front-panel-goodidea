@@ -5,6 +5,8 @@ import {
   AlumnoPostDto,
   AlumnoCargaMasivaDto,
   AlumnoCargaResultado,
+  HistorialAlumnosResponse,
+  HistorialAlumnoPutDto,
 } from "@/types/alumnosCatalogo";
 
 export const AlumnosCatalogoService = {
@@ -135,6 +137,80 @@ export const AlumnosCatalogoService = {
         err.response?.data?.mensaje ||
         err.response?.data?.message ||
         "Error al eliminar el alumno.";
+      return { exito: false, status, error: errorMsg };
+    }
+  },
+
+  /**
+   * 3.6 Listar historial de alumnos de una empresa
+   * GET api/alumnos/historial/empresa/{i_CveEmpresa}
+   */
+  async getHistorialAlumnos(
+    i_CveEmpresa: number,
+    params?: {
+      searchTerm?: string;
+      pagina?: number;
+      tamano?: number;
+      fechaInicio?: string;
+      fechaFin?: string;
+    }
+  ): Promise<HistorialAlumnosResponse> {
+    try {
+      const queryParams: Record<string, any> = {};
+      if (params?.searchTerm && params.searchTerm.trim()) {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+      if (params?.pagina) {
+        queryParams.pagina = params.pagina;
+      }
+      if (params?.tamano) {
+        queryParams.tamano = params.tamano;
+      }
+      if (params?.fechaInicio && params.fechaInicio.trim()) {
+        queryParams.fechaInicio = params.fechaInicio.trim();
+      }
+      if (params?.fechaFin && params.fechaFin.trim()) {
+        queryParams.fechaFin = params.fechaFin.trim();
+      }
+
+      const resp = await apiClient.get<HistorialAlumnosResponse>(
+        `alumnos/historial/empresa/${i_CveEmpresa}`,
+        { params: queryParams }
+      );
+
+      return (
+        resp.data || {
+          datos: [],
+          total: 0,
+          pagina: 1,
+          tamano: 10,
+          totalPaginas: 0,
+        }
+      );
+    } catch (err: any) {
+      console.error("[AlumnosCatalogoService.getHistorialAlumnos] Error:", err);
+      throw err;
+    }
+  },
+
+  /**
+   * 3.7 Guardar evaluación y entregables
+   * PUT api/alumnos/historial/{i_CveAlumnoAgenda}
+   */
+  async putHistorialAlumno(
+    i_CveAlumnoAgenda: number,
+    dto: HistorialAlumnoPutDto
+  ): Promise<{ exito: boolean; status: number; error?: string }> {
+    try {
+      const resp = await apiClient.put(`alumnos/historial/${i_CveAlumnoAgenda}`, dto);
+      return { exito: true, status: resp.status };
+    } catch (err: any) {
+      const status = err.response?.status || 500;
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.mensaje ||
+        err.response?.data?.message ||
+        "Error al actualizar la evaluación y entregables.";
       return { exito: false, status, error: errorMsg };
     }
   },

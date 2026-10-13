@@ -51,3 +51,44 @@ export interface AlumnoCargaResultado {
 export interface ApiError {
   error: string;
 }
+
+export type VistaPersonal = "catalogo" | "historial";
+
+export interface EntregableAlumno {
+  i_CveAgendaEntregable: number;
+  v_Entregable: string;
+  v_Estatus: "ENTREGADO" | "PENDIENTE";
+}
+
+export interface HistorialAlumno {
+  i_CveAlumnoAgenda: number;
+  d_FechaInicio: string | null;
+  d_Horas: number | null;
+  v_Curso: string | null;
+  v_Nomina: string | null;
+  v_Puesto: string | null;
+  v_Nombre: string | null;
+  b_Asistio: boolean | null;
+  v_EvTeorica: string | null;
+  v_EvPractica: string | null;
+  v_EvFinal: string | null;
+  v_SolicitadoPor: string | null;
+  v_OrdenCompra: string | null;
+  entregables: EntregableAlumno[];
+}
+
+export interface HistorialAlumnosResponse {
+  datos: HistorialAlumno[];
+  total: number;
+  pagina: number;
+  tamano: number;
+  totalPaginas: number;
+}
+
+export interface HistorialAlumnoPutDto {
+  b_Asistio: boolean | null;
+  v_EvTeorica: string | null;
+  v_EvPractica: string | null;
+  v_EvFinal: string | null;
+  Entregables: { i_CveAgendaEntregable: number; b_Entregado: boolean }[];
+}

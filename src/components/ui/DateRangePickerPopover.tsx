@@ -27,13 +27,15 @@ import {
   subWeeks,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { formatearFechaTexto } from "@/lib/date-utils";
 
 interface DateRangePickerPopoverProps {
   fechaInicio: string; // YYYY-MM-DD
   fechaFin: string; // YYYY-MM-DD
   onChangeRange: (inicio: string, fin: string) => void;
+  placeholder?: string;
+  onLimpiar?: () => void;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -42,6 +44,8 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   fechaInicio,
   fechaFin,
   onChangeRange,
+  placeholder,
+  onLimpiar,
   className,
   style,
 }) => {
@@ -285,11 +289,12 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   };
 
   // Label text for button trigger
-  const labelTexto = tempStart && tempEnd
-    ? `${formatearFechaTexto(format(tempStart, "yyyy-MM-dd"))} - ${formatearFechaTexto(format(tempEnd, "yyyy-MM-dd"))}`
-    : tempStart
-      ? formatearFechaTexto(format(tempStart, "yyyy-MM-dd"))
-      : "Seleccionar rango";
+  const labelTexto =
+    fechaInicio && fechaFin
+      ? `${formatearFechaTexto(fechaInicio)} - ${formatearFechaTexto(fechaFin)}`
+      : fechaInicio
+      ? formatearFechaTexto(fechaInicio)
+      : (placeholder || "Seleccionar rango");
 
   return (
     <div
@@ -305,6 +310,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           display: "flex",
           alignItems: "center",
           gap: "8px",
+          height: "32px",
           padding: "6px 14px",
           borderRadius: "20px",
           border: "1px solid #d0dce8",
@@ -319,7 +325,37 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
       >
         <Calendar size={15} style={{ color: "#64748b" }} />
         <span>{labelTexto}</span>
-        <ChevronDown size={14} style={{ color: "#64748b", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }} />
+        {onLimpiar && (fechaInicio || fechaFin) ? (
+          <span
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onLimpiar();
+            }}
+            title="Quitar filtro de fechas"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2px",
+              borderRadius: "50%",
+              color: "#64748b",
+              marginLeft: "2px",
+            }}
+            className="hover:text-red-600 hover:bg-slate-100"
+          >
+            <X size={13} />
+          </span>
+        ) : (
+          <ChevronDown
+            size={14}
+            style={{
+              color: "#64748b",
+              transform: isOpen ? "rotate(180deg)" : "none",
+              transition: "transform 0.2s ease",
+            }}
+          />
+        )}
       </button>
 
       {/* Popover Dropdown Card */}
@@ -538,7 +574,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           <div
             style={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: onLimpiar ? "space-between" : "flex-end",
               alignItems: "center",
               gap: "12px",
               padding: "12px 24px",
@@ -546,21 +582,43 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
               backgroundColor: "#ffffff",
             }}
           >
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#64748b",
-                cursor: "pointer",
-                padding: "6px 16px",
-              }}
-            >
-              Cancelar
-            </button>
+            {onLimpiar && (
+              <button
+                type="button"
+                onClick={() => {
+                  onLimpiar();
+                  setIsOpen(false);
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: "#dc2626",
+                  cursor: "pointer",
+                  padding: "6px 0",
+                }}
+                className="hover:underline"
+              >
+                Limpiar rango
+              </button>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#64748b",
+                  cursor: "pointer",
+                  padding: "6px 16px",
+                }}
+              >
+                Cancelar
+              </button>
             <button
               type="button"
               onClick={handleApply}
@@ -582,8 +640,9 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
             </button>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    )}
+  </div>
   );
 };
 
