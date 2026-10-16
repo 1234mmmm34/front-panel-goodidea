@@ -7,6 +7,7 @@ import {
   AlumnoCargaResultado,
   HistorialAlumnosResponse,
   HistorialAlumnoPutDto,
+  HistorialResumenDto,
 } from "@/types/alumnosCatalogo";
 
 export const AlumnosCatalogoService = {
@@ -212,6 +213,51 @@ export const AlumnosCatalogoService = {
         err.response?.data?.message ||
         "Error al actualizar la evaluación y entregables.";
       return { exito: false, status, error: errorMsg };
+    }
+  },
+
+  /**
+   * 3.8 Resumen del historial de alumnos de una empresa
+   * GET api/alumnos/historial/empresa/{i_CveEmpresa}/resumen
+   */
+  async getHistorialResumen(
+    i_CveEmpresa: number,
+    params?: {
+      searchTerm?: string;
+      fechaInicio?: string;
+      fechaFin?: string;
+    }
+  ): Promise<HistorialResumenDto> {
+    try {
+      const queryParams: Record<string, any> = {};
+      if (params?.searchTerm && params.searchTerm.trim()) {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+      if (params?.fechaInicio && params.fechaInicio.trim()) {
+        queryParams.fechaInicio = params.fechaInicio.trim();
+      }
+      if (params?.fechaFin && params.fechaFin.trim()) {
+        queryParams.fechaFin = params.fechaFin.trim();
+      }
+
+      const resp = await apiClient.get<HistorialResumenDto>(
+        `alumnos/historial/empresa/${i_CveEmpresa}/resumen`,
+        { params: queryParams }
+      );
+
+      return (
+        resp.data || {
+          i_Cursos: 0,
+          i_Alumnos: 0,
+          i_Inscripciones: 0,
+          i_Aprobados: 0,
+          i_Reprobados: 0,
+          i_SinEvaluar: 0,
+        }
+      );
+    } catch (err: any) {
+      console.error("[AlumnosCatalogoService.getHistorialResumen] Error:", err);
+      throw err;
     }
   },
 };

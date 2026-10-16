@@ -94,3 +94,14 @@ export interface HistorialAlumnoPutDto {
   v_EvFinal: string | null;
   Entregables: { i_CveAgendaEntregable: number; b_Entregado: boolean }[];
 }
+
+// Resumen del historial de alumnos por empresa
+export interface HistorialResumenDto {
+  i_Cursos: number;
+  i_Alumnos: number;
+  i_Inscripciones: number;
+  i_Aprobados: number;
+  i_Reprobados: number;
+  i_SinEvaluar: number;
+}
+

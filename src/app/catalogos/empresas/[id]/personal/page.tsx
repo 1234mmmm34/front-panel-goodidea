@@ -21,6 +21,7 @@ import { ModalNuevoAlumno } from "@/components/personal/ModalNuevoAlumno";
 import { ModalCargaMasivaPersonal } from "@/components/personal/ModalCargaMasivaPersonal";
 import { ModalEvaluacionAlumno } from "@/components/personal/ModalEvaluacionAlumno";
 import { ModalConfirmarMarcarEntregables } from "@/components/personal/ModalConfirmarMarcarEntregables";
+import { TarjetasResumenHistorial } from "@/components/personal/TarjetasResumenHistorial";
 import { DateRangePickerPopover } from "@/components/ui/DateRangePickerPopover";
 import { PaginadorCustom } from "@/components/ui/PaginadorCustom";
 import {
@@ -29,6 +30,7 @@ import {
   HistorialAlumno,
   EntregableAlumno,
   HistorialAlumnoPutDto,
+  HistorialResumenDto,
 } from "@/types/alumnosCatalogo";
 import { AlumnosCatalogoService } from "@/services/alumnosCatalogo.service";
 import { EmpresasService } from "@/services/empresas.service";
@@ -95,6 +97,10 @@ export default function CatalogosPersonalPage() {
   // Modal y estado para marcar todos los entregables
   const [modalMarcarEntregablesAbierto, setModalMarcarEntregablesAbierto] = useState<boolean>(false);
   const [marcandoEntregables, setMarcandoEntregables] = useState<boolean>(false);
+
+  // Estado del resumen del historial
+  const [resumenHistorial, setResumenHistorial] = useState<HistorialResumenDto | null>(null);
+  const [cargandoResumen, setCargandoResumen] = useState<boolean>(true);
 
   // Cargar datos de la empresa
   useEffect(() => {
@@ -164,6 +170,29 @@ export default function CatalogosPersonalPage() {
     }
   }, [idEmpresa, busqueda, paginaActual, tamanoPagina, fechaInicio, fechaFin, toast]);
 
+  // Cargar resumen de historial desde el servidor (Vista Historial)
+  const cargarResumen = useCallback(async () => {
+    setCargandoResumen(true);
+    try {
+      const res = await AlumnosCatalogoService.getHistorialResumen(idEmpresa, {
+        searchTerm: busqueda.trim() || undefined,
+        fechaInicio: fechaInicio.trim() || undefined,
+        fechaFin: fechaFin.trim() || undefined,
+      });
+      setResumenHistorial(res);
+    } catch (err: any) {
+      setResumenHistorial(null);
+      const errorMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.mensaje ||
+        err?.response?.data?.message ||
+        "Ocurrió un error al cargar el resumen del historial.";
+      toast.error(errorMsg);
+    } finally {
+      setCargandoResumen(false);
+    }
+  }, [idEmpresa, busqueda, fechaInicio, fechaFin, toast]);
+
   useEffect(() => {
     if (vista === "catalogo") {
       cargarAlumnos();
@@ -171,6 +200,12 @@ export default function CatalogosPersonalPage() {
       cargarHistorial();
     }
   }, [vista, cargarAlumnos, cargarHistorial]);
+
+  useEffect(() => {
+    if (vista === "historial") {
+      cargarResumen();
+    }
+  }, [vista, cargarResumen]);
 
   // Cambio de vista
   const handleCambioVista = (nuevaVista: VistaPersonal) => {
@@ -205,6 +240,7 @@ export default function CatalogosPersonalPage() {
       cargarAlumnos();
     } else {
       cargarHistorial();
+      cargarResumen();
     }
   };
 
@@ -332,6 +368,7 @@ export default function CatalogosPersonalPage() {
       toast.success(`Entregables marcados para ${exitosas.length} alumnos`);
       setSeleccionados(new Map());
       cargarHistorial();
+      cargarResumen();
     } else {
       toast.error(
         `${fallidas.length} de ${filasConPendientes.length} no se pudieron actualizar.`
@@ -341,6 +378,9 @@ export default function CatalogosPersonalPage() {
       fallidas.forEach((item) => nuevoMapa.set(item.i_CveAlumnoAgenda, item));
       setSeleccionados(nuevoMapa);
       cargarHistorial();
+      if (exitosas.length > 0) {
+        cargarResumen();
+      }
     }
   };
 
@@ -482,7 +522,7 @@ export default function CatalogosPersonalPage() {
       </div>
 
       {/* Encabezado */}
-      <div className="page-header mb-4">
+      <div className="page-header mb-4" style={{ marginBottom: "16px" }}>
         <div>
           <h1 className="page-title">
             Catálogo de personal
@@ -506,8 +546,18 @@ export default function CatalogosPersonalPage() {
         </button>
       </div>
 
+      {/* Cards de resumen (solo en vista Historial) */}
+      {vista === "historial" && (
+        <div style={{ marginBottom: "16px" }}>
+          <TarjetasResumenHistorial
+            resumen={resumenHistorial}
+            cargando={cargandoResumen}
+          />
+        </div>
+      )}
+
       {/* Barra superior (Barra de Filtros y Botones) */}
-      <div className="card mb-4 p-4 filter-card" style={{ position: "relative", zIndex: 40, overflow: "visible" }}>
+      <div className="card mb-4 p-4 filter-card" style={{ position: "relative", zIndex: 40, overflow: "visible", marginBottom: "16px" }}>
         <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "16px", flexWrap: "wrap", justifyContent: "space-between", overflow: "visible" }}>
           
           {/* Lado izquierdo: Select de vista y Rango de fechas */}
@@ -688,7 +738,7 @@ export default function CatalogosPersonalPage() {
       </div>
 
       {/* Contenedor de Tabla con Scroll Horizontal si se desborda */}
-      <div className="alegra-table-container border border-slate-200/80 shadow-sm rounded-xl overflow-hidden mb-4">
+      <div className="alegra-table-container border border-slate-200/80 shadow-sm rounded-xl overflow-hidden mb-4" style={{ marginBottom: "16px" }}>
         {vista === "catalogo" ? (
           /* Vista Catálogo de Alumnos */
           <div style={{ overflowX: "auto", width: "100%" }}>
@@ -1250,6 +1300,7 @@ export default function CatalogosPersonalPage() {
           setAlumnosModalEvaluacion([]);
           if (huboGuardadoParcial) {
             cargarHistorial();
+            cargarResumen();
           }
         }}
         onGuardadoExitoso={() => {
@@ -1257,6 +1308,7 @@ export default function CatalogosPersonalPage() {
           setAlumnosModalEvaluacion([]);
           setSeleccionados(new Map());
           cargarHistorial();
+          cargarResumen();
         }}
       />
 
