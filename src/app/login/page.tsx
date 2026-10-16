@@ -4,10 +4,13 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { AuthService } from "@/services/auth.service";
+import { PerfilesService } from "@/services/perfiles.service";
 import { useToast } from "@/context/ToastContext";
+import { useMenu } from "@/context/MenuContext";
 
 export default function LoginPage() {
   const { toast } = useToast();
+  const { recargarMenu } = useMenu();
   const router = useRouter();
 
   const [email, setEmail] = useState<string>("");
@@ -32,11 +35,36 @@ export default function LoginPage() {
       password: password,
     });
 
-    setCargando(false);
-
     if (resultado.exito) {
-      router.push("/programacion");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("session-change"));
+      }
+
+      try {
+        await recargarMenu();
+      } catch (err) {
+        console.error("Error al recargar menú en login:", err);
+      }
+
+      const idPerfil = resultado.sesion?.id_perfil;
+      let rutaDestino = "/calendario";
+
+      if (idPerfil && idPerfil > 0) {
+        try {
+          const respInicio = await PerfilesService.getRutaInicioPerfil(idPerfil);
+          if (respInicio?.v_RutaInicio) {
+            const r = respInicio.v_RutaInicio.trim();
+            rutaDestino = r.startsWith("/") ? r : `/${r}`;
+          }
+        } catch (err) {
+          console.error("Error al obtener página de inicio del perfil:", err);
+          toast.error("Ocurrió un error al consultar la página de inicio del perfil.");
+        }
+      }
+
+      router.push(rutaDestino);
     } else {
+      setCargando(false);
       setErrorMensaje(
         resultado.mensaje || "El usuario no existe o credenciales incorrectas"
       );

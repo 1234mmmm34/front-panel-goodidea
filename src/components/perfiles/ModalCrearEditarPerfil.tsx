@@ -98,6 +98,7 @@ export const ModalCrearEditarPerfil: React.FC<Props> = ({
   // Estado del formulario
   const [v_NombrePerfil, setV_NombrePerfil] = useState<string>("");
   const [v_Descripcion, setV_Descripcion] = useState<string>("");
+  const [i_CveFuncionalidadInicio, setI_CveFuncionalidadInicio] = useState<number | null>(null);
 
   // Estado de rutas y selección
   const [rutasData, setRutasData] = useState<RutasPerfilResponse>({
@@ -121,6 +122,7 @@ export const ModalCrearEditarPerfil: React.FC<Props> = ({
     if (!abierto) {
       setV_NombrePerfil("");
       setV_Descripcion("");
+      setI_CveFuncionalidadInicio(null);
       setHijasSeleccionadas(new Set());
       setRutasData({ rutasRaiz: [], rutasHijas: [] });
       setBusquedaPermisos("");
@@ -131,9 +133,11 @@ export const ModalCrearEditarPerfil: React.FC<Props> = ({
     if (esEdicion && perfilEditar) {
       setV_NombrePerfil(perfilEditar.v_NombrePerfil || "");
       setV_Descripcion(perfilEditar.v_Descripcion || "");
+      setI_CveFuncionalidadInicio(perfilEditar.i_CveFuncionalidadInicio ?? null);
     } else {
       setV_NombrePerfil("");
       setV_Descripcion("");
+      setI_CveFuncionalidadInicio(null);
     }
 
     // Cargar rutas
@@ -211,6 +215,42 @@ export const ModalCrearEditarPerfil: React.FC<Props> = ({
       })
       .filter((item) => item.hijas.length > 0);
   }, [raicesConHijas, rutasData.rutasHijas, busquedaPermisos]);
+
+  // Opciones para la página de inicio (rutas hijas marcadas, o todas si ninguna está marcada)
+  const opcionesInicio = useMemo(() => {
+    const hijas = rutasData.rutasHijas || [];
+    const hayMarcadas = hijasSeleccionadas.size > 0;
+
+    const lista: { id: number; label: string }[] = [];
+
+    raicesConHijas.forEach((raiz) => {
+      const hijasDeRaiz = hijas.filter(
+        (h) => h.i_SCveFuncionalidad === raiz.i_CveFuncionalidad
+      );
+      hijasDeRaiz.forEach((hija) => {
+        if (!hayMarcadas || hijasSeleccionadas.has(hija.i_CveFuncionalidad)) {
+          lista.push({
+            id: hija.i_CveFuncionalidad,
+            label: `${raiz.v_NombreFuncionalidad} › ${hija.v_NombreFuncionalidad}`,
+          });
+        }
+      });
+    });
+
+    return lista;
+  }, [raicesConHijas, rutasData.rutasHijas, hijasSeleccionadas]);
+
+  // Si se desmarca en Permisos la ruta elegida como inicio, regresar a "Primera opción del menú" (null)
+  useEffect(() => {
+    if (cargandoRutas) return;
+    if (i_CveFuncionalidadInicio !== null) {
+      if (hijasSeleccionadas.size > 0) {
+        if (!hijasSeleccionadas.has(i_CveFuncionalidadInicio)) {
+          setI_CveFuncionalidadInicio(null);
+        }
+      }
+    }
+  }, [hijasSeleccionadas, i_CveFuncionalidadInicio, cargandoRutas]);
 
   // Alternar expansión de una raíz
   const toggleExpasionRaiz = (cveRaiz: number) => {
@@ -299,6 +339,7 @@ export const ModalCrearEditarPerfil: React.FC<Props> = ({
           i_CvePerfil: esEdicion && perfilEditar ? perfilEditar.i_CvePerfil : 0,
           v_NombrePerfil: nombreLimpio,
           v_Descripcion: v_Descripcion ? v_Descripcion.trim() : "",
+          i_CveFuncionalidadInicio: i_CveFuncionalidadInicio,
         },
         Rutas: rutasPayload,
       };
@@ -898,6 +939,63 @@ export const ModalCrearEditarPerfil: React.FC<Props> = ({
                     })}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Sección 3: Página de inicio */}
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "12px",
+                  paddingBottom: "8px",
+                  borderBottom: "1px solid #f1f5f9",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    color: "#475569",
+                  }}
+                >
+                  3. Página de inicio
+                </span>
+              </div>
+
+              <div className="form-group" style={{ margin: 0, maxWidth: "420px" }}>
+                <label className="form-label" htmlFor="i_CveFuncionalidadInicio">
+                  Página de inicio
+                </label>
+                <select
+                  id="i_CveFuncionalidadInicio"
+                  className="form-select"
+                  value={i_CveFuncionalidadInicio ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setI_CveFuncionalidadInicio(val === "" ? null : Number(val));
+                  }}
+                  disabled={guardando || cargandoRutas}
+                  style={{
+                    fontSize: "13px",
+                    borderRadius: "8px",
+                    borderColor: "#d0dce8",
+                  }}
+                >
+                  <option value="">Primera opción del menú</option>
+                  {opcionesInicio.map((opc) => (
+                    <option key={opc.id} value={opc.id}>
+                      {opc.label}
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: "11px", color: "#64748b", display: "block", marginTop: "4px" }}>
+                  Página que verá el usuario al iniciar sesión.
+                </span>
               </div>
             </div>
           </div>

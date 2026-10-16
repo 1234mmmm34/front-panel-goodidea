@@ -4,6 +4,7 @@ import {
   Tenant,
   Usuario,
   UsuariosPagedDto,
+  InstructorDisponibleDto,
 } from "@/types/usuarios";
 
 export interface ResultadoRespuestaUsuarios {
@@ -96,7 +97,13 @@ export const UsuariosService = {
           params: { iCveTenant },
         });
         if (!resp.data) return null;
-        return resp.data?.data || resp.data;
+        const u = resp.data?.data || resp.data;
+        return {
+          ...u,
+          b_EsPersonal: Boolean(u.b_EsPersonal ?? u.b_esPersonal ?? u.bEsPersonal),
+          i_CveInstructor: u.i_CveInstructor ?? u.i_cveInstructor ?? u.iCveInstructor ?? null,
+          v_Instructor: u.v_Instructor ?? u.v_instructor ?? u.vInstructor ?? null,
+        };
       },
       null
     );
@@ -116,6 +123,8 @@ export const UsuariosService = {
     v_telefono?: string | null;
     i_CvePerfil: number;
     i_CveTenant: number;
+    b_EsPersonal?: boolean;
+    i_CveInstructor?: number | null;
   }): Promise<ResultadoRespuestaUsuarios> {
     try {
       const body = {
@@ -133,6 +142,8 @@ export const UsuariosService = {
         v_telefono: payload.v_telefono ? payload.v_telefono.trim() : null,
         i_CvePerfil: payload.i_CvePerfil,
         i_CveTenant: payload.i_CveTenant,
+        b_EsPersonal: Boolean(payload.b_EsPersonal),
+        i_CveInstructor: payload.b_EsPersonal ? (payload.i_CveInstructor ?? null) : null,
       };
 
       const resp = await apiClient.post("usuarios", body);
@@ -168,6 +179,8 @@ export const UsuariosService = {
     v_telefono?: string | null;
     i_CvePerfil: number;
     i_CveTenant: number;
+    b_EsPersonal?: boolean;
+    i_CveInstructor?: number | null;
   }): Promise<ResultadoRespuestaUsuarios> {
     try {
       const body = {
@@ -182,6 +195,8 @@ export const UsuariosService = {
         v_telefono: payload.v_telefono ? payload.v_telefono.trim() : null,
         i_CvePerfil: payload.i_CvePerfil,
         i_CveTenant: payload.i_CveTenant,
+        b_EsPersonal: Boolean(payload.b_EsPersonal),
+        i_CveInstructor: payload.b_EsPersonal ? (payload.i_CveInstructor ?? null) : null,
       };
 
       const resp = await apiClient.post("usuarios/editar", body);
@@ -245,6 +260,29 @@ export const UsuariosService = {
         const resp = await apiClient.get<any>(`tenant/${idUsuario}`);
         const raw = Array.isArray(resp.data) ? resp.data : resp.data?.datos || resp.data?.data || [];
         return Array.isArray(raw) ? raw : [];
+      },
+      []
+    );
+  },
+
+  /**
+   * 8. Obtener personal disponible (sin usuario ligado)
+   * GET usuarios/instructoresDisponibles
+   */
+  async getInstructoresDisponibles(): Promise<InstructorDisponibleDto[]> {
+    return httpDefensivo(
+      async () => {
+        const resp = await apiClient.get<any>("usuarios/instructoresDisponibles");
+        const raw =
+          resp.data?.datos ||
+          resp.data?.data ||
+          resp.data?.Datos ||
+          (Array.isArray(resp.data) ? resp.data : []);
+        return (Array.isArray(raw) ? raw : []).map((i: any) => ({
+          i_CveInstructor: i.i_CveInstructor ?? i.id ?? i.Id ?? 0,
+          v_NombreCompleto: i.v_NombreCompleto ?? i.nombreCompleto ?? i.v_Nombre ?? "",
+          v_Email: i.v_Email ?? i.email ?? i.v_email ?? null,
+        }));
       },
       []
     );

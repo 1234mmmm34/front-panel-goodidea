@@ -3,6 +3,7 @@ export interface T_Perfiles {
   i_CveTenant: number;
   v_NombrePerfil: string;
   v_Descripcion: string;
+  i_CveFuncionalidadInicio: number | null; // NUEVO: id de la ruta hija que es la página de inicio
 }
 
 export interface RutasPerfilesGetDto {
@@ -30,8 +31,13 @@ export interface PerfilPayload {
     i_CvePerfil: number;
     v_NombrePerfil: string;
     v_Descripcion: string;
+    i_CveFuncionalidadInicio: number | null; // NUEVO
   };
   Rutas: T_RutasPerfiles[];
+}
+
+export interface RutaInicioPerfilResponse {
+  v_RutaInicio: string | null;
 }
 
 export interface ResultadoRespuestaPerfiles {

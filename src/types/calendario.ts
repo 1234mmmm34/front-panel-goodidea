@@ -4,6 +4,7 @@ export interface AgendaGetDto {
   d_FechaInicio: string | null;
   d_FechaFin: string | null;
   v_Empresa: string | null;
+  v_MotivoCancelacion?: string | null;
   i_CveEstatus: number | null;
   v_Servicio: string | null;
   v_TipoServicio: string | null;

@@ -296,7 +296,12 @@ export default function CatalogosPersonalPage() {
         b_Asistio: f.b_Asistio ?? null,
         v_EvTeorica: f.v_EvTeorica?.trim() || null,
         v_EvPractica: f.v_EvPractica?.trim() || null,
-        v_EvFinal: f.v_EvFinal?.trim() || null,
+        v_EvFinal: (() => {
+          const v = f.v_EvFinal?.trim().toUpperCase();
+          if (v === "APROBADO") return "APROBADO";
+          if (v === "NO APROBADO") return "NO APROBADO";
+          return null;
+        })(),
         Entregables: (f.entregables || []).map((ent) => ({
           i_CveAgendaEntregable: ent.i_CveAgendaEntregable,
           b_Entregado: true,
@@ -383,7 +388,12 @@ export default function CatalogosPersonalPage() {
       b_Asistio: row.b_Asistio ?? null,
       v_EvTeorica: row.v_EvTeorica?.trim() || null,
       v_EvPractica: row.v_EvPractica?.trim() || null,
-      v_EvFinal: row.v_EvFinal?.trim() || null,
+      v_EvFinal: (() => {
+        const v = row.v_EvFinal?.trim().toUpperCase();
+        if (v === "APROBADO") return "APROBADO";
+        if (v === "NO APROBADO") return "NO APROBADO";
+        return null;
+      })(),
       Entregables: nuevosEntregables.map((item) => ({
         i_CveAgendaEntregable: item.i_CveAgendaEntregable,
         b_Entregado: item.v_Estatus === "ENTREGADO",
@@ -685,17 +695,18 @@ export default function CatalogosPersonalPage() {
             <table className="alegra-table alegra-table-compact">
               <thead>
                 <tr>
-                  <th style={{ width: "16%", padding: "8px 12px" }}>Nómina</th>
-                  <th style={{ width: "36%", padding: "8px 12px" }}>Nombre</th>
-                  <th style={{ width: "24%", padding: "8px 12px" }}>CURP</th>
-                  <th style={{ width: "24%", padding: "8px 12px" }}>Puesto</th>
+                  <th style={{ width: "14%", padding: "8px 12px" }}>Nómina</th>
+                  <th style={{ width: "30%", padding: "8px 12px" }}>Nombre</th>
+                  <th style={{ width: "22%", padding: "8px 12px" }}>CURP</th>
+                  <th style={{ width: "22%", padding: "8px 12px" }}>Puesto</th>
+                  <th className="text-center" style={{ width: "12%", minWidth: "90px", padding: "8px 12px" }}>Estatus</th>
                   <th className="text-center" style={{ width: "90px", minWidth: "90px", padding: "8px 12px", whiteSpace: "nowrap" }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {cargando ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "48px 16px" }}>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "48px 16px" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", color: "#64748b" }}>
                         <div className="spinner-border text-primary" style={{ width: "24px", height: "24px" }}></div>
                         <span style={{ fontSize: "13px" }}>Cargando catálogo de alumnos...</span>
@@ -704,7 +715,7 @@ export default function CatalogosPersonalPage() {
                   </tr>
                 ) : alumnos.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "48px 16px" }}>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "48px 16px" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px" }}>
                         <div
                           style={{
@@ -757,9 +768,48 @@ export default function CatalogosPersonalPage() {
                         </button>
                       </td>
                       <td style={{ padding: "6px 12px", verticalAlign: "middle" }}>
-                        <span className="font-mono text-xs text-secondary">{row.v_CURP}</span>
+                        <span className="font-mono text-xs text-secondary">
+                          {row.v_CURP && row.v_CURP.trim() ? row.v_CURP : "—"}
+                        </span>
                       </td>
                       <td style={{ color: "#334155", padding: "6px 12px", verticalAlign: "middle" }}>{row.v_Puesto}</td>
+                      <td className="text-center" style={{ padding: "6px 12px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                        {row.b_Vigente ? (
+                          <span
+                            className="badge-soft-green"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "2px 8px",
+                              borderRadius: "12px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              backgroundColor: "#ecfdf5",
+                              color: "#065f46",
+                              border: "1px solid #a7f3d0",
+                            }}
+                          >
+                            Activo
+                          </span>
+                        ) : (
+                          <span
+                            className="badge-soft-gray"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "2px 8px",
+                              borderRadius: "12px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              backgroundColor: "#f1f5f9",
+                              color: "#475569",
+                              border: "1px solid #cbd5e1",
+                            }}
+                          >
+                            Inactivo
+                          </span>
+                        )}
+                      </td>
                       <td className="text-center" style={{ width: "90px", minWidth: "90px", padding: "6px 12px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", flexWrap: "nowrap" }}>
                           <button
@@ -828,7 +878,7 @@ export default function CatalogosPersonalPage() {
                   <th style={{ padding: "6px 12px", whiteSpace: "nowrap", textAlign: "center", fontSize: "12px" }}>Asistió</th>
                   <th style={{ padding: "6px 12px", whiteSpace: "nowrap", textAlign: "center", fontSize: "12px" }}>EV teórica</th>
                   <th style={{ padding: "6px 12px", whiteSpace: "nowrap", textAlign: "center", fontSize: "12px" }}>EV práctica</th>
-                  <th style={{ padding: "6px 12px", whiteSpace: "nowrap", textAlign: "center", fontSize: "12px" }}>EV final</th>
+                  <th style={{ padding: "6px 12px", whiteSpace: "nowrap", textAlign: "center", fontSize: "12px", minWidth: "105px" }}>EV final</th>
                   <th style={{ padding: "6px 12px", minWidth: "220px", fontSize: "12px" }}>Entregables</th>
                   <th style={{ padding: "6px 12px", minWidth: "150px", fontSize: "12px" }}>Solicitado por</th>
                   <th style={{ padding: "6px 12px", whiteSpace: "nowrap", fontSize: "12px" }}>Orden de compra</th>
@@ -1013,14 +1063,49 @@ export default function CatalogosPersonalPage() {
                         </td>
 
                         {/* EV final */}
-                        <td style={{ padding: "6px 12px", verticalAlign: "middle", textAlign: "center", fontWeight: 600, color: "#334155", fontSize: "12px" }}>
-                          {row.v_EvFinal && row.v_EvFinal.trim() ? (
-                            row.v_EvFinal
-                          ) : (
-                            <span style={{ color: "#dc2626", fontSize: "12px", fontWeight: 500 }}>
-                              Pendiente
-                            </span>
-                          )}
+                        <td style={{ padding: "6px 12px", verticalAlign: "middle", textAlign: "center", fontSize: "12px", whiteSpace: "nowrap" }}>
+                          {(() => {
+                            const valor = row.v_EvFinal?.trim().toUpperCase();
+                            if (valor === "APROBADO") {
+                              return (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    padding: "2px 8px",
+                                    borderRadius: "12px",
+                                    fontSize: "11px",
+                                    fontWeight: 600,
+                                    backgroundColor: "#ecfdf5",
+                                    color: "#065f46",
+                                    border: "1px solid #a7f3d0",
+                                  }}
+                                >
+                                  Aprobado
+                                </span>
+                              );
+                            }
+                            if (valor === "NO APROBADO") {
+                              return (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    padding: "2px 8px",
+                                    borderRadius: "12px",
+                                    fontSize: "11px",
+                                    fontWeight: 600,
+                                    backgroundColor: "#fef2f2",
+                                    color: "#991b1b",
+                                    border: "1px solid #fecaca",
+                                  }}
+                                >
+                                  No aprobado
+                                </span>
+                              );
+                            }
+                            return <span style={{ color: "#94a3b8" }}>—</span>;
+                          })()}
                         </td>
 
                         {/* Entregables */}

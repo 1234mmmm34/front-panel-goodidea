@@ -1505,10 +1505,10 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                           <p style={{ fontSize: "12px", color: "#64748b", margin: 0, padding: "8px 0" }}>No hay alumnos inscritos en este servicio.</p>
                         ) : (
                           <div
-                            className="alegra-table-container"
+                            className={`alegra-table-container ${alumnosInscritos.length >= 7 ? "custom-scrollbar" : ""}`}
                             style={{
-                              maxHeight: "260px",
-                              overflowY: "auto",
+                              maxHeight: alumnosInscritos.length >= 7 ? "260px" : undefined,
+                              overflowY: alumnosInscritos.length >= 7 ? "auto" : undefined,
                               borderRadius: "6px",
                               border: "1px solid #e2e8f0",
                               scrollbarWidth: "thin",

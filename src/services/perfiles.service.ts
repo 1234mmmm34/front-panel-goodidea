@@ -4,6 +4,7 @@ import {
   RutasPerfilResponse,
   PerfilPayload,
   ResultadoRespuestaPerfiles,
+  RutaInicioPerfilResponse,
 } from "@/types/perfiles";
 import { Tenant } from "@/types/usuarios";
 
@@ -131,5 +132,17 @@ export const PerfilesService = {
       },
       []
     );
+  },
+
+  /**
+   * 7. Obtener la página de inicio de un perfil
+   * GET perfiles/{i_CvePerfil}/inicio
+   */
+  async getRutaInicioPerfil(i_CvePerfil: number): Promise<RutaInicioPerfilResponse> {
+    const resp = await apiClient.get<any>(`perfiles/${i_CvePerfil}/inicio`);
+    const data = resp.data?.data || resp.data?.datos || resp.data || {};
+    return {
+      v_RutaInicio: data.v_RutaInicio ?? null,
+    };
   },
 };

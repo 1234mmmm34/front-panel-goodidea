@@ -84,14 +84,21 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     console.warn(`[API Error] ${status} en ${url}:`, error.response?.data || error.message);
 
-    if (typeof window !== "undefined" && status === 401) {
-      // No limpiar ni redirigir si el 401 viene del propio intento de login
-      if (!url.includes("login") && !window.location.pathname.startsWith("/login")) {
-        console.warn("[Auth] 401 no autorizado en", url, "-> Limpiando sesión");
-        localStorage.removeItem("userData");
-        localStorage.removeItem("sesion_stps");
-        sessionStorage.clear();
-        window.location.href = "/login";
+    if (typeof window !== "undefined") {
+      // Excepción: 403 en endpoints de consultor no desloguea, se propaga al componente
+      if (status === 403 && url.includes("consultor")) {
+        return Promise.reject(error);
+      }
+
+      if (status === 401 || status === 403) {
+        // No limpiar ni redirigir si viene del propio intento de login
+        if (!url.includes("login") && !window.location.pathname.startsWith("/login")) {
+          console.warn(`[Auth] ${status} no autorizado en ${url} -> Limpiando sesión`);
+          localStorage.removeItem("userData");
+          localStorage.removeItem("sesion_stps");
+          sessionStorage.clear();
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);

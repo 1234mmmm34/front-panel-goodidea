@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { X, UserPlus, Edit3, IdCard, Key, AlertCircle, RefreshCw } from "lucide-react";
-import { Perfil, Tenant, Usuario } from "@/types/usuarios";
+import { Perfil, Tenant, Usuario, InstructorDisponibleDto } from "@/types/usuarios";
 import { UsuariosService } from "@/services/usuarios.service";
 import { obtenerSesionActual } from "@/lib/api-client";
 import { useToast } from "@/context/ToastContext";
@@ -43,9 +43,32 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
   const [iCveTenant, setICveTenant] = useState<number>(0);
   const [nombreTenantDeshabilitado, setNombreTenantDeshabilitado] = useState<string>("");
 
+  // Campos de vinculación con Personal
+  const [bEsPersonal, setBEsPersonal] = useState<boolean>(false);
+  const [iCveInstructor, setICveInstructor] = useState<number | null>(null);
+  const [vInstructor, setVInstructor] = useState<string | null>(null);
+  const [usuarioOriginalEsPersonal, setUsuarioOriginalEsPersonal] = useState<boolean>(false);
+  const [usuarioOriginalCveInstructor, setUsuarioOriginalCveInstructor] = useState<number | null>(null);
+  const [opcionPersonal, setOpcionPersonal] = useState<"crear" | "ligar">("crear");
+  const [cambiandoInstructor, setCambiandoInstructor] = useState<boolean>(false);
+  const [instructoresDisponibles, setInstructoresDisponibles] = useState<InstructorDisponibleDto[]>([]);
+  const [cargandoInstructores, setCargandoInstructores] = useState<boolean>(false);
+
   // Errores de validación
   const [errores, setErrores] = useState<Record<string, boolean>>({});
   const [mensajeErrorGlobal, setMensajeErrorGlobal] = useState<string | null>(null);
+
+  const cargarInstructoresDisponibles = async () => {
+    setCargandoInstructores(true);
+    try {
+      const list = await UsuariosService.getInstructoresDisponibles();
+      setInstructoresDisponibles(list);
+    } catch {
+      toast.error("Error al cargar la lista de personal disponible.");
+    } finally {
+      setCargandoInstructores(false);
+    }
+  };
 
   useEffect(() => {
     if (!abierto) return;
@@ -92,6 +115,18 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
         setBActive(source.b_Active ?? true);
         setICvePerfil(source.i_CvePerfil ?? 0);
         setICveTenant(tenantParaPerfiles);
+
+        // Datos de vinculación con Personal
+        const esPers = Boolean(source.b_EsPersonal);
+        const cveInst = source.i_CveInstructor ?? null;
+        setBEsPersonal(esPers);
+        setUsuarioOriginalEsPersonal(esPers);
+        setICveInstructor(cveInst);
+        setUsuarioOriginalCveInstructor(cveInst);
+        setVInstructor(source.v_Instructor ?? null);
+        setOpcionPersonal("crear");
+        setCambiandoInstructor(false);
+        setInstructoresDisponibles([]);
       } else {
         // Modo Agregar
         setUsername("");
@@ -104,6 +139,16 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
         setICvePerfil(0);
         setICveTenant(idTenantSesion > 0 ? idTenantSesion : (listTenants[0]?.i_CveTenant ?? 0));
         setNombreTenantDeshabilitado("");
+
+        // Personal
+        setBEsPersonal(false);
+        setUsuarioOriginalEsPersonal(false);
+        setICveInstructor(null);
+        setUsuarioOriginalCveInstructor(null);
+        setVInstructor(null);
+        setOpcionPersonal("crear");
+        setCambiandoInstructor(false);
+        setInstructoresDisponibles([]);
       }
 
       setCargandoCatalogos(false);
@@ -129,10 +174,23 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
     if (!iCvePerfil || iCvePerfil === 0) errs.iCvePerfil = true;
     if (!esEdicion && (!iCveTenant || iCveTenant === 0)) errs.iCveTenant = true;
 
+    // Validación de Personal
+    if (bEsPersonal) {
+      if (esEdicion && usuarioOriginalEsPersonal && cambiandoInstructor && !iCveInstructor) {
+        errs.iCveInstructor = true;
+      } else if ((!esEdicion || !usuarioOriginalEsPersonal) && opcionPersonal === "ligar" && !iCveInstructor) {
+        errs.iCveInstructor = true;
+      }
+    }
+
     setErrores(errs);
 
     if (Object.keys(errs).length > 0) {
-      setMensajeErrorGlobal("Completa los campos obligatorios antes de continuar.");
+      if (errs.iCveInstructor) {
+        setMensajeErrorGlobal("Debes seleccionar un registro de personal disponible.");
+      } else {
+        setMensajeErrorGlobal("Completa los campos obligatorios antes de continuar.");
+      }
       return;
     }
 
@@ -150,6 +208,8 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
         v_telefono: vTelefono || null,
         i_CvePerfil: iCvePerfil,
         i_CveTenant: iCveTenant,
+        b_EsPersonal: bEsPersonal,
+        i_CveInstructor: bEsPersonal ? iCveInstructor : null,
       });
 
       setGuardando(false);
@@ -158,8 +218,21 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
         onGuardado();
         onCerrar();
       } else {
-        toast.error(res.mensaje || "Error: correo ya asociado a una cuenta existente");
-        setMensajeErrorGlobal(res.mensaje || "Error: correo ya asociado a una cuenta existente");
+        const rawMsg = res.mensaje || "";
+        const esErrorPersonal =
+          rawMsg.toLowerCase().includes("instructor") ||
+          rawMsg.toLowerCase().includes("personal") ||
+          rawMsg.toLowerCase().includes("ligado") ||
+          (bEsPersonal && !!iCveInstructor && (cambiandoInstructor || opcionPersonal === "ligar"));
+
+        if (esErrorPersonal && !rawMsg.toLowerCase().includes("correo") && !rawMsg.toLowerCase().includes("email")) {
+          toast.error("Ese registro de personal ya está ligado a otro usuario.");
+          setMensajeErrorGlobal("Ese registro de personal ya está ligado a otro usuario.");
+          cargarInstructoresDisponibles();
+        } else {
+          toast.error(rawMsg || "Error al actualizar el usuario");
+          setMensajeErrorGlobal(rawMsg || "Error al actualizar el usuario");
+        }
       }
     } else {
       const res = await UsuariosService.crearUsuario({
@@ -172,6 +245,8 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
         v_telefono: vTelefono || null,
         i_CvePerfil: iCvePerfil,
         i_CveTenant: iCveTenant,
+        b_EsPersonal: bEsPersonal,
+        i_CveInstructor: bEsPersonal ? iCveInstructor : null,
       });
 
       setGuardando(false);
@@ -180,8 +255,8 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
         onGuardado();
         onCerrar();
       } else {
-        toast.error(res.mensaje || "Error: correo ya asociado a una cuenta existente");
-        setMensajeErrorGlobal(res.mensaje || "Error: correo ya asociado a una cuenta existente");
+        toast.error(res.mensaje || "Error al registrar el usuario");
+        setMensajeErrorGlobal(res.mensaje || "Error al registrar el usuario");
       }
     }
   };
@@ -446,6 +521,203 @@ export const ModalCrearEditarUsuario: React.FC<Props> = ({
                           </option>
                         ))}
                       </select>
+                    )}
+                  </div>
+
+                  {/* Vinculación Personal de la empresa */}
+                  <div style={{ marginTop: "4px", paddingTop: "12px", borderTop: "1px dashed #e2e8f0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <input
+                        type="checkbox"
+                        id="chk-es-personal"
+                        checked={bEsPersonal}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setBEsPersonal(checked);
+                          if (!checked) {
+                            setICveInstructor(null);
+                            setCambiandoInstructor(false);
+                            setOpcionPersonal("crear");
+                          } else {
+                            if (esEdicion && usuarioOriginalEsPersonal && usuarioOriginalCveInstructor) {
+                              setICveInstructor(usuarioOriginalCveInstructor);
+                              setCambiandoInstructor(false);
+                            } else {
+                              setOpcionPersonal("crear");
+                              setICveInstructor(null);
+                            }
+                          }
+                        }}
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          accentColor: "#2B8FCC",
+                          cursor: "pointer",
+                        }}
+                      />
+                      <label
+                        htmlFor="chk-es-personal"
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          color: "#1e293b",
+                          cursor: "pointer",
+                          margin: 0,
+                        }}
+                      >
+                        Personal de la empresa
+                      </label>
+                    </div>
+
+                    {bEsPersonal && (
+                      <div
+                        style={{
+                          marginTop: "10px",
+                          padding: "12px",
+                          backgroundColor: "#f8fafc",
+                          borderRadius: "8px",
+                          border: "1px solid #e2e8f0",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px",
+                        }}
+                      >
+                        {/* Edición con personal ya ligado previamente */}
+                        {esEdicion && usuarioOriginalEsPersonal && !cambiandoInstructor ? (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                            <div style={{ fontSize: "12px", color: "#334155" }}>
+                              <span style={{ color: "#64748b" }}>Ligado a: </span>
+                              <strong style={{ color: "#0f172a" }}>{vInstructor || "Personal asignado"}</strong>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              style={{ fontSize: "11px", padding: "3px 10px", height: "auto" }}
+                              onClick={() => {
+                                setCambiandoInstructor(true);
+                                cargarInstructoresDisponibles();
+                                setICveInstructor(null);
+                              }}
+                            >
+                              Cambiar
+                            </button>
+                          </div>
+                        ) : esEdicion && usuarioOriginalEsPersonal && cambiandoInstructor ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <label className="form-label" style={{ fontSize: "11px", fontWeight: 600, margin: 0 }}>
+                                Seleccionar personal <span style={{ color: "#dc3545" }}>*</span>
+                              </label>
+                              <button
+                                type="button"
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: "#64748b",
+                                  fontSize: "11px",
+                                  cursor: "pointer",
+                                  textDecoration: "underline",
+                                  padding: 0,
+                                }}
+                                onClick={() => {
+                                  setCambiandoInstructor(false);
+                                  setICveInstructor(usuarioOriginalCveInstructor);
+                                }}
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                            <select
+                              className={`form-select text-xs ${errores.iCveInstructor ? "border-red-500 bg-red-50" : ""}`}
+                              style={{ borderRadius: "8px", height: "34px" }}
+                              value={iCveInstructor ?? ""}
+                              onChange={(e) => setICveInstructor(e.target.value ? Number(e.target.value) : null)}
+                              disabled={cargandoInstructores}
+                            >
+                              <option value="">
+                                {cargandoInstructores ? "Cargando personal disponible..." : "-- Seleccione un registro de personal --"}
+                              </option>
+                              {instructoresDisponibles.length === 0 && !cargandoInstructores && (
+                                <option value="" disabled>No hay personal disponible sin usuario ligado</option>
+                              )}
+                              {instructoresDisponibles.map((ins) => (
+                                <option key={ins.i_CveInstructor} value={ins.i_CveInstructor}>
+                                  {ins.v_NombreCompleto} {ins.v_Email ? `(${ins.v_Email})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                            {errores.iCveInstructor && (
+                              <span style={{ fontSize: "11px", color: "#dc3545" }}>
+                                Debes seleccionar un registro de personal disponible.
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          /* Modo Alta O Edición sin personal ligado originalmente */
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", cursor: "pointer", margin: 0 }}>
+                              <input
+                                type="radio"
+                                name="opcionPersonal"
+                                value="crear"
+                                checked={opcionPersonal === "crear"}
+                                onChange={() => {
+                                  setOpcionPersonal("crear");
+                                  setICveInstructor(null);
+                                }}
+                                style={{ accentColor: "#2B8FCC" }}
+                              />
+                              <span>Crear registro de personal con estos datos</span>
+                            </label>
+
+                            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", cursor: "pointer", margin: 0 }}>
+                              <input
+                                type="radio"
+                                name="opcionPersonal"
+                                value="ligar"
+                                checked={opcionPersonal === "ligar"}
+                                onChange={() => {
+                                  setOpcionPersonal("ligar");
+                                  if (instructoresDisponibles.length === 0) {
+                                    cargarInstructoresDisponibles();
+                                  }
+                                }}
+                                style={{ accentColor: "#2B8FCC" }}
+                              />
+                              <span>Ligar a personal existente</span>
+                            </label>
+
+                            {opcionPersonal === "ligar" && (
+                              <div style={{ marginTop: "4px" }}>
+                                <select
+                                  className={`form-select text-xs ${errores.iCveInstructor ? "border-red-500 bg-red-50" : ""}`}
+                                  style={{ borderRadius: "8px", height: "34px" }}
+                                  value={iCveInstructor ?? ""}
+                                  onChange={(e) => setICveInstructor(e.target.value ? Number(e.target.value) : null)}
+                                  disabled={cargandoInstructores}
+                                >
+                                  <option value="">
+                                    {cargandoInstructores ? "Cargando personal disponible..." : "-- Seleccione un registro de personal --"}
+                                  </option>
+                                  {instructoresDisponibles.length === 0 && !cargandoInstructores && (
+                                    <option value="" disabled>No hay personal disponible sin usuario ligado</option>
+                                  )}
+                                  {instructoresDisponibles.map((ins) => (
+                                    <option key={ins.i_CveInstructor} value={ins.i_CveInstructor}>
+                                      {ins.v_NombreCompleto} {ins.v_Email ? `(${ins.v_Email})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                                {errores.iCveInstructor && (
+                                  <span style={{ fontSize: "11px", color: "#dc3545", display: "block", marginTop: "2px" }}>
+                                    Debes seleccionar un registro de personal disponible.
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

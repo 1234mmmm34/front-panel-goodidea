@@ -4,8 +4,9 @@ export interface AlumnoCatalogo {
   i_CveEmpresa: number;
   v_Nomina: string;
   v_Nombre: string;
-  v_CURP: string;
+  v_CURP: string | null;
   v_Puesto: string;
+  b_Vigente: boolean;
 }
 
 // Respuesta paginada del listado
@@ -22,8 +23,9 @@ export interface AlumnoPostDto {
   i_CveEmpresa: number;
   v_Nomina: string;
   v_Nombre: string;
-  v_CURP: string;
+  v_CURP: string | null;
   v_Puesto: string;
+  b_Vigente: boolean;
 }
 
 // Carga masiva

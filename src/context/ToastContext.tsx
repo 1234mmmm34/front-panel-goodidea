@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from "lucide-react";
 
 export type ToastType = "success" | "error" | "warning" | "info";
@@ -52,12 +52,15 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const toast = {
-    success: (msg: string) => addToast("success", msg),
-    error: (msg: string) => addToast("error", msg),
-    warning: (msg: string) => addToast("warning", msg),
-    info: (msg: string) => addToast("info", msg),
-  };
+  const toast = useMemo(
+    () => ({
+      success: (msg: string) => addToast("success", msg),
+      error: (msg: string) => addToast("error", msg),
+      warning: (msg: string) => addToast("warning", msg),
+      info: (msg: string) => addToast("info", msg),
+    }),
+    [addToast]
+  );
 
   const confirmModal = useCallback((options: ConfirmOptions) => {
     setConfirmState(options);

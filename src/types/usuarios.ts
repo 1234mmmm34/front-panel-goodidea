@@ -13,6 +13,15 @@ export interface Usuario {
   v_Nombres: string | null;
   v_ApellidoPaterno: string | null;
   v_ApellidoMaterno: string | null;
+  b_EsPersonal?: boolean;
+  i_CveInstructor?: number | null;
+  v_Instructor?: string | null;
+}
+
+export interface InstructorDisponibleDto {
+  i_CveInstructor: number;
+  v_NombreCompleto: string;
+  v_Email: string | null;
 }
 
 export interface UsuariosPagedDto {

@@ -31,6 +31,7 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
   const [nombre, setNombre] = useState("");
   const [curp, setCurp] = useState("");
   const [puesto, setPuesto] = useState("");
+  const [vigente, setVigente] = useState(true);
 
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
@@ -50,11 +51,13 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
         setNombre(alumnoEditar.v_Nombre || "");
         setCurp(alumnoEditar.v_CURP || "");
         setPuesto(alumnoEditar.v_Puesto || "");
+        setVigente(alumnoEditar.b_Vigente !== undefined ? Boolean(alumnoEditar.b_Vigente) : true);
       } else {
         setNomina("");
         setNombre("");
         setCurp("");
         setPuesto("");
+        setVigente(true);
       }
       setErrores({});
       setErrorServidor(null);
@@ -80,12 +83,18 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
       nuevosErrores.nombre = "El nombre completo es obligatorio.";
     }
 
-    // CURP
+    // CURP: obligatoria solo si el estatus es Activo. Si es Inactivo puede ir vacía; si se captura, se valida el mismo formato.
     const curpClean = curp.trim().toUpperCase();
-    if (!curpClean) {
-      nuevosErrores.curp = "La CURP es obligatoria.";
-    } else if (curpClean.length !== 18 || !CURP_REGEX.test(curpClean)) {
-      nuevosErrores.curp = "La CURP no tiene un formato válido (18 caracteres).";
+    if (vigente) {
+      if (!curpClean) {
+        nuevosErrores.curp = "La CURP es obligatoria.";
+      } else if (curpClean.length !== 18 || !CURP_REGEX.test(curpClean)) {
+        nuevosErrores.curp = "La CURP no tiene un formato válido (18 caracteres).";
+      }
+    } else {
+      if (curpClean && (curpClean.length !== 18 || !CURP_REGEX.test(curpClean))) {
+        nuevosErrores.curp = "La CURP no tiene un formato válido (18 caracteres).";
+      }
     }
 
     // Puesto
@@ -104,12 +113,14 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
 
     if (!validarCampos()) return;
 
+    const curpClean = curp.trim().toUpperCase();
     const dto: AlumnoPostDto = {
       i_CveEmpresa: idEmpresa,
       v_Nomina: nomina.trim(),
       v_Nombre: nombre.trim().toUpperCase(),
-      v_CURP: curp.trim().toUpperCase(),
+      v_CURP: curpClean ? curpClean : null,
       v_Puesto: puesto.trim(),
+      b_Vigente: vigente,
     };
 
     setGuardando(true);
@@ -312,17 +323,49 @@ export const ModalNuevoAlumno: React.FC<ModalNuevoAlumnoProps> = ({
               )}
             </div>
 
+            {/* Estatus */}
+            <div>
+              <label className="form-label" style={{ fontSize: "12px", fontWeight: 600, color: "#334155" }}>
+                Estatus <span style={{ color: "#ef4444" }}>*</span>
+              </label>
+              <select
+                className="form-control"
+                style={{
+                  height: "38px",
+                  fontSize: "13px",
+                  borderRadius: "8px",
+                  backgroundColor: "#ffffff",
+                  cursor: "pointer",
+                }}
+                value={vigente ? "true" : "false"}
+                onChange={(e) => {
+                  const nuevoVigente = e.target.value === "true";
+                  setVigente(nuevoVigente);
+                  if (!nuevoVigente && errores.curp && !curp.trim()) {
+                    setErrores((prev) => ({ ...prev, curp: "" }));
+                  }
+                }}
+              >
+                <option value="true">Activo</option>
+                <option value="false">Inactivo</option>
+              </select>
+            </div>
+
             {/* CURP */}
             <div>
               <label className="form-label" style={{ fontSize: "12px", fontWeight: 600, color: "#334155" }}>
-                CURP <span style={{ color: "#ef4444" }}>*</span>
+                CURP {vigente ? (
+                  <span style={{ color: "#ef4444" }}>*</span>
+                ) : (
+                  <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b" }}>(opcional para inactivos)</span>
+                )}
               </label>
               <input
                 type="text"
                 maxLength={18}
                 className={`form-control font-mono ${errores.curp ? "border-red-500" : ""}`}
                 style={{ height: "38px", fontSize: "13px", borderRadius: "8px", textTransform: "uppercase" }}
-                placeholder="Ej. HELJ850312HNLRPN04"
+                placeholder={vigente ? "Ej. HELJ850312HNLRPN04" : "Ej. HELJ850312HNLRPN04 (opcional)"}
                 value={curp}
                 onChange={(e) => {
                   setCurp(e.target.value.toUpperCase());

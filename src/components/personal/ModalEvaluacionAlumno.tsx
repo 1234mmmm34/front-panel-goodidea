@@ -22,7 +22,7 @@ interface FilaAlumnoEdicion {
   d_FechaInicio: string | null;
   evTeorica: string;
   evPractica: string;
-  evFinal: string;
+  evFinal: "APROBADO" | "NO APROBADO" | null;
   entregables: EntregableAlumno[];
   estado: "pendiente" | "guardando" | "guardado" | "error";
   errorMensaje?: string;
@@ -46,9 +46,11 @@ function filaHaCambiado(original: HistorialAlumno, actual: FilaAlumnoEdicion): b
   const pAct = actual.evPractica.trim();
   if (pOrig !== pAct) return true;
 
-  const fOrig = (original.v_EvFinal || "").trim();
-  const fAct = actual.evFinal.trim();
-  if (fOrig !== fAct) return true;
+  const fOrig = (original.v_EvFinal || "").trim().toUpperCase();
+  const fAct = (actual.evFinal || "").trim().toUpperCase();
+  const fOrigNorm = fOrig === "APROBADO" || fOrig === "NO APROBADO" ? fOrig : "";
+  const fActNorm = fAct === "APROBADO" || fAct === "NO APROBADO" ? fAct : "";
+  if (fOrigNorm !== fActNorm) return true;
 
   const origMap = new Map(
     (original.entregables || []).map((e) => [e.i_CveAgendaEntregable, e.v_Estatus])
@@ -111,7 +113,12 @@ export const ModalEvaluacionAlumno: React.FC<ModalEvaluacionAlumnoProps> = ({
           d_FechaInicio: al.d_FechaInicio,
           evTeorica: al.v_EvTeorica || "",
           evPractica: al.v_EvPractica || "",
-          evFinal: al.v_EvFinal || "",
+          evFinal: (() => {
+            const v = (al.v_EvFinal || "").trim().toUpperCase();
+            if (v === "APROBADO") return "APROBADO";
+            if (v === "NO APROBADO") return "NO APROBADO";
+            return null;
+          })(),
           entregables: (al.entregables || []).map((e) => ({ ...e })),
           estado: "pendiente",
           errorMensaje: undefined,
@@ -171,7 +178,10 @@ export const ModalEvaluacionAlumno: React.FC<ModalEvaluacionAlumnoProps> = ({
     );
   };
 
-  const handleCambioFinal = (id: number, val: string) => {
+  const handleCambioFinal = (
+    id: number,
+    val: "APROBADO" | "NO APROBADO" | null
+  ) => {
     setFilas((prev) =>
       prev.map((f) =>
         f.i_CveAlumnoAgenda === id
@@ -247,7 +257,7 @@ export const ModalEvaluacionAlumno: React.FC<ModalEvaluacionAlumnoProps> = ({
         b_Asistio: f.asistio,
         v_EvTeorica: f.evTeorica.trim() === "" ? null : f.evTeorica.trim(),
         v_EvPractica: f.evPractica.trim() === "" ? null : f.evPractica.trim(),
-        v_EvFinal: f.evFinal.trim() === "" ? null : f.evFinal.trim(),
+        v_EvFinal: f.evFinal,
         Entregables: f.entregables.map((ent) => ({
           i_CveAgendaEntregable: ent.i_CveAgendaEntregable,
           b_Entregado: ent.v_Estatus === "ENTREGADO",
@@ -445,7 +455,7 @@ export const ModalEvaluacionAlumno: React.FC<ModalEvaluacionAlumnoProps> = ({
           >
             <table
               className="alegra-table alegra-table-compact"
-              style={{ minWidth: "980px", margin: 0 }}
+              style={{ minWidth: "1020px", margin: 0 }}
             >
               <thead
                 style={{
@@ -488,7 +498,8 @@ export const ModalEvaluacionAlumno: React.FC<ModalEvaluacionAlumnoProps> = ({
                   </th>
                   <th
                     style={{
-                      width: "105px",
+                      width: "135px",
+                      minWidth: "125px",
                       padding: "6px 12px",
                       textAlign: "center",
                       whiteSpace: "nowrap",
@@ -687,27 +698,36 @@ export const ModalEvaluacionAlumno: React.FC<ModalEvaluacionAlumnoProps> = ({
                             textAlign: "center",
                           }}
                         >
-                          <input
-                            type="text"
-                            maxLength={10}
+                          <select
                             className="form-control text-xs"
-                            placeholder="Pendiente"
-                            value={f.evFinal}
-                            onChange={(e) =>
-                              handleCambioFinal(f.i_CveAlumnoAgenda, e.target.value)
-                            }
+                            value={f.evFinal ?? ""}
+                            onChange={(e) => {
+                              const val =
+                                e.target.value === "APROBADO"
+                                  ? "APROBADO"
+                                  : e.target.value === "NO APROBADO"
+                                  ? "NO APROBADO"
+                                  : null;
+                              handleCambioFinal(f.i_CveAlumnoAgenda, val);
+                            }}
                             disabled={bloqueado}
                             style={{
-                              width: "76px",
                               height: "28px",
                               fontSize: "12px",
-                              textAlign: "center",
-                              margin: "0 auto",
-                              borderColor: tieneError ? "#f87171" : undefined,
+                              padding: "2px 6px",
                               borderRadius: "6px",
                               backgroundColor: bloqueado ? "#f8fafc" : "#ffffff",
+                              borderColor: tieneError ? "#f87171" : undefined,
+                              cursor: bloqueado ? "not-allowed" : "pointer",
+                              width: "125px",
+                              minWidth: "120px",
+                              margin: "0 auto",
                             }}
-                          />
+                          >
+                            <option value="">Pendiente</option>
+                            <option value="APROBADO">Aprobado</option>
+                            <option value="NO APROBADO">No aprobado</option>
+                          </select>
                         </td>
 
                         {/* Entregables */}
