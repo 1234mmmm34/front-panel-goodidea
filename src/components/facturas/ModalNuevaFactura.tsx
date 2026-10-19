@@ -17,7 +17,7 @@ import {
   Calendar,
   FileText,
 } from "lucide-react";
-import { EmpresaGetDto } from "@/types/empresas";
+import { EmpresaGetDto, PlantaGetDto } from "@/types/empresas";
 import { ServicioSinFacturaDto } from "@/types/facturas";
 import { EmpresasService } from "@/services/empresas.service";
 import { FacturasService } from "@/services/facturas.service";
@@ -85,6 +85,9 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
   const [searchEmpresaText, setSearchEmpresaText] = useState<string>("");
   const [dropdownEmpresaAbierto, setDropdownEmpresaAbierto] = useState<boolean>(false);
 
+  const [plantas, setPlantas] = useState<PlantaGetDto[]>([]);
+  const [plantaSeleccionadaId, setPlantaSeleccionadaId] = useState<number>(0);
+
   const [searchServicioText, setSearchServicioText] = useState<string>("");
   const [serviciosBusqueda, setServiciosBusqueda] = useState<ServicioSinFacturaDto[]>([]);
   const [buscandoServicios, setBuscandoServicios] = useState<boolean>(false);
@@ -135,6 +138,8 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
       setEmpresaSeleccionadaId("");
       setSearchEmpresaText("");
       setDropdownEmpresaAbierto(false);
+      setPlantas([]);
+      setPlantaSeleccionadaId(0);
       setSearchServicioText("");
       setServiciosBusqueda([]);
       setServiciosIndividuales([]);
@@ -174,6 +179,33 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
     );
   }, [empresas, searchEmpresaText]);
 
+  // Cargar plantas al seleccionar o cambiar empresa
+  useEffect(() => {
+    if (!empresaSeleccionadaId) {
+      setPlantas([]);
+      setPlantaSeleccionadaId(0);
+      return;
+    }
+
+    setPlantaSeleccionadaId(0);
+    const empId = Number(empresaSeleccionadaId);
+    if (!empId) {
+      setPlantas([]);
+      return;
+    }
+
+    EmpresasService.getPlantas(empId)
+      .then((res) => {
+        const ordenadas = (res || []).slice().sort((a, b) =>
+          (a.v_NombrePlanta || "").localeCompare(b.v_NombrePlanta || "")
+        );
+        setPlantas(ordenadas);
+      })
+      .catch(() => {
+        setPlantas([]);
+      });
+  }, [empresaSeleccionadaId]);
+
   // Búsqueda de servicios con Debounce
   useEffect(() => {
     if (!empresaSeleccionadaId) {
@@ -185,14 +217,15 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
       setBuscandoServicios(true);
       const res = await FacturasService.getServiciosSinFactura(
         Number(empresaSeleccionadaId),
-        searchServicioText
+        searchServicioText,
+        plantaSeleccionadaId
       );
       setServiciosBusqueda(res);
       setBuscandoServicios(false);
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [empresaSeleccionadaId, searchServicioText]);
+  }, [empresaSeleccionadaId, plantaSeleccionadaId, searchServicioText]);
 
   // Cerrar dropdowns al hacer clic afuera
   useEffect(() => {
@@ -1240,7 +1273,14 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                   </h4>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: "16px",
+                    alignItems: "flex-start",
+                  }}
+                >
                   {/* Select Empresa con Buscador */}
                   <div style={{ position: "relative" }} ref={containerEmpresaRef}>
                     <label
@@ -1274,6 +1314,8 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                           setDropdownEmpresaAbierto(true);
                           if (empresaSeleccionadaId) {
                             setEmpresaSeleccionadaId("");
+                            setPlantas([]);
+                            setPlantaSeleccionadaId(0);
                             setServiciosIndividuales([]);
                             setGrupos([]);
                           }
@@ -1285,6 +1327,8 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                           onClick={() => {
                             setEmpresaSeleccionadaId("");
                             setSearchEmpresaText("");
+                            setPlantas([]);
+                            setPlantaSeleccionadaId(0);
                             setServiciosIndividuales([]);
                             setGrupos([]);
                             setDropdownEmpresaAbierto(true);
@@ -1346,6 +1390,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                 setEmpresaSeleccionadaId(emp.iD_Empresa.toString());
                                 setSearchEmpresaText(emp.s_RazonSocial || "");
                                 setDropdownEmpresaAbierto(false);
+                                setPlantaSeleccionadaId(0);
                                 setServiciosIndividuales([]);
                                 setGrupos([]);
                                 setErrorPaso1(null);
@@ -1382,6 +1427,48 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                         )}
                       </div>
                     )}
+                  </div>
+
+                  {/* Select Planta */}
+                  <div>
+                    <label
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: "#4a6580",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Planta
+                    </label>
+                    <select
+                      className="form-select"
+                      disabled={!empresaSeleccionadaId}
+                      style={{
+                        borderRadius: "8px",
+                        height: "36px",
+                        fontSize: "13px",
+                        border: "1px solid #d0dce8",
+                        backgroundColor: !empresaSeleccionadaId ? "#f8fafc" : "#ffffff",
+                        color: !empresaSeleccionadaId ? "#94a3b8" : "#1e3a5f",
+                        cursor: !empresaSeleccionadaId ? "not-allowed" : "pointer",
+                        width: "100%",
+                      }}
+                      value={plantaSeleccionadaId}
+                      onChange={(e) => setPlantaSeleccionadaId(Number(e.target.value))}
+                    >
+                      <option value={0}>Todas las plantas</option>
+                      {plantas.map((p) => {
+                        const idPlanta = p.i_CvePlanta ?? p.iCvePlanta ?? p.id_planta ?? 0;
+                        const nombrePlanta = p.v_NombrePlanta || p.v_Nombre || `Planta ${idPlanta}`;
+                        return (
+                          <option key={`planta-${idPlanta}`} value={idPlanta}>
+                            {nombrePlanta}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
 
                   {/* Autocomplete Buscador por Servicio / Cotización */}

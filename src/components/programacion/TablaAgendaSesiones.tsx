@@ -172,6 +172,9 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
                     <div style={{ fontWeight: 700, color: "#1e3a5f" }} className="uppercase">
                       {item.v_Empresa || "—"}
                     </div>
+                    {item.v_Planta && item.v_Planta.trim() !== "" && (
+                      <span className="subtext">{item.v_Planta}</span>
+                    )}
                   </td>
 
                   {/* 5. Estatus */}

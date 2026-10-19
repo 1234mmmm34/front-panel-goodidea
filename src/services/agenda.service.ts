@@ -114,6 +114,7 @@ export const AgendaService = {
         d_FechaInicio: item.d_FechaInicio ?? item.f_FechaInicio ?? item.FechaInicio ?? null,
         d_FechaFin: item.d_FechaFin ?? item.f_FechaFin ?? item.FechaFin ?? null,
         v_Empresa: item.v_Empresa ?? item.s_RazonSocial ?? item.v_NombreEmpresa ?? "",
+        v_Planta: item.v_Planta ?? item.vPlanta ?? item.s_Planta ?? null,
         v_Servicio: item.v_Servicio ?? item.s_NombreServicio ?? item.v_NombreServicio ?? "",
         v_TipoServicio: item.v_TipoServicio ?? item.s_TipoServicio ?? "",
         v_Titular: item.v_Titular ?? item.v_NomTitular ?? item.v_NombreTitular ?? "",

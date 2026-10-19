@@ -280,15 +280,20 @@ export const FacturasService = {
   },
 
   /**
-   * GET facturas/GetServiciosSinFactura?i_CveEmpresa={id}&v_Busqueda={texto}
+   * GET facturas/GetServiciosSinFactura?i_CveEmpresa={id}&v_Busqueda={texto}&i_CvePlanta={id}
    */
   async getServiciosSinFactura(
     iCveEmpresa: number,
-    vBusqueda: string = ""
+    vBusqueda: string = "",
+    iCvePlanta: number = 0
   ): Promise<ServicioSinFacturaDto[]> {
     return httpDefensivo(async () => {
       const resp = await apiClient.get<any>("facturas/GetServiciosSinFactura", {
-        params: { i_CveEmpresa: iCveEmpresa, v_Busqueda: vBusqueda },
+        params: {
+          i_CveEmpresa: iCveEmpresa,
+          v_Busqueda: vBusqueda,
+          i_CvePlanta: iCvePlanta,
+        },
       });
       const raw = Array.isArray(resp.data)
         ? resp.data
