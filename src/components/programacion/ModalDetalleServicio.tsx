@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   X,
   Calendar,
@@ -26,6 +26,7 @@ import { ModalReprogramarSesion } from "./ModalReprogramarSesion";
 import { ModalCancelarSesion } from "./ModalCancelarSesion";
 import { ModalEditarInstructorSesion } from "./ModalEditarInstructorSesion";
 import { ModalProgramarServicio } from "./ModalProgramarServicio";
+import { ModalConfirmarEliminar } from "@/components/ui/ModalConfirmarEliminar";
 import {
   AgendaDetalleGetDto,
   AgendaDetalleUpdateDto,
@@ -36,6 +37,9 @@ import {
   SesionDetalleDto,
   ProveedorGetDto,
   CambiarProveedorDto,
+  GastoServicio,
+  GuardarGastoPayload,
+  ProveedorRapidoPayload,
 } from "@/types/servicios";
 import { AgendaService } from "@/services/agenda.service";
 import { AlumnosService } from "@/services/alumnos.service";
@@ -44,6 +48,7 @@ import { entregables as entregablesCat } from "@/types/catalogos";
 import { VerDocumento } from "@/services/archivos.service";
 import { formatearFechaCorta, esFechaPasada } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
+import { obtenerSesionActual } from "@/lib/api-client";
 
 interface Props {
   abierto: boolean;
@@ -92,6 +97,29 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [formNoCotizacionProv, setFormNoCotizacionProv] = useState<string>("");
   const [formNoOrdenCompraProv, setFormNoOrdenCompraProv] = useState<string>("");
   const [guardandoProveedor, setGuardandoProveedor] = useState<boolean>(false);
+
+  // Estados para Gastos Extras
+  const [modalGastoAbierto, setModalGastoAbierto] = useState<boolean>(false);
+  const [gastoEditando, setGastoEditando] = useState<GastoServicio | null>(null);
+  const [formGastoProveedorId, setFormGastoProveedorId] = useState<string>("");
+  const [formGastoConcepto, setFormGastoConcepto] = useState<string>("");
+  const [formGastoUnidad, setFormGastoUnidad] = useState<string>("Pieza");
+  const [formGastoCantidad, setFormGastoCantidad] = useState<string>("1");
+  const [formGastoCostoUnitario, setFormGastoCostoUnitario] = useState<string>("");
+  const [formGastoNoCotizacion, setFormGastoNoCotizacion] = useState<string>("");
+  const [formGastoNoOrdenCompra, setFormGastoNoOrdenCompra] = useState<string>("");
+  const [guardandoGasto, setGuardandoGasto] = useState<boolean>(false);
+
+  // Alta rápida de proveedor dentro del sub-modal de gasto
+  const [mostrarAltaRapidaProveedor, setMostrarAltaRapidaProveedor] = useState<boolean>(false);
+  const [altaRazonSocial, setAltaRazonSocial] = useState<string>("");
+  const [altaRFC, setAltaRFC] = useState<string>("");
+  const [altaGiro, setAltaGiro] = useState<string>("");
+  const [guardandoAltaRapida, setGuardandoAltaRapida] = useState<boolean>(false);
+
+  // Eliminar gasto
+  const [gastoAEliminar, setGastoAEliminar] = useState<GastoServicio | null>(null);
+  const [eliminandoGasto, setEliminandoGasto] = useState<boolean>(false);
 
   // Estados locales editables
   const [cotizacionGI, setCotizacionGI] = useState<string>("");
@@ -178,7 +206,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     try {
       const res = await AgendaService.cambiarProveedor(payload);
       if (res.exito || res.status === 200) {
-        toast.success("Proveedor actualizado");
+        toast.success("Servicio externo actualizado");
         setModalProveedorAbierto(false);
         await cargarDetalle();
         if (onGuardadoExitoso) onGuardadoExitoso();
@@ -194,6 +222,289 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     } finally {
       setGuardandoProveedor(false);
     }
+  };
+
+  const listaGastos: GastoServicio[] = useMemo(() => {
+    return (detalle?.Gastos || (detalle as any)?.gastos || []) as GastoServicio[];
+  }, [detalle]);
+
+  const totalGastosSubtotal = useMemo(() => {
+    return listaGastos.reduce((acc, g) => acc + (Number(g.d_Subtotal) || 0), 0);
+  }, [listaGastos]);
+
+  const proveedoresFiltradosGasto = useMemo<{ cve: number; nombre: string }[]>(() => {
+    return proveedoresList
+      .map((p: any) => {
+        const cve = Number(p.i_CveProveedor ?? p.iD_Proveedor ?? p.id_proveedor);
+        const nombre = p.v_RazonSocial || p.v_Nombre || p.s_RazonSocial || `Proveedor #${cve}`;
+        return { cve, nombre };
+      })
+      .filter((p: { cve: number; nombre: string }) => Boolean(p.cve));
+  }, [proveedoresList]);
+
+  const subtotalGastoCalculado = useMemo(() => {
+    const cant = Number(formGastoCantidad) || 0;
+    const precio = Number(formGastoCostoUnitario) || 0;
+    return cant * precio;
+  }, [formGastoCantidad, formGastoCostoUnitario]);
+
+  const abrirModalAgregarGasto = async () => {
+    if (proveedoresList.length === 0) {
+      const list = await AgendaService.getProveedores();
+      setProveedoresList(list || []);
+    }
+    setGastoEditando(null);
+    setFormGastoProveedorId("");
+    setFormGastoConcepto("");
+    setFormGastoUnidad("Pieza");
+    setFormGastoCantidad("1");
+    setFormGastoCostoUnitario("");
+    setFormGastoNoCotizacion("");
+    setFormGastoNoOrdenCompra("");
+    setMostrarAltaRapidaProveedor(false);
+    setAltaRazonSocial("");
+    setAltaRFC("");
+    setAltaGiro("");
+    setModalGastoAbierto(true);
+  };
+
+  const abrirModalEditarGasto = async (gasto: GastoServicio) => {
+    if (proveedoresList.length === 0) {
+      const list = await AgendaService.getProveedores();
+      setProveedoresList(list || []);
+    }
+    setGastoEditando(gasto);
+    setFormGastoProveedorId(gasto.i_CveProveedor ? String(gasto.i_CveProveedor) : "");
+    setFormGastoConcepto(gasto.v_Concepto || "");
+    setFormGastoUnidad(gasto.v_Unidad || "Pieza");
+    setFormGastoCantidad(gasto.i_Cantidad != null ? String(gasto.i_Cantidad) : "1");
+    setFormGastoCostoUnitario(gasto.d_CostoUnitario != null ? String(gasto.d_CostoUnitario) : "");
+    setFormGastoNoCotizacion(gasto.v_NoCotizacion || "");
+    setFormGastoNoOrdenCompra(gasto.v_NoOrdenCompra || "");
+    setMostrarAltaRapidaProveedor(false);
+    setAltaRazonSocial("");
+    setAltaRFC("");
+    setAltaGiro("");
+    setModalGastoAbierto(true);
+  };
+
+  const handleGuardarGasto = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!detalle) return;
+
+    if (mostrarAltaRapidaProveedor) {
+      toast.warning("Completa o cancela el alta rápida del nuevo proveedor antes de guardar el gasto.");
+      return;
+    }
+
+    if (!formGastoProveedorId || formGastoProveedorId === "NUEVO") {
+      toast.error("Selecciona un proveedor para el gasto.");
+      return;
+    }
+
+    if (!formGastoConcepto.trim()) {
+      toast.error("Ingresa el concepto del gasto.");
+      return;
+    }
+
+    const cantNum = Number(formGastoCantidad);
+    if (isNaN(cantNum) || cantNum <= 0) {
+      toast.error("La cantidad debe ser mayor a 0.");
+      return;
+    }
+
+    const costoNum = Number(formGastoCostoUnitario);
+    if (isNaN(costoNum) || costoNum <= 0) {
+      toast.error("El costo unitario (sin IVA) debe ser mayor a 0.");
+      return;
+    }
+
+    const payload: GuardarGastoPayload = {
+      i_CveGasto: gastoEditando ? gastoEditando.i_CveGasto : 0,
+      i_CveServAgendaDet: detalle.i_CveServAgendaDet,
+      i_CveProveedor: Number(formGastoProveedorId),
+      v_Concepto: formGastoConcepto.trim(),
+      v_Unidad: formGastoUnidad || "Pieza",
+      i_Cantidad: cantNum,
+      d_CostoUnitario: costoNum,
+      v_NoCotizacion: formGastoNoCotizacion.trim() || null,
+      v_NoOrdenCompra: formGastoNoOrdenCompra.trim() || null,
+    };
+
+    setGuardandoGasto(true);
+    try {
+      const res = await AgendaService.guardarGasto(payload);
+      if (res.exito || res.status === 200) {
+        toast.success("Gasto guardado");
+        setModalGastoAbierto(false);
+        await cargarDetalle();
+        if (onGuardadoExitoso) onGuardadoExitoso();
+      } else if (res.status === 409) {
+        toast.warning(res.mensaje || "Conflicto al guardar el gasto.");
+      } else if (res.status === 400) {
+        toast.error(res.mensaje || "Datos de gasto no válidos.");
+      } else {
+        toast.error(res.mensaje || "Error al guardar el gasto.");
+      }
+    } catch {
+      toast.error("Ocurrió un error al guardar el gasto.");
+    } finally {
+      setGuardandoGasto(false);
+    }
+  };
+
+  const handleCrearProveedorRapido = async () => {
+    if (!altaRazonSocial.trim()) {
+      toast.error("Ingresa la razón social del proveedor.");
+      return;
+    }
+    const rfcLimpio = altaRFC.trim().toUpperCase().replace(/\s+/g, "");
+    if (!rfcLimpio) {
+      toast.error("Ingresa el RFC del proveedor.");
+      return;
+    }
+    if (!altaGiro.trim()) {
+      toast.error("Ingresa el giro o actividad del proveedor.");
+      return;
+    }
+
+    const sesion = obtenerSesionActual();
+    const tenantId = sesion?.id_tenant ?? 1;
+
+    const payload: ProveedorRapidoPayload = {
+      S_RazonSocial: altaRazonSocial.trim(),
+      S_RFC: rfcLimpio,
+      S_GiroActividad: altaGiro.trim(),
+      i_CveTenant: tenantId,
+    };
+
+    setGuardandoAltaRapida(true);
+    try {
+      const res = await AgendaService.crearProveedorRapido(payload);
+      if (res.exito && res.data) {
+        const nuevoProv: ProveedorGetDto = {
+          i_CveProveedor: res.data.i_CveProveedor,
+          v_RazonSocial: res.data.v_Nombre,
+          v_Nombre: res.data.v_Nombre,
+        } as any;
+        setProveedoresList((prev) => [...prev, nuevoProv]);
+        setFormGastoProveedorId(String(res.data.i_CveProveedor));
+        setMostrarAltaRapidaProveedor(false);
+        setAltaRazonSocial("");
+        setAltaRFC("");
+        setAltaGiro("");
+        toast.success("Proveedor dado de alta");
+      } else if (res.status === 409) {
+        toast.warning(res.mensaje || "El RFC ya existe.");
+      } else if (res.status === 400) {
+        toast.error(res.mensaje || "Datos de proveedor no válidos.");
+      } else {
+        toast.error(res.mensaje || "Error al registrar el proveedor.");
+      }
+    } catch {
+      toast.error("Ocurrió un error al dar de alta el proveedor.");
+    } finally {
+      setGuardandoAltaRapida(false);
+    }
+  };
+
+  const handleConfirmarEliminarGasto = async () => {
+    if (!gastoAEliminar) return;
+    setEliminandoGasto(true);
+    try {
+      const res = await AgendaService.eliminarGasto(gastoAEliminar.i_CveGasto);
+      if (res.exito || res.status === 200) {
+        toast.success("Gasto eliminado");
+        setGastoAEliminar(null);
+        await cargarDetalle();
+        if (onGuardadoExitoso) onGuardadoExitoso();
+      } else if (res.status === 409) {
+        toast.warning(res.mensaje || "Conflicto al eliminar el gasto.");
+      } else if (res.status === 400) {
+        toast.error(res.mensaje || "No se pudo eliminar el gasto.");
+      } else {
+        toast.error(res.mensaje || "Error al eliminar el gasto.");
+      }
+    } catch {
+      toast.error("Ocurrió un error al eliminar el gasto.");
+    } finally {
+      setEliminandoGasto(false);
+    }
+  };
+
+  const renderEstadoPagoBadge = (estado: string | null) => {
+    if (!estado) return <span style={{ color: "#94a3b8" }}>—</span>;
+    const est = estado.trim().toLowerCase();
+    if (est === "pagada" || est === "pagado") {
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "2px 8px",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: 600,
+            backgroundColor: "#dcfce7",
+            color: "#166534",
+            border: "1px solid #bbf7d0",
+          }}
+        >
+          Pagada
+        </span>
+      );
+    }
+    if (est === "abonada" || est === "abonado") {
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "2px 8px",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: 600,
+            backgroundColor: "#fef3c7",
+            color: "#92400e",
+            border: "1px solid #fde68a",
+          }}
+        >
+          Abonada
+        </span>
+      );
+    }
+    if (est === "sin pagar") {
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "2px 8px",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: 600,
+            backgroundColor: "#f1f5f9",
+            color: "#475569",
+            border: "1px solid #e2e8f0",
+          }}
+        >
+          Sin pagar
+        </span>
+      );
+    }
+    return (
+      <span
+        style={{
+          display: "inline-block",
+          padding: "2px 8px",
+          borderRadius: "12px",
+          fontSize: "11px",
+          fontWeight: 600,
+          backgroundColor: "#f1f5f9",
+          color: "#475569",
+          border: "1px solid #e2e8f0",
+        }}
+      >
+        {estado}
+      </span>
+    );
   };
 
   const cargarAlumnosInscritos = async (idServAgendaDet: number) => {
@@ -1721,11 +2032,11 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                 )}
               </div>
 
-              {/* BLOQUE 1.4.2 — Información del Proveedor */}
+              {/* BLOQUE 1.4.2 — Servicio externo contratado */}
               <div style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                   <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
-                    Información del proveedor
+                    Servicio externo contratado
                   </h4>
                   {detalle.i_CveProveedor && Number(detalle.i_CveProveedor) > 0 ? (
                     <button
@@ -1743,7 +2054,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                         fontWeight: 400,
                       }}
                       onClick={abrirModalProveedor}
-                      title="Editar información del proveedor"
+                      title="Editar servicio externo"
                     >
                       <Edit2 size={12} style={{ color: "#94a3b8" }} />
                       <span>Editar</span>
@@ -1755,7 +2066,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "4px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
                       <span style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>
-                        Sin proveedor asignado
+                        Sin servicio externo contratado
                       </span>
                       <button
                         type="button"
@@ -1764,8 +2075,8 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                         disabled={tieneSesionConInstructorApoyo}
                         title={
                           tieneSesionConInstructorApoyo
-                            ? "Quita el instructor de apoyo de las sesiones para poder agregar un proveedor."
-                            : "Agregar proveedor"
+                            ? "Quita el instructor de apoyo de las sesiones para poder agregar un servicio externo."
+                            : "Agregar servicio externo"
                         }
                         style={{
                           display: "inline-flex",
@@ -1779,19 +2090,19 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                         }}
                       >
                         <Plus size={14} />
-                        <span>Agregar proveedor</span>
+                        <span>Agregar servicio externo</span>
                       </button>
                     </div>
                     {tieneSesionConInstructorApoyo && (
                       <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
-                        Quita el instructor de apoyo de las sesiones para poder agregar un proveedor.
+                        Quita el instructor de apoyo de las sesiones para poder agregar un servicio externo.
                       </p>
                     )}
                   </div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px" }}>
                     <div>
-                      <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>proveedor</span>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>servicio externo</span>
                       <p style={{ fontSize: "13px", fontWeight: 500, color: "#1e293b", margin: 0 }}>
                         {detalle.v_Proveedor || "—"}
                       </p>
@@ -1826,6 +2137,149 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                         {detalle.v_NoOrdenCompraProv || "—"}
                       </p>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* BLOQUE 1.4.3 — Gastos extras */}
+              <div style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
+                    Gastos extras
+                  </h4>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={abrirModalAgregarGasto}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "12px",
+                      padding: "4px 12px",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Plus size={14} />
+                    <span>Agregar gasto</span>
+                  </button>
+                </div>
+
+                {listaGastos.length === 0 ? (
+                  <div style={{ paddingTop: "4px" }}>
+                    <span style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>
+                      Sin gastos registrados
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "6px", backgroundColor: "#ffffff" }}>
+                    <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", textAlign: "left" }}>
+                      <thead>
+                        <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#64748b" }}>
+                          <th style={{ padding: "8px 12px", fontWeight: 500 }}>Proveedor</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 500 }}>Concepto</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "right" }}>Cantidad</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "right" }}>Costo unit. s/IVA</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "right" }}>Subtotal s/IVA</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 500 }}>Cotización</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 500 }}>OC</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "center" }}>Estado de pago</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "center" }}>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {listaGastos.map((gasto, gIdx) => (
+                          <tr key={`gasto-${gasto.i_CveGasto || gIdx}`} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "8px 12px", color: "#1e293b", fontWeight: 500 }}>
+                              {gasto.v_Proveedor || "—"}
+                            </td>
+                            <td style={{ padding: "8px 12px", color: "#334155" }}>
+                              {gasto.v_Concepto}
+                            </td>
+                            <td style={{ padding: "8px 12px", fontFamily: "var(--font-mono)", textAlign: "right", color: "#334155" }}>
+                              {`${Number(gasto.i_Cantidad).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${gasto.v_Unidad || "Pieza"}`}
+                            </td>
+                            <td style={{ padding: "8px 12px", fontFamily: "var(--font-mono)", textAlign: "right", color: "#334155" }}>
+                              ${(gasto.d_CostoUnitario ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td style={{ padding: "8px 12px", fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 600, color: "#0f172a" }}>
+                              ${(gasto.d_Subtotal ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td style={{ padding: "8px 12px", color: "#64748b" }}>
+                              {gasto.v_NoCotizacion || "—"}
+                            </td>
+                            <td style={{ padding: "8px 12px", color: "#64748b" }}>
+                              {gasto.v_NoOrdenCompra || "—"}
+                            </td>
+                            <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                              {renderEstadoPagoBadge(gasto.v_EstadoPago)}
+                            </td>
+                            <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                                <button
+                                  type="button"
+                                  className="btn-icon"
+                                  onClick={() => abrirModalEditarGasto(gasto)}
+                                  title="Editar gasto"
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: "#64748b",
+                                    cursor: "pointer",
+                                    padding: "4px",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-icon"
+                                  disabled={gasto.b_TienePagos}
+                                  title={
+                                    gasto.b_TienePagos
+                                      ? "Este gasto ya tiene pagos realizados"
+                                      : "Eliminar gasto"
+                                  }
+                                  onClick={() => {
+                                    if (!gasto.b_TienePagos) {
+                                      setGastoAEliminar(gasto);
+                                    }
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: gasto.b_TienePagos ? "#94a3b8" : "#dc3545",
+                                    cursor: gasto.b_TienePagos ? "not-allowed" : "pointer",
+                                    opacity: gasto.b_TienePagos ? 0.4 : 1,
+                                    padding: "4px",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot style={{ backgroundColor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
+                        <tr>
+                          <td colSpan={4} style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "#334155", fontSize: "12px" }}>
+                            Total gastos s/IVA
+                          </td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, fontFamily: "var(--font-mono)", color: "#2B8FCC", fontSize: "13px" }}>
+                            ${totalGastosSubtotal.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td colSpan={4}></td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 )}
               </div>
@@ -2451,8 +2905,8 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
             >
               <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#0f172a", margin: 0 }}>
                 {detalle?.i_CveProveedor && Number(detalle.i_CveProveedor) > 0
-                  ? "Editar información del proveedor"
-                  : "Agregar proveedor"}
+                  ? "Editar servicio externo"
+                  : "Agregar servicio externo"}
               </h3>
               <button
                 type="button"
@@ -2468,7 +2922,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
             <form onSubmit={handleGuardarProveedor} style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
               <div>
                 <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
-                  Proveedor <span style={{ color: "#dc3545" }}>*</span>
+                  Servicio externo <span style={{ color: "#dc3545" }}>*</span>
                 </label>
                 <select
                   className="form-select"
@@ -2477,7 +2931,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   disabled={guardandoProveedor}
                   style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
                 >
-                  <option value="">— Sin proveedor —</option>
+                  <option value="">— Sin servicio externo —</option>
                   {proveedoresList.map((p: any) => {
                     const cve = p.i_CveProveedor ?? p.iD_Proveedor ?? p.id_proveedor;
                     const nombre = p.v_RazonSocial || p.v_Nombre || p.s_RazonSocial || `Proveedor #${cve}`;
@@ -2567,6 +3021,392 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
           </div>
         </div>
       )}
+
+      {/* Sub-modal Agregar / Editar Gasto Extra */}
+      {modalGastoAbierto && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(3px)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "12px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              width: "100%",
+              maxWidth: "520px",
+              maxHeight: "90vh",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "16px 20px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: "#f8fafc",
+              }}
+            >
+              <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#0f172a", margin: 0 }}>
+                {gastoEditando ? "Editar gasto" : "Agregar gasto"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalGastoAbierto(false)}
+                disabled={guardandoGasto || guardandoAltaRapida}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body Form */}
+            <form
+              onSubmit={handleGuardarGasto}
+              style={{
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "14px",
+                overflowY: "auto",
+              }}
+            >
+              {/* Nota si el gasto ya tiene pagos */}
+              {gastoEditando?.b_TienePagos && (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    backgroundColor: "#fff6da",
+                    border: "1px solid #ffe89a",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    color: "#856404",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <AlertTriangle size={16} style={{ flexShrink: 0, color: "#856404" }} />
+                  <span>
+                    Este gasto ya tiene pagos realizados; solo puedes cambiar concepto, unidad, cotización y orden de compra.
+                  </span>
+                </div>
+              )}
+
+              {/* Proveedor: select normal con lista de proveedores y opción + Nuevo proveedor */}
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                  Proveedor <span style={{ color: "#dc3545" }}>*</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={formGastoProveedorId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "NUEVO") {
+                      setMostrarAltaRapidaProveedor(true);
+                      setFormGastoProveedorId("NUEVO");
+                    } else {
+                      setFormGastoProveedorId(val);
+                      setMostrarAltaRapidaProveedor(false);
+                    }
+                  }}
+                  disabled={guardandoGasto || Boolean(gastoEditando?.b_TienePagos)}
+                  style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                >
+                  <option value="">— Selecciona un proveedor —</option>
+                  {proveedoresFiltradosGasto.map((p: { cve: number; nombre: string }) => (
+                    <option key={p.cve} value={p.cve}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                  {!gastoEditando?.b_TienePagos && (
+                    <option value="NUEVO" style={{ fontWeight: 600, color: "#2B8FCC" }}>
+                      + Nuevo proveedor
+                    </option>
+                  )}
+                </select>
+
+                {/* Recuadro Alta Rápida de Proveedor */}
+                {mostrarAltaRapidaProveedor && (
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      padding: "14px",
+                      borderRadius: "8px",
+                      border: "1.5px dashed #93c5fd",
+                      backgroundColor: "#f0f7ff",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e40af" }}>
+                        Alta rápida de proveedor
+                      </span>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "4px" }}>
+                        Razón social <span style={{ color: "#dc3545" }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        placeholder="Ej. Suministros Industriales S.A. de C.V."
+                        value={altaRazonSocial}
+                        onChange={(e) => setAltaRazonSocial(e.target.value)}
+                        disabled={guardandoAltaRapida}
+                        style={{ fontSize: "12px", height: "32px", borderRadius: "6px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "4px" }}>
+                        RFC <span style={{ color: "#dc3545" }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        placeholder="Ej. SIN120315AB1"
+                        maxLength={13}
+                        value={altaRFC}
+                        onChange={(e) => setAltaRFC(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                        disabled={guardandoAltaRapida}
+                        style={{ fontSize: "12px", height: "32px", borderRadius: "6px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "4px" }}>
+                        Giro <span style={{ color: "#dc3545" }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        placeholder="Ej. Mantenimiento y consumibles"
+                        value={altaGiro}
+                        onChange={(e) => setAltaGiro(e.target.value)}
+                        disabled={guardandoAltaRapida}
+                        style={{ fontSize: "12px", height: "32px", borderRadius: "6px" }}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setMostrarAltaRapidaProveedor(false);
+                          setFormGastoProveedorId("");
+                          setAltaRazonSocial("");
+                          setAltaRFC("");
+                          setAltaGiro("");
+                        }}
+                        disabled={guardandoAltaRapida}
+                        style={{ fontSize: "12px", padding: "4px 12px" }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        style={{ backgroundColor: "#2B8FCC", fontSize: "12px", padding: "4px 14px" }}
+                        onClick={handleCrearProveedorRapido}
+                        disabled={guardandoAltaRapida}
+                      >
+                        {guardandoAltaRapida ? "Registrando..." : "Dar de alta"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Concepto */}
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                  Concepto <span style={{ color: "#dc3545" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  maxLength={250}
+                  className="form-control"
+                  placeholder="Ej. Válvulas de presión"
+                  value={formGastoConcepto}
+                  onChange={(e) => setFormGastoConcepto(e.target.value)}
+                  disabled={guardandoGasto}
+                  style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                />
+              </div>
+
+              {/* Cantidad y Unidad */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                    Cantidad <span style={{ color: "#dc3545" }}>*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    className="form-control"
+                    placeholder="1"
+                    value={formGastoCantidad}
+                    onChange={(e) => setFormGastoCantidad(e.target.value)}
+                    disabled={guardandoGasto || Boolean(gastoEditando?.b_TienePagos)}
+                    style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                    Unidad <span style={{ color: "#dc3545" }}>*</span>
+                  </label>
+                  <select
+                    className="form-select"
+                    value={formGastoUnidad}
+                    onChange={(e) => setFormGastoUnidad(e.target.value)}
+                    disabled={guardandoGasto}
+                    style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                  >
+                    <option value="Pieza">Pieza</option>
+                    <option value="Hora">Hora</option>
+                    <option value="Servicio">Servicio</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Costo Unitario y Subtotal */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                    Costo unitario (sin IVA) <span style={{ color: "#dc3545" }}>*</span>
+                  </label>
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#64748b", fontSize: "13px" }}>$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      className="form-control"
+                      placeholder="0.00"
+                      value={formGastoCostoUnitario}
+                      onChange={(e) => setFormGastoCostoUnitario(e.target.value)}
+                      disabled={guardandoGasto || Boolean(gastoEditando?.b_TienePagos)}
+                      style={{ fontSize: "13px", height: "38px", borderRadius: "8px", paddingLeft: "24px" }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                    Subtotal (sin IVA)
+                  </label>
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#64748b", fontSize: "13px" }}>$</span>
+                    <input
+                      type="text"
+                      readOnly
+                      className="form-control"
+                      value={`$${subtotalGastoCalculado.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      style={{
+                        fontSize: "13px",
+                        height: "38px",
+                        borderRadius: "8px",
+                        paddingLeft: "24px",
+                        backgroundColor: "#f8fafc",
+                        color: "#334155",
+                        fontWeight: 600,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* No. Cotización y Orden de Compra */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                    No. cotización
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ej. COT-PROV-001"
+                    value={formGastoNoCotizacion}
+                    onChange={(e) => setFormGastoNoCotizacion(e.target.value)}
+                    disabled={guardandoGasto}
+                    style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                    Orden de compra
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ej. OC-PROV-99"
+                    value={formGastoNoOrdenCompra}
+                    onChange={(e) => setFormGastoNoOrdenCompra(e.target.value)}
+                    disabled={guardandoGasto}
+                    style={{ fontSize: "13px", height: "38px", borderRadius: "8px" }}
+                  />
+                </div>
+              </div>
+
+              {/* Footer acciones */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setModalGastoAbierto(false)}
+                  disabled={guardandoGasto || guardandoAltaRapida}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  style={{ backgroundColor: "#2B8FCC" }}
+                  disabled={guardandoGasto || guardandoAltaRapida || mostrarAltaRapidaProveedor}
+                >
+                  {guardandoGasto ? "Guardando..." : "Guardar cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Eliminar Gasto Extra */}
+      <ModalConfirmarEliminar
+        abierto={!!gastoAEliminar}
+        nombreElemento={gastoAEliminar?.v_Concepto || ""}
+        mensajePersonalizado={gastoAEliminar ? `¿Deseas eliminar el gasto "${gastoAEliminar.v_Concepto}"?` : undefined}
+        onCerrar={() => setGastoAEliminar(null)}
+        onConfirmar={handleConfirmarEliminarGasto}
+        cargando={eliminandoGasto}
+      />
     </div>
   );
 };

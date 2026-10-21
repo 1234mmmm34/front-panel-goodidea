@@ -239,7 +239,7 @@ export const FiltrosGastos: React.FC<Props> = ({
               border: "1px solid #cbd5e1",
               outline: "none",
             }}
-            placeholder="Buscar por proveedor, servicio, OC o cotización..."
+            placeholder="Buscar por proveedor, concepto, OC o cotización..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             onKeyDown={handleKeyDownSearch}

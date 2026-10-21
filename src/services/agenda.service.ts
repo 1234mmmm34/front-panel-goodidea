@@ -15,6 +15,9 @@ import {
   CambiarProveedorDto,
   CambiarTitularesSesionDto,
   ProgramarServicioDto,
+  GastoServicio,
+  GuardarGastoPayload,
+  ProveedorRapidoPayload,
 } from "@/types/servicios";
 
 export const AgendaService = {
@@ -253,6 +256,7 @@ export const AgendaService = {
       const alumnos = data.Alumnos || data.alumnos || [];
       const facturas = data.Facturas || data.facturas || [];
       const entregablesRaw = data.Entregables || data.entregables || [];
+      const gastosRaw = data.Gastos || data.gastos || [];
 
       const entregablesParsed = (Array.isArray(entregablesRaw) ? entregablesRaw : []).map((item: any) => ({
         ...item,
@@ -292,6 +296,20 @@ export const AgendaService = {
         Alumnos: Array.isArray(alumnos) ? alumnos : [],
         Facturas: Array.isArray(facturas) ? facturas : [],
         Entregables: entregablesParsed,
+        Gastos: (Array.isArray(gastosRaw) ? gastosRaw : []).map((g: any) => ({
+          i_CveGasto: g.i_CveGasto ?? g.i_cveGasto ?? g.iCveGasto ?? g.id ?? 0,
+          i_CveProveedor: g.i_CveProveedor ?? g.i_cveProveedor ?? g.iCveProveedor ?? 0,
+          v_Proveedor: g.v_Proveedor ?? g.v_proveedor ?? g.vProveedor ?? null,
+          v_Concepto: g.v_Concepto ?? g.v_concepto ?? g.vConcepto ?? "",
+          v_Unidad: g.v_Unidad ?? g.v_unidad ?? g.vUnidad ?? "Pieza",
+          i_Cantidad: Number(g.i_Cantidad ?? g.i_cantidad ?? g.iCantidad ?? 0),
+          d_CostoUnitario: Number(g.d_CostoUnitario ?? g.d_costoUnitario ?? g.dCostoUnitario ?? 0),
+          d_Subtotal: Number(g.d_Subtotal ?? g.d_subtotal ?? g.dSubtotal ?? 0),
+          v_NoCotizacion: g.v_NoCotizacion ?? g.v_noCotizacion ?? g.vNoCotizacion ?? null,
+          v_NoOrdenCompra: g.v_NoOrdenCompra ?? g.v_noOrdenCompra ?? g.vNoOrdenCompra ?? null,
+          v_EstadoPago: g.v_EstadoPago ?? g.v_estadoPago ?? g.vEstadoPago ?? null,
+          b_TienePagos: Boolean(g.b_TienePagos ?? g.b_tienePagos ?? g.bTienePagos),
+        })),
       };
     }, null);
   },
@@ -410,6 +428,143 @@ export const AgendaService = {
         }
         if (!msg) {
           msg = data.mensaje || data.message || data.error || (typeof data === "string" ? data : "");
+        }
+      } else if (typeof data === "string" && data.trim()) {
+        msg = data;
+      }
+      if (!msg) {
+        msg = err?.message || "Ocurrió un error al procesar la solicitud.";
+      }
+      return { status, exito: false, mensaje: msg };
+    }
+  },
+
+  /**
+   * Guarda o actualiza un gasto extra del servicio agendado.
+   * Endpoint: POST proveedores/GuardarGasto
+   */
+  async guardarGasto(payload: GuardarGastoPayload): Promise<{ status: number; exito: boolean; mensaje?: string }> {
+    try {
+      const resp = await apiClient.post("proveedores/GuardarGasto", payload);
+      if (resp.status >= 200 && resp.status < 300) {
+        return { status: resp.status, exito: true };
+      }
+      return {
+        status: resp.status,
+        exito: false,
+        mensaje: resp.data?.mensaje || resp.data?.message || resp.data?.error || "Error al guardar el gasto",
+      };
+    } catch (err: any) {
+      const status = err?.response?.status || 500;
+      const data = err?.response?.data;
+      let msg = "";
+
+      if (data && typeof data === "object") {
+        if (data.error && typeof data.error === "string") {
+          msg = data.error;
+        } else if (data.errors && typeof data.errors === "object") {
+          const fieldErrors: string[] = [];
+          Object.entries(data.errors).forEach(([field, msgs]) => {
+            if (Array.isArray(msgs)) fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+            else if (typeof msgs === "string") fieldErrors.push(`${field}: ${msgs}`);
+          });
+          if (fieldErrors.length > 0) msg = fieldErrors.join(" | ");
+        }
+        if (!msg) {
+          msg = data.mensaje || data.message || (typeof data === "string" ? data : "");
+        }
+      } else if (typeof data === "string" && data.trim()) {
+        msg = data;
+      }
+      if (!msg) {
+        msg = err?.message || "Ocurrió un error al procesar la solicitud.";
+      }
+      return { status, exito: false, mensaje: msg };
+    }
+  },
+
+  /**
+   * Elimina un gasto extra por ID.
+   * Endpoint: DELETE proveedores/EliminarGasto/{id}
+   */
+  async eliminarGasto(id: number): Promise<{ status: number; exito: boolean; mensaje?: string }> {
+    try {
+      const resp = await apiClient.delete(`proveedores/EliminarGasto/${id}`);
+      if (resp.status >= 200 && resp.status < 300) {
+        return { status: resp.status, exito: true };
+      }
+      return {
+        status: resp.status,
+        exito: false,
+        mensaje: resp.data?.mensaje || resp.data?.message || resp.data?.error || "Error al eliminar el gasto",
+      };
+    } catch (err: any) {
+      const status = err?.response?.status || 500;
+      const data = err?.response?.data;
+      let msg = "";
+
+      if (data && typeof data === "object") {
+        if (data.error && typeof data.error === "string") {
+          msg = data.error;
+        } else if (data.errors && typeof data.errors === "object") {
+          const fieldErrors: string[] = [];
+          Object.entries(data.errors).forEach(([field, msgs]) => {
+            if (Array.isArray(msgs)) fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+            else if (typeof msgs === "string") fieldErrors.push(`${field}: ${msgs}`);
+          });
+          if (fieldErrors.length > 0) msg = fieldErrors.join(" | ");
+        }
+        if (!msg) {
+          msg = data.mensaje || data.message || (typeof data === "string" ? data : "");
+        }
+      } else if (typeof data === "string" && data.trim()) {
+        msg = data;
+      }
+      if (!msg) {
+        msg = err?.message || "Ocurrió un error al procesar la solicitud.";
+      }
+      return { status, exito: false, mensaje: msg };
+    }
+  },
+
+  /**
+   * Crea un proveedor rápido para gastos extras.
+   * Endpoint: POST proveedores/ProveedorRapido
+   */
+  async crearProveedorRapido(payload: ProveedorRapidoPayload): Promise<{
+    status: number;
+    exito: boolean;
+    mensaje?: string;
+    data?: { i_CveProveedor: number; v_Nombre: string };
+  }> {
+    try {
+      const resp = await apiClient.post("proveedores/ProveedorRapido", payload);
+      if (resp.status >= 200 && resp.status < 300) {
+        return { status: resp.status, exito: true, data: resp.data };
+      }
+      return {
+        status: resp.status,
+        exito: false,
+        mensaje: resp.data?.mensaje || resp.data?.message || resp.data?.error || "Error al registrar el proveedor",
+      };
+    } catch (err: any) {
+      const status = err?.response?.status || 500;
+      const data = err?.response?.data;
+      let msg = "";
+
+      if (data && typeof data === "object") {
+        if (data.error && typeof data.error === "string") {
+          msg = data.error;
+        } else if (data.errors && typeof data.errors === "object") {
+          const fieldErrors: string[] = [];
+          Object.entries(data.errors).forEach(([field, msgs]) => {
+            if (Array.isArray(msgs)) fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+            else if (typeof msgs === "string") fieldErrors.push(`${field}: ${msgs}`);
+          });
+          if (fieldErrors.length > 0) msg = fieldErrors.join(" | ");
+        }
+        if (!msg) {
+          msg = data.mensaje || data.message || (typeof data === "string" ? data : "");
         }
       } else if (typeof data === "string" && data.trim()) {
         msg = data;

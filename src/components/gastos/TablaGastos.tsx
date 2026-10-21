@@ -177,7 +177,7 @@ export const TablaGastos: React.FC<Props> = ({
             <th>Proveedor</th>
             <th>OC prov.</th>
             <th>Cotización prov.</th>
-            <th>Servicios</th>
+            <th>Concepto</th>
             <th>Fecha del servicio</th>
             <th>Próximo pago</th>
             <th style={{ textAlign: "right" }}>Total s/IVA</th>

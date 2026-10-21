@@ -642,7 +642,7 @@ export const ModalDetalleGasto: React.FC<Props> = ({
                               borderRight: "1px solid #e2e8f0",
                             }}
                           >
-                            Servicio
+                            Concepto
                           </th>
                           <th
                             style={{

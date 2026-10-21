@@ -130,6 +130,7 @@ export interface AgendaDetalleGetDto {
   Sesiones: SesionDetalleDto[];
   Entregables: EntregableDetalleDto[];
   Facturas: FacturaDetalleDto[];
+  Gastos: GastoServicio[];
   b_TipoDato: boolean;                // controla si se muestra el rango de horas en el header de sesión
   i_CveAgendaDetalle: number;
   i_Orden: number;
@@ -192,6 +193,40 @@ export interface CambiarProveedorDto {
   d_PrecioProveedor: number;
   v_NoOrdenCompraProv: string | null;
   v_NoCotizacionProv: string | null;
+}
+
+export interface GastoServicio {
+  i_CveGasto: number;
+  i_CveProveedor: number;
+  v_Proveedor: string | null;
+  v_Concepto: string;
+  v_Unidad: string;            // 'Pieza' | 'Hora' | 'Servicio'
+  i_Cantidad: number;          // acepta decimales
+  d_CostoUnitario: number;     // sin IVA
+  d_Subtotal: number;          // cantidad × costo unitario, sin IVA
+  v_NoCotizacion: string | null;
+  v_NoOrdenCompra: string | null;
+  v_EstadoPago: string | null; // 'Sin pagar' | 'Abonada' | 'Pagada' | null
+  b_TienePagos: boolean;       // true = ya tiene pagos realizados en Finanzas
+}
+
+export interface GuardarGastoPayload {
+  i_CveGasto: number;          // 0 = nuevo
+  i_CveServAgendaDet: number;
+  i_CveProveedor: number;
+  v_Concepto: string;
+  v_Unidad: string;
+  i_Cantidad: number;
+  d_CostoUnitario: number;     // sin IVA
+  v_NoCotizacion: string | null;
+  v_NoOrdenCompra: string | null;
+}
+
+export interface ProveedorRapidoPayload {
+  S_RazonSocial: string;
+  S_RFC: string;
+  S_GiroActividad: string;
+  i_CveTenant: number;         // de obtenerSesionActual(), igual que en Empresas
 }
 
 export interface FacturaUpdateDto {
