@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import axios from "axios";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { FacturaGetDto, FiltrosFacturasState, FacturasResumenDto } from "@/types/facturas";
 import { FacturasService } from "@/services/facturas.service";
@@ -36,13 +37,17 @@ export default function FacturasPage() {
   const [totalPaginas, setTotalPaginas] = useState<number>(1);
   const [totalRegistros, setTotalRegistros] = useState<number>(0);
 
-  // 3. Datos, Resumen y estado de carga
+  // 3. Clave para recargar tras acciones de modales
+  const [refreshKey, setRefreshKey] = useState<number>(0);
+  const recargar = () => setRefreshKey((k) => k + 1);
+
+  // 4. Datos, Resumen y estado de carga
   const [datos, setDatos] = useState<FacturaGetDto[]>([]);
   const [resumen, setResumen] = useState<FacturasResumenDto | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
   const [cargandoResumen, setCargandoResumen] = useState<boolean>(true);
 
-  // 4. Estados para Modales
+  // 5. Estados para Modales
   const [modalNuevaAbierto, setModalNuevaAbierto] = useState<boolean>(false);
   const [facturaSeleccionada, setFacturaSeleccionada] = useState<FacturaGetDto | null>(null);
   const [modalDetalleAbierto, setModalDetalleAbierto] = useState<boolean>(false);
@@ -51,63 +56,83 @@ export default function FacturasPage() {
 
   const { toast } = useToast();
 
-  // Carga de datos y resumen de facturas
-  const cargarFacturas = useCallback(
-    async (pageToLoad: number, pageSizeToLoad: number, currentFiltros: FiltrosFacturasState) => {
+  // 6. Carga sincronizada de datos y resumen con cancelación (AbortController)
+  useEffect(() => {
+    // No consultar con el rango incompleto
+    if (!filtros.fechaInicio || !filtros.fechaFin) return;
+
+    const controller = new AbortController();
+
+    const cargar = async () => {
       setCargando(true);
       setCargandoResumen(true);
 
       try {
         const [resFacturas, resResumen] = await Promise.all([
           FacturasService.getFacturas({
-            estado: currentFiltros.estado,
-            fechaInicio: currentFiltros.fechaInicio,
-            fechaFin: currentFiltros.fechaFin,
-            fechaPago: currentFiltros.fechaInicio,
-            fechaPagoFin: currentFiltros.fechaFin,
-            searchTerm: currentFiltros.searchTerm,
-            pagina: pageToLoad,
-            tamano: pageSizeToLoad,
+            estado: filtros.estado,
+            fechaInicio: filtros.fechaInicio,
+            fechaFin: filtros.fechaFin,
+            fechaPago: filtros.fechaInicio,
+            fechaPagoFin: filtros.fechaFin,
+            searchTerm: filtros.searchTerm,
+            empresa: filtros.empresa,
+            pagina,
+            tamano,
+            signal: controller.signal,
           }),
           FacturasService.getFacturasResumen({
-            estado: currentFiltros.estado,
-            fechaInicio: currentFiltros.fechaInicio,
-            fechaFin: currentFiltros.fechaFin,
-            fechaPago: currentFiltros.fechaInicio,
-            fechaPagoFin: currentFiltros.fechaFin,
-            searchTerm: currentFiltros.searchTerm,
+            estado: filtros.estado,
+            fechaInicio: filtros.fechaInicio,
+            fechaFin: filtros.fechaFin,
+            fechaPago: filtros.fechaInicio,
+            fechaPagoFin: filtros.fechaFin,
+            searchTerm: filtros.searchTerm,
+            empresa: filtros.empresa,
+            signal: controller.signal,
           }),
         ]);
 
         setDatos(resFacturas.datos);
         setTotalRegistros(resFacturas.total);
         setTotalPaginas(resFacturas.totalPaginas);
-
         setResumen(resResumen);
       } catch (err: any) {
+        if (axios.isCancel(err) || err?.name === "CanceledError" || controller.signal.aborted) {
+          // Petición cancelada: ignorar, no tocar estado ni mostrar toast
+          return;
+        }
         console.error("Error cargando facturas y resúmenes:", err);
         toast.error("Ocurrió un error al cargar la información de facturas.");
       } finally {
-        setCargando(false);
-        setCargandoResumen(false);
+        if (!controller.signal.aborted) {
+          setCargando(false);
+          setCargandoResumen(false);
+        }
       }
-    },
-    [toast]
-  );
+    };
 
-  useEffect(() => {
-    cargarFacturas(pagina, tamano, filtros);
-  }, [pagina, tamano, filtros, cargarFacturas]);
+    cargar();
 
-  // Manejadores de cambios en filtros
-  const handleCambiarFiltros = (nuevosFiltros: FiltrosFacturasState) => {
-    setFiltros(nuevosFiltros);
+    return () => {
+      controller.abort();
+    };
+  }, [
+    filtros.estado,
+    filtros.fechaInicio,
+    filtros.fechaFin,
+    filtros.searchTerm,
+    filtros.empresa,
+    pagina,
+    tamano,
+    refreshKey,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ]);
+
+  // Manejadores de cambios en filtros (solo actualizan estado, el useEffect dispara la carga)
+  const handleCambiarFiltros = (cambios: Partial<FiltrosFacturasState>) => {
+    setFiltros((prev) => ({ ...prev, ...cambios }));
     setPagina(1); // Resetea a página 1 al cambiar filtro
-  };
-
-  const handleBuscar = () => {
-    setPagina(1);
-    cargarFacturas(1, tamano, filtros);
   };
 
   const handleCambioPagina = (nuevaPagina: number) => {
@@ -163,7 +188,6 @@ export default function FacturasPage() {
         <FiltrosFacturas
           filtros={filtros}
           onCambiarFiltros={handleCambiarFiltros}
-          onBuscar={handleBuscar}
           onNuevaFactura={() => setModalNuevaAbierto(true)}
         />
 
@@ -187,7 +211,7 @@ export default function FacturasPage() {
       <ModalNuevaFactura
         abierto={modalNuevaAbierto}
         onCerrar={() => setModalNuevaAbierto(false)}
-        onGuardar={() => cargarFacturas(pagina, tamano, filtros)}
+        onGuardar={recargar}
       />
 
       <ModalFacturaDetalle
@@ -197,7 +221,7 @@ export default function FacturasPage() {
           setModalDetalleAbierto(false);
           setFacturaSeleccionada(null);
         }}
-        onCambio={() => cargarFacturas(pagina, tamano, filtros)}
+        onCambio={recargar}
       />
 
       <ModalTimbrado
@@ -207,7 +231,7 @@ export default function FacturasPage() {
           setModalTimbradoAbierto(false);
           setFacturaSeleccionada(null);
         }}
-        onGuardar={() => cargarFacturas(pagina, tamano, filtros)}
+        onGuardar={recargar}
       />
 
       <ModalCancelarFacturas
@@ -217,7 +241,7 @@ export default function FacturasPage() {
           setModalCancelarAbierto(false);
           setFacturaSeleccionada(null);
         }}
-        onGuardadoExitoso={() => cargarFacturas(pagina, tamano, filtros)}
+        onGuardadoExitoso={recargar}
       />
     </AppLayout>
   );

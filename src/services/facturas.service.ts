@@ -1,3 +1,4 @@
+import axios from "axios";
 import { apiClient, httpDefensivo } from "@/lib/api-client";
 import {
   FacturaGetDto,
@@ -54,97 +55,97 @@ export const FacturasService = {
     empresa?: string;
     pagina: number;
     tamano: number;
+    signal?: AbortSignal;
   }): Promise<PaginadoResponse<FacturaGetDto>> {
-    return httpDefensivo(async () => {
-      const queryParams: Record<string, string | number> = {
-        searchTerm: params.searchTerm ?? "",
-        empresa: params.empresa ?? "",
-        estado: params.estado ?? "",
-        pagina: params.pagina,
-        tamano: params.tamano,
-      };
-
-      const inicio = (params.fechaInicio || params.fechaPago || "").trim();
-      const fin = (params.fechaFin || params.fechaPagoFin || "").trim();
-
-      if (inicio.length > 0) {
-        queryParams.fechaInicio = inicio;
-      }
-      if (fin.length > 0) {
-        queryParams.fechaFin = fin;
-      }
-
-      let resp = await apiClient.get<any>("facturas", { params: queryParams });
-      let rawDatos: FacturaGetDto[] = [];
-      let data = resp.data;
-
-      if (Array.isArray(data)) {
-        rawDatos = data;
-      } else if (data && typeof data === "object") {
-        if (Array.isArray(data.datos)) rawDatos = data.datos;
-        else if (Array.isArray(data.data)) rawDatos = data.data;
-        else if (Array.isArray(data.Datos)) rawDatos = data.Datos;
-      }
-
-      // Reintento inteligente: si no devolvió nada con "Cobrada" o "Liquidada", intentar con el estado alternativo
-      if (
-        rawDatos.length === 0 &&
-        (queryParams.estado === "Cobrada" || queryParams.estado === "Liquidada")
-      ) {
-        const estadoAlt = queryParams.estado === "Cobrada" ? "Liquidada" : "Cobrada";
-        const queryParamsAlt = { ...queryParams, estado: estadoAlt };
-        try {
-          const respAlt = await apiClient.get<any>("facturas", { params: queryParamsAlt });
-          const dataAlt = respAlt.data;
-          let rawAlt: FacturaGetDto[] = [];
-          if (Array.isArray(dataAlt)) {
-            rawAlt = dataAlt;
-          } else if (dataAlt && typeof dataAlt === "object") {
-            if (Array.isArray(dataAlt.datos)) rawAlt = dataAlt.datos;
-            else if (Array.isArray(dataAlt.data)) rawAlt = dataAlt.data;
-            else if (Array.isArray(dataAlt.Datos)) rawAlt = dataAlt.Datos;
-          }
-          if (rawAlt.length > 0) {
-            rawDatos = rawAlt;
-          }
-        } catch {
-          // Si falla la petición alternativa, se mantiene la respuesta original
-        }
-      }
-
-      if (rawDatos.length === 0) {
-        return {
-          datos: [],
-          total: 0,
-          pagina: params.pagina,
-          tamano: params.tamano,
-          totalPaginas: 1,
-        };
-      }
-
-      const primerElemento = rawDatos[0] as any;
-      const totalRegistros =
-        primerElemento?.total ??
-        primerElemento?.Total ??
-        primerElemento?.i_TotalRegistros ??
-        rawDatos.length;
-
-      const totalPaginas = Math.ceil(totalRegistros / (params.tamano || 10)) || 1;
-
-      return {
-        datos: rawDatos,
-        total: totalRegistros,
-        pagina: params.pagina,
-        tamano: params.tamano,
-        totalPaginas,
-      };
-    }, {
-      datos: [],
-      total: 0,
+    const queryParams: Record<string, string | number> = {
+      searchTerm: params.searchTerm ?? "",
+      empresa: params.empresa ?? "",
+      estado: params.estado ?? "",
       pagina: params.pagina,
       tamano: params.tamano,
-      totalPaginas: 1,
+    };
+
+    const inicio = (params.fechaInicio || params.fechaPago || "").trim();
+    const fin = (params.fechaFin || params.fechaPagoFin || "").trim();
+
+    if (inicio.length > 0) {
+      queryParams.fechaInicio = inicio;
+    }
+    if (fin.length > 0) {
+      queryParams.fechaFin = fin;
+    }
+
+    let resp = await apiClient.get<any>("facturas", {
+      params: queryParams,
+      signal: params.signal,
     });
+    let rawDatos: FacturaGetDto[] = [];
+    let data = resp.data;
+
+    if (Array.isArray(data)) {
+      rawDatos = data;
+    } else if (data && typeof data === "object") {
+      if (Array.isArray(data.datos)) rawDatos = data.datos;
+      else if (Array.isArray(data.data)) rawDatos = data.data;
+      else if (Array.isArray(data.Datos)) rawDatos = data.Datos;
+    }
+
+    // Reintento inteligente: si no devolvió nada con "Cobrada" o "Liquidada", intentar con el estado alternativo
+    if (
+      rawDatos.length === 0 &&
+      (queryParams.estado === "Cobrada" || queryParams.estado === "Liquidada")
+    ) {
+      const estadoAlt = queryParams.estado === "Cobrada" ? "Liquidada" : "Cobrada";
+      const queryParamsAlt = { ...queryParams, estado: estadoAlt };
+      try {
+        const respAlt = await apiClient.get<any>("facturas", {
+          params: queryParamsAlt,
+          signal: params.signal,
+        });
+        const dataAlt = respAlt.data;
+        let rawAlt: FacturaGetDto[] = [];
+        if (Array.isArray(dataAlt)) {
+          rawAlt = dataAlt;
+        } else if (dataAlt && typeof dataAlt === "object") {
+          if (Array.isArray(dataAlt.datos)) rawAlt = dataAlt.datos;
+          else if (Array.isArray(dataAlt.data)) rawAlt = dataAlt.data;
+          else if (Array.isArray(dataAlt.Datos)) rawAlt = dataAlt.Datos;
+        }
+        if (rawAlt.length > 0) {
+          rawDatos = rawAlt;
+        }
+      } catch (errAlt: any) {
+        if (axios.isCancel(errAlt)) throw errAlt;
+        // Si falla la petición alternativa, se mantiene la respuesta original
+      }
+    }
+
+    if (rawDatos.length === 0) {
+      return {
+        datos: [],
+        total: 0,
+        pagina: params.pagina,
+        tamano: params.tamano,
+        totalPaginas: 1,
+      };
+    }
+
+    const primerElemento = rawDatos[0] as any;
+    const totalRegistros =
+      primerElemento?.total ??
+      primerElemento?.Total ??
+      primerElemento?.i_TotalRegistros ??
+      rawDatos.length;
+
+    const totalPaginas = Math.ceil(totalRegistros / (params.tamano || 10)) || 1;
+
+    return {
+      datos: rawDatos,
+      total: totalRegistros,
+      pagina: params.pagina,
+      tamano: params.tamano,
+      totalPaginas,
+    };
   },
 
   /**
@@ -159,55 +160,55 @@ export const FacturasService = {
     fechaFin?: string | null;
     searchTerm?: string;
     empresa?: string;
+    signal?: AbortSignal;
   }): Promise<FacturasResumenDto> {
-    return httpDefensivo(async () => {
-      const queryParams: Record<string, string> = {
-        searchTerm: params.searchTerm ?? "",
-        empresa: params.empresa ?? "",
-        estado: params.estado ?? "",
-      };
+    const queryParams: Record<string, string> = {
+      searchTerm: params.searchTerm ?? "",
+      empresa: params.empresa ?? "",
+      estado: params.estado ?? "",
+    };
 
-      const inicio = (params.fechaInicio || params.fechaPago || "").trim();
-      const fin = (params.fechaFin || params.fechaPagoFin || "").trim();
+    const inicio = (params.fechaInicio || params.fechaPago || "").trim();
+    const fin = (params.fechaFin || params.fechaPagoFin || "").trim();
 
-      if (inicio.length > 0) {
-        queryParams.fechaInicio = inicio;
-      }
-      if (fin.length > 0) {
-        queryParams.fechaFin = fin;
-      }
+    if (inicio.length > 0) {
+      queryParams.fechaInicio = inicio;
+    }
+    if (fin.length > 0) {
+      queryParams.fechaFin = fin;
+    }
 
-      let resp = await apiClient.get<any>("facturas/Resumen", { params: queryParams });
-      let data = resp.data;
-
-      if (
-        (!data || (!data.d_TotalPagado && !data.d_TotalFacturado && !data.i_TotalFacturas)) &&
-        (queryParams.estado === "Cobrada" || queryParams.estado === "Liquidada")
-      ) {
-        const estadoAlt = queryParams.estado === "Cobrada" ? "Liquidada" : "Cobrada";
-        const queryParamsAlt = { ...queryParams, estado: estadoAlt };
-        try {
-          const respAlt = await apiClient.get<any>("facturas/Resumen", { params: queryParamsAlt });
-          if (respAlt?.data) data = respAlt.data;
-        } catch {
-          // Ignorar error alternativo
-        }
-      }
-
-      return {
-        d_TotalPagado: Number(data?.d_TotalPagado ?? data?.TotalPagado ?? 0),
-        d_TotalPendiente: Number(data?.d_TotalPendiente ?? data?.TotalPendiente ?? 0),
-        d_TotalFacturado: Number(data?.d_TotalFacturado ?? data?.TotalFacturado ?? 0),
-        i_TotalFacturas: Number(data?.i_TotalFacturas ?? data?.TotalFacturas ?? 0),
-        d_PendientePorPagar: Number(data?.d_PendientePorPagar ?? data?.PendientePorPagar ?? 0),
-      };
-    }, {
-      d_TotalPagado: 0,
-      d_TotalPendiente: 0,
-      d_TotalFacturado: 0,
-      i_TotalFacturas: 0,
-      d_PendientePorPagar: 0,
+    let resp = await apiClient.get<any>("facturas/Resumen", {
+      params: queryParams,
+      signal: params.signal,
     });
+    let data = resp.data;
+
+    if (
+      (!data || (!data.d_TotalPagado && !data.d_TotalFacturado && !data.i_TotalFacturas)) &&
+      (queryParams.estado === "Cobrada" || queryParams.estado === "Liquidada")
+    ) {
+      const estadoAlt = queryParams.estado === "Cobrada" ? "Liquidada" : "Cobrada";
+      const queryParamsAlt = { ...queryParams, estado: estadoAlt };
+      try {
+        const respAlt = await apiClient.get<any>("facturas/Resumen", {
+          params: queryParamsAlt,
+          signal: params.signal,
+        });
+        if (respAlt?.data) data = respAlt.data;
+      } catch (errAlt: any) {
+        if (axios.isCancel(errAlt)) throw errAlt;
+        // Ignorar error alternativo
+      }
+    }
+
+    return {
+      d_TotalPagado: Number(data?.d_TotalPagado ?? data?.TotalPagado ?? 0),
+      d_TotalPendiente: Number(data?.d_TotalPendiente ?? data?.TotalPendiente ?? 0),
+      d_TotalFacturado: Number(data?.d_TotalFacturado ?? data?.TotalFacturado ?? 0),
+      i_TotalFacturas: Number(data?.i_TotalFacturas ?? data?.TotalFacturas ?? 0),
+      d_PendientePorPagar: Number(data?.d_PendientePorPagar ?? data?.PendientePorPagar ?? 0),
+    };
   },
 
   // --- 2. Endpoints para los 4 modales ---

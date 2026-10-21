@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Plus } from "lucide-react";
 import { FiltrosFacturasState, EsEstadoPendiente } from "@/types/facturas";
@@ -8,8 +8,8 @@ import DateRangePickerPopover from "@/components/ui/DateRangePickerPopover";
 
 interface Props {
   filtros: FiltrosFacturasState;
-  onCambiarFiltros: (nuevosFiltros: FiltrosFacturasState) => void;
-  onBuscar: () => void;
+  onCambiarFiltros: (cambios: Partial<FiltrosFacturasState>) => void;
+  onBuscar?: () => void;
   onNuevaFactura: () => void;
 }
 
@@ -20,17 +20,28 @@ export const FiltrosFacturas: React.FC<Props> = ({
   onNuevaFactura,
 }) => {
   const [localSearch, setLocalSearch] = useState<string>(filtros.searchTerm);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setLocalSearch(filtros.searchTerm);
   }, [filtros.searchTerm]);
 
+  // Debounce de ~400ms para no saturar con peticiones por tecla
+  useEffect(() => {
+    timerRef.current = setTimeout(() => {
+      const trimmed = localSearch.trim();
+      if (trimmed !== (filtros.searchTerm || "")) {
+        onCambiarFiltros({ searchTerm: trimmed });
+      }
+    }, 400);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [localSearch]);
+
   const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nuevoEstado = e.target.value;
-    onCambiarFiltros({
-      ...filtros,
-      estado: nuevoEstado,
-    });
+    onCambiarFiltros({ estado: e.target.value });
   };
 
   const obtenerLabelFecha = (estado: string): string => {
@@ -53,8 +64,11 @@ export const FiltrosFacturas: React.FC<Props> = ({
 
   const handleKeyDownSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      onCambiarFiltros({ ...filtros, searchTerm: localSearch });
-      onBuscar();
+      if (timerRef.current) clearTimeout(timerRef.current);
+      const trimmed = localSearch.trim();
+      if (trimmed !== (filtros.searchTerm || "")) {
+        onCambiarFiltros({ searchTerm: trimmed });
+      }
     }
   };
 
@@ -115,13 +129,8 @@ export const FiltrosFacturas: React.FC<Props> = ({
                 fechaInicio={filtros.fechaInicio}
                 fechaFin={filtros.fechaFin}
                 onChangeRange={(inicio, fin) => {
-                  onCambiarFiltros({
-                    ...filtros,
-                    fechaInicio: inicio,
-                    fechaFin: fin,
-                    fechaPago: inicio,
-                  });
-                  onBuscar();
+                  if (!inicio || !fin) return;
+                  onCambiarFiltros({ fechaInicio: inicio, fechaFin: fin, fechaPago: inicio });
                 }}
               />
             </div>
