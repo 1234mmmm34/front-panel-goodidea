@@ -233,6 +233,7 @@ export const ConsultorService = {
       i_CveTipoServicio: cabeceraRaw.i_CveTipoServicio ?? 0,
       v_Notas: cabeceraRaw.v_Notas ?? null,
       d_FechaConfirmacionTermino: cabeceraRaw.d_FechaConfirmacionTermino ?? null,
+      v_ConfirmadoPor: cabeceraRaw.v_ConfirmadoPor ?? null,
     };
 
     const sesiones = (Array.isArray(sesionesRaw) ? sesionesRaw : []).map((s: any) => ({

@@ -47,6 +47,7 @@ export interface AgendaServicioGetDto {
   entregablesParseados?: EntregableResumenDto[];
   v_Notas?: string | null;
   d_FechaConfirmacionTermino?: string | null;
+  v_ConfirmadoPor?: string | null;
 }
 
 export interface TerminoServicioDto {
@@ -59,6 +60,7 @@ export interface TerminoServicioDto {
   d_FechaFin: string | null;
   v_Responsable: string | null;
   d_FechaConfirmacionTermino: string | null;
+  v_ConfirmadoPor: string | null;
   b_Confirmado: boolean;
 }
 
@@ -169,6 +171,7 @@ export interface AgendaDetalleGetDto {
   v_KeyVoBo?: string | null;
   v_Notas?: string | null;
   d_FechaConfirmacionTermino?: string | null;
+  v_ConfirmadoPor?: string | null;
 }
 
 export interface CambiarTitularesSesionDto {

@@ -203,17 +203,19 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
           texto: `En curso${fFinStr ? ` · Finaliza el ${fFinStr}` : ""}`,
         };
         break;
-      case 3:
+      case 3: {
+        const porQuien = cabecera.v_ConfirmadoPor?.trim();
         config = {
           bg: "#ecfdf3",
           border: "#abefc6",
           text: "#067647",
           icon: CheckCircle2,
           texto: cabecera.d_FechaConfirmacionTermino
-            ? `Terminado · Confirmado el ${formatearFechaTexto(cabecera.d_FechaConfirmacionTermino)}`
+            ? `Terminado · Confirmado ${porQuien ? `por ${porQuien} ` : ""}el ${formatearFechaTexto(cabecera.d_FechaConfirmacionTermino)}`
             : "Terminado",
         };
         break;
+      }
       case 4:
         config = {
           bg: "#f2f4f7",

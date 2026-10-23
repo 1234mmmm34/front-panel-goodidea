@@ -29,6 +29,7 @@ export interface AgendaServicioConsultorGetDto {
   i_TotalRegistros: number;
   entregablesParseados?: EntregableResumen[];
   d_FechaConfirmacionTermino?: string | null;
+  v_ConfirmadoPor?: string | null;
 }
 
 export interface AgendaDetalleConsultorCabeceraDto {
@@ -52,6 +53,7 @@ export interface AgendaDetalleConsultorCabeceraDto {
   i_CveTipoServicio: number; // 2 Capacitación, 3 Estudios, 5 Productos, 6 Servicios
   v_Notas: string | null;
   d_FechaConfirmacionTermino: string | null;
+  v_ConfirmadoPor: string | null;
 }
 
 export interface SesionConsultorDto {

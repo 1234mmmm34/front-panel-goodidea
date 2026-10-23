@@ -255,7 +255,7 @@ export default function ConfirmarTerminoPage() {
             {yaConfirmadoDeAntes && (
               <p style={{ fontSize: "14px", color: "#475569", margin: "0 0 16px 0", lineHeight: 1.5 }}>
                 {servicio?.d_FechaConfirmacionTermino
-                  ? `Este servicio ya había sido confirmado el ${formatearFechaTexto(servicio.d_FechaConfirmacionTermino)}.`
+                  ? `Este servicio ya había sido confirmado ${servicio.v_ConfirmadoPor?.trim() ? `por ${servicio.v_ConfirmadoPor.trim()} ` : ""}el ${formatearFechaTexto(servicio.d_FechaConfirmacionTermino)}.`
                   : "Este servicio ya había sido confirmado."}
               </p>
             )}
