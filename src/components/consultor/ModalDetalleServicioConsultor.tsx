@@ -12,6 +12,9 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  PlayCircle,
+  XCircle,
+  RefreshCw,
 } from "lucide-react";
 import {
   AgendaDetalleConsultorCabeceraDto,
@@ -23,6 +26,36 @@ import { ConsultorService } from "@/services/consultor.service";
 import { VerDocumento } from "@/services/archivos.service";
 import { formatearFechaTexto } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
+
+function obtenerFechasExtremosSesiones(sesiones?: Array<{
+  d_FechaHoraInicio?: string | null;
+  d_FechaHoraFin?: string | null;
+  b_Cancelada?: boolean | null;
+}> | null): { fechaInicio: string | null; fechaFin: string | null } {
+  if (!sesiones || sesiones.length === 0) {
+    return { fechaInicio: null, fechaFin: null };
+  }
+  const validas = sesiones.filter((s) => !s.b_Cancelada && !(s as any).b_cancelada);
+  const pool = validas.length > 0 ? validas : sesiones;
+
+  let minInicio: string | null = null;
+  let maxFin: string | null = null;
+
+  for (const s of pool) {
+    if (s.d_FechaHoraInicio) {
+      if (!minInicio || s.d_FechaHoraInicio < minInicio) {
+        minInicio = s.d_FechaHoraInicio;
+      }
+    }
+    if (s.d_FechaHoraFin) {
+      if (!maxFin || s.d_FechaHoraFin > maxFin) {
+        maxFin = s.d_FechaHoraFin;
+      }
+    }
+  }
+
+  return { fechaInicio: minInicio, fechaFin: maxFin };
+}
 
 interface Props {
   abierto: boolean;
@@ -39,7 +72,7 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
   onCerrar,
   onGuardadoExitoso,
 }) => {
-  const { toast } = useToast();
+  const { toast, confirmModal } = useToast();
   const [cargando, setCargando] = useState<boolean>(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
@@ -93,6 +126,167 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
     } finally {
       setCargando(false);
     }
+  };
+
+  const handleConfirmarTerminoClick = () => {
+    if (!cabecera) return;
+    confirmModal({
+      title: "¿Confirmas que este servicio ya terminó?",
+      message: "Se avisará a administración para facturar.",
+      confirmText: "Confirmar",
+      cancelText: "Cancelar",
+      variant: "primary",
+      onConfirm: async () => {
+        try {
+          const res = await ConsultorService.confirmarTermino(cabecera.i_CveServAgendaDet);
+          if (res.exito) {
+            toast.success("Servicio confirmado como terminado");
+            await cargarDetalle();
+            onGuardadoExitoso?.();
+          } else {
+            toast.error(res.mensaje || "Error al confirmar terminado");
+          }
+        } catch (error: any) {
+          const msg =
+            error?.response?.data?.mensaje ||
+            error?.response?.data?.message ||
+            error?.response?.data?.error ||
+            "Error al confirmar terminado";
+          toast.error(msg);
+        }
+      },
+    });
+  };
+
+  const renderBannerEstatus = () => {
+    if (!cabecera) return null;
+    if (cabecera.b_SinProgramar && cabecera.i_CveEstatus !== 0) return null;
+
+    const estatus = cabecera.i_CveEstatus ?? 1;
+    const { fechaInicio, fechaFin } = obtenerFechasExtremosSesiones(sesiones);
+    const fInicioStr = fechaInicio ? formatearFechaTexto(fechaInicio) : "";
+    const fFinStr = fechaFin ? formatearFechaTexto(fechaFin) : "";
+
+    let config = {
+      bg: "#e7f1fb",
+      border: "#b6d4f2",
+      text: "#1f5f9e",
+      icon: Calendar,
+      texto: `Programado${fInicioStr ? ` · Inicia el ${fInicioStr}` : ""}`,
+    };
+
+    switch (estatus) {
+      case 0:
+        config = {
+          bg: "#fef3f2",
+          border: "#fecdca",
+          text: "#b42318",
+          icon: XCircle,
+          texto: "Cancelado",
+        };
+        break;
+      case 1:
+        config = {
+          bg: "#e7f1fb",
+          border: "#b6d4f2",
+          text: "#1f5f9e",
+          icon: Calendar,
+          texto: `Programado${fInicioStr ? ` · Inicia el ${fInicioStr}` : ""}`,
+        };
+        break;
+      case 2:
+        config = {
+          bg: "#fff8e1",
+          border: "#ffe08a",
+          text: "#8a6100",
+          icon: PlayCircle,
+          texto: `En curso${fFinStr ? ` · Finaliza el ${fFinStr}` : ""}`,
+        };
+        break;
+      case 3:
+        config = {
+          bg: "#ecfdf3",
+          border: "#abefc6",
+          text: "#067647",
+          icon: CheckCircle2,
+          texto: cabecera.d_FechaConfirmacionTermino
+            ? `Terminado · Confirmado el ${formatearFechaTexto(cabecera.d_FechaConfirmacionTermino)}`
+            : "Terminado",
+        };
+        break;
+      case 4:
+        config = {
+          bg: "#f2f4f7",
+          border: "#d0d5dd",
+          text: "#475467",
+          icon: RefreshCw,
+          texto: "Reprogramado",
+        };
+        break;
+      case 5:
+        config = {
+          bg: "#fff4ec",
+          border: "#ffd3b0",
+          text: "#b54708",
+          icon: AlertTriangle,
+          texto: "Por confirmar · Llegó la fecha de finalización estimada. ¿Ya terminó?",
+        };
+        break;
+      default:
+        break;
+    }
+
+    const IconComp = config.icon;
+
+    return (
+      <div
+        style={{
+          marginTop: "14px",
+          padding: "12px 14px",
+          backgroundColor: config.bg,
+          border: `1px solid ${config.border}`,
+          borderRadius: "8px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+          flexWrap: "wrap",
+          fontSize: "12px",
+          color: config.text,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 auto", minWidth: 0 }}>
+          <IconComp size={16} style={{ color: config.text, flexShrink: 0 }} />
+          <span style={{ fontWeight: 500, lineHeight: 1.4 }}>{config.texto}</span>
+        </div>
+
+        {estatus === 5 && (
+          <button
+            type="button"
+            className="btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              backgroundColor: "#16a34a",
+              color: "#ffffff",
+              fontSize: "12px",
+              fontWeight: 600,
+              padding: "6px 14px",
+              borderRadius: "6px",
+              border: "none",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            onClick={handleConfirmarTerminoClick}
+          >
+            <CheckCircle2 size={16} />
+            Confirmar terminado
+          </button>
+        )}
+      </div>
+    );
   };
 
   const handleToggleEntregable = async (ent: EntregableConsultorDto) => {
@@ -250,6 +444,16 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
         return <span className="badge badge-success">Terminado</span>;
       case 4:
         return <span className="badge badge-secondary">Reprogramado</span>;
+      case 5:
+        return (
+          <span
+            className="badge"
+            title="Llegó la fecha de finalización estimada. Falta confirmar que terminó."
+            style={{ backgroundColor: "#ffe5d0", color: "#984c0c" }}
+          >
+            Por confirmar
+          </span>
+        );
       default:
         return <span className="badge badge-primary">Programado</span>;
     }
@@ -394,14 +598,9 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                     <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>planta</span>
                     <p style={{ fontSize: "13px", fontWeight: 400, color: "#0f172a", margin: 0, lineHeight: 1.3 }}>{cabecera.v_Planta || "—"}</p>
                   </div>
-
-                  <div>
-                    <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>estatus</span>
-                    <div style={{ marginTop: "2px" }}>
-                      {renderEstatusBadge(cabecera.i_CveEstatus)}
-                    </div>
-                  </div>
                 </div>
+
+                {renderBannerEstatus()}
 
                 {cabecera.b_SinProgramar && (
                   <div
@@ -528,28 +727,36 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                                   <span style={{ fontWeight: 500, color: "#1e293b" }}>
                                     Sesión {sesion.i_Orden || sIdx + 1}
                                   </span>
-                                  <span style={{ color: "#475569" }}>
-                                    — {formatearFechaTexto(sesion.d_FechaHoraInicio)}
-                                  </span>
+                                  {cabecera.i_CveTipoServicio === 3 || cabecera.i_CveTipoServicio === 6 ? (
+                                    <span style={{ color: "#475569" }}>
+                                      — {formatearFechaTexto(sesion.d_FechaHoraInicio)} – {formatearFechaTexto(sesion.d_FechaHoraFin)}
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <span style={{ color: "#475569" }}>
+                                        — {formatearFechaTexto(sesion.d_FechaHoraInicio)}
+                                      </span>
 
-                                  {cabecera.b_TipoDato && sesion.d_FechaHoraInicio && (
-                                    <span style={{ color: "#64748b", fontFamily: "var(--font-mono)", fontSize: "12px" }}>
-                                      (
-                                      {new Date(sesion.d_FechaHoraInicio).toLocaleTimeString("en-US", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
-                                      {sesion.d_FechaHoraFin && (
-                                        <>
-                                          {" a "}
-                                          {new Date(sesion.d_FechaHoraFin).toLocaleTimeString("en-US", {
+                                      {cabecera.b_TipoDato && sesion.d_FechaHoraInicio && (
+                                        <span style={{ color: "#64748b", fontFamily: "var(--font-mono)", fontSize: "12px" }}>
+                                          (
+                                          {new Date(sesion.d_FechaHoraInicio).toLocaleTimeString("en-US", {
                                             hour: "2-digit",
                                             minute: "2-digit",
                                           })}
-                                        </>
+                                          {sesion.d_FechaHoraFin && (
+                                            <>
+                                              {" a "}
+                                              {new Date(sesion.d_FechaHoraFin).toLocaleTimeString("en-US", {
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                              })}
+                                            </>
+                                          )}
+                                          )
+                                        </span>
                                       )}
-                                      )
-                                    </span>
+                                    </>
                                   )}
                                 </div>
 

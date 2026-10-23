@@ -19,7 +19,10 @@ export const AuthGuard: React.FC<Props> = ({ children }) => {
   useEffect(() => {
     const sesion = obtenerSesionActual();
     const esRutaLogin = pathname === "/login";
-    const esRutaPublica = esRutaLogin || pathname.startsWith("/contrasenia");
+    const esRutaPublica =
+      esRutaLogin ||
+      pathname.startsWith("/contrasenia") ||
+      pathname.startsWith("/confirmar-termino");
 
     if (!sesion && !esRutaPublica) {
       router.replace("/login");
@@ -39,6 +42,11 @@ export const AuthGuard: React.FC<Props> = ({ children }) => {
         </div>
       </div>
     );
+  }
+
+  // Página pública de confirmación de término: sin MenuProvider
+  if (pathname.startsWith("/confirmar-termino")) {
+    return <ToastProvider>{children}</ToastProvider>;
   }
 
   return (

@@ -91,8 +91,16 @@ apiClient.interceptors.response.use(
       }
 
       if (status === 401 || status === 403) {
-        // No limpiar ni redirigir si viene del propio intento de login
-        if (!url.includes("login") && !window.location.pathname.startsWith("/login")) {
+        const esRutaPublicaTermino =
+          url.includes("termino") ||
+          window.location.pathname.startsWith("/confirmar-termino");
+
+        // No limpiar ni redirigir si viene del propio intento de login o de término
+        if (
+          !url.includes("login") &&
+          !window.location.pathname.startsWith("/login") &&
+          !esRutaPublicaTermino
+        ) {
           console.warn(`[Auth] ${status} no autorizado en ${url} -> Limpiando sesión`);
           localStorage.removeItem("userData");
           localStorage.removeItem("sesion_stps");

@@ -7,6 +7,7 @@ import {
   User,
   Users,
   AlertTriangle,
+  Lock,
   CheckCircle2,
   Circle,
   Edit2,
@@ -21,6 +22,8 @@ import {
   Trash2,
   Loader2,
   Copy,
+  PlayCircle,
+  XCircle,
 } from "lucide-react";
 import { ModalReprogramarSesion } from "./ModalReprogramarSesion";
 import { ModalCancelarSesion } from "./ModalCancelarSesion";
@@ -40,13 +43,20 @@ import {
   GastoServicio,
   GuardarGastoPayload,
   ProveedorRapidoPayload,
+  SesionHorario,
+  EditarMontosPayload,
+  EditarMontosConflicto,
+  FacturaAsociada,
+  AbonoAsociado,
+  FacturasAsociadas,
 } from "@/types/servicios";
 import { AgendaService } from "@/services/agenda.service";
+import { FacturasService } from "@/services/facturas.service";
 import { AlumnosService } from "@/services/alumnos.service";
 import { CatalogosService } from "@/services/catalogos.service";
 import { entregables as entregablesCat } from "@/types/catalogos";
 import { VerDocumento } from "@/services/archivos.service";
-import { formatearFechaCorta, esFechaPasada } from "@/lib/date-utils";
+import { formatearFechaCorta, formatearFechaTexto, esFechaPasada } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
 import { obtenerSesionActual } from "@/lib/api-client";
 
@@ -60,6 +70,36 @@ interface Props {
 }
 
 const IVA = 0.16;
+
+function obtenerFechasExtremosSesiones(sesiones?: Array<{
+  d_FechaHoraInicio?: string | null;
+  d_FechaHoraFin?: string | null;
+  b_Cancelada?: boolean | null;
+}> | null): { fechaInicio: string | null; fechaFin: string | null } {
+  if (!sesiones || sesiones.length === 0) {
+    return { fechaInicio: null, fechaFin: null };
+  }
+  const validas = sesiones.filter((s) => !s.b_Cancelada && !(s as any).b_cancelada);
+  const pool = validas.length > 0 ? validas : sesiones;
+
+  let minInicio: string | null = null;
+  let maxFin: string | null = null;
+
+  for (const s of pool) {
+    if (s.d_FechaHoraInicio) {
+      if (!minInicio || s.d_FechaHoraInicio < minInicio) {
+        minInicio = s.d_FechaHoraInicio;
+      }
+    }
+    if (s.d_FechaHoraFin) {
+      if (!maxFin || s.d_FechaHoraFin > maxFin) {
+        maxFin = s.d_FechaHoraFin;
+      }
+    }
+  }
+
+  return { fechaInicio: minInicio, fechaFin: maxFin };
+}
 
 export const ModalDetalleServicio: React.FC<Props> = ({
   abierto,
@@ -126,6 +166,34 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [ordenCompra, setOrdenCompra] = useState<string>("");
   const [editandoCotizacion, setEditandoCotizacion] = useState<boolean>(false);
   const [editandoOC, setEditandoOC] = useState<boolean>(false);
+
+  // Estados para "Editar montos"
+  const [modalEditarMontosAbierto, setModalEditarMontosAbierto] = useState<boolean>(false);
+  const [formMontoCantidad, setFormMontoCantidad] = useState<string>("");
+  const [formMontoPrecioUnitario, setFormMontoPrecioUnitario] = useState<string>("");
+  const [guardandoMontos, setGuardandoMontos] = useState<boolean>(false);
+
+  // Advertencia cambio de horas
+  const [modalAdvertenciaHorasAbierto, setModalAdvertenciaHorasAbierto] = useState<boolean>(false);
+
+  // Modo secuencial de ajuste de sesiones
+  const [modalSecuencialAbierto, setModalSecuencialAbierto] = useState<boolean>(false);
+  const [secuencialIndex, setSecuencialIndex] = useState<number>(0);
+  const [secuencialSesionesAjustadas, setSecuencialSesionesAjustadas] = useState<SesionHorario[]>([]);
+
+  // Conflicto de facturas asociadas
+  const [modalFacturasAsociadasAbierto, setModalFacturasAsociadasAbierto] = useState<boolean>(false);
+  const [cargandoFacturasAsociadas, setCargandoFacturasAsociadas] = useState<boolean>(false);
+  const [datosFacturasAsociadas, setDatosFacturasAsociadas] = useState<FacturasAsociadas | null>(null);
+
+  // Conflicto de utilidad
+  const [modalUtilidadAbierto, setModalUtilidadAbierto] = useState<boolean>(false);
+  const [conflictoUtilidad, setConflictoUtilidad] = useState<EditarMontosConflicto | null>(null);
+
+  // Estado acumulado para confirmaciones sucesivas y reintentos
+  const [sesionesParaReenvio, setSesionesParaReenvio] = useState<SesionHorario[]>([]);
+  const [estadoConfirmaFacturas, setEstadoConfirmaFacturas] = useState<boolean>(false);
+  const [estadoConfirmaUtilidad, setEstadoConfirmaUtilidad] = useState<boolean>(false);
 
   const [facturas, setFacturas] = useState<FacturaDetalleDto[]>([]);
   const [entregables, setEntregables] = useState<EntregableDetalleDto[]>([]);
@@ -247,6 +315,68 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     const precio = Number(formGastoCostoUnitario) || 0;
     return cant * precio;
   }, [formGastoCantidad, formGastoCostoUnitario]);
+
+  // --- useMemo para Sesiones y Editar montos ---
+  const listaSesiones: SesionDetalleDto[] = useMemo(() => {
+    if (!detalle) return [];
+    return (
+      detalle.Sesiones ||
+      (detalle as any).sesiones ||
+      (detalle as any).Detalles ||
+      (detalle as any).detalles ||
+      []
+    );
+  }, [detalle]);
+
+  const tieneSesionConInstructorApoyo = useMemo(() => {
+    return (listaSesiones || []).some((s) => {
+      const bCanc = Boolean(s.b_Cancelada || (s as any).b_cancelada || (s as any).bCancelada);
+      const iCveReprog = s.i_CveReprograma ?? (s as any).i_cveReprograma;
+      const esReprog = iCveReprog != null && Number(iCveReprog) > 0;
+      const esVig = !bCanc && !esReprog;
+      return esVig && s.i_CveApoyo != null && Number(s.i_CveApoyo) > 0 && s.b_TipoProvInsApoyo === false;
+    });
+  }, [listaSesiones]);
+
+  const esServicioPorHoras = useMemo(() => {
+    if (!detalle) return false;
+    if (Number(detalle.i_CveTipoServicio) === 2) return true;
+    if (!detalle.v_Unidad) return false;
+    const u = detalle.v_Unidad.toLowerCase();
+    return u.includes("hora") || u.includes("hr");
+  }, [detalle?.i_CveTipoServicio, detalle?.v_Unidad]);
+
+  const sesionesVigentes = useMemo(() => {
+    if (!detalle) return [];
+    return (listaSesiones || [])
+      .filter((s) => {
+        const bCancelada = Boolean(
+          s.b_Cancelada ||
+          (s as any).b_cancelada ||
+          (s as any).bCancelada
+        );
+        const iCveReprog =
+          s.i_CveReprograma ??
+          (s as any).i_cveReprograma ??
+          (s as any).iCveReprograma;
+        return !bCancelada && !(iCveReprog != null && Number(iCveReprog) > 0);
+      })
+      .sort((a, b) => (a.i_Orden ?? 0) - (b.i_Orden ?? 0));
+  }, [detalle, listaSesiones]);
+
+  const montoSubtotalCalculado = useMemo(() => {
+    const cant = parseFloat(formMontoCantidad) || 0;
+    const pu = parseFloat(formMontoPrecioUnitario) || 0;
+    return cant * pu;
+  }, [formMontoCantidad, formMontoPrecioUnitario]);
+
+  const montoFinalConIvaCalculado = useMemo(() => {
+    return montoSubtotalCalculado * (1 + IVA);
+  }, [montoSubtotalCalculado]);
+
+  const ocultarEditarMontos = useMemo(() => {
+    return detalle?.v_TipoVenta === "proyecto";
+  }, [detalle]);
 
   const abrirModalAgregarGasto = async () => {
     if (proveedoresList.length === 0) {
@@ -549,6 +679,175 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     cargarAlumnosInscritos(iCveServAgendaDet);
   };
 
+  const handleConfirmarTerminoClick = () => {
+    if (!detalle) return;
+    confirmModal({
+      title: "¿Confirmas que este servicio ya terminó?",
+      message: "Se avisará a administración para facturar.",
+      confirmText: "Confirmar",
+      cancelText: "Cancelar",
+      variant: "primary",
+      onConfirm: async () => {
+        try {
+          const res = await FacturasService.confirmarTermino(detalle.i_CveServAgendaDet);
+          if (res.exito) {
+            toast.success("Servicio confirmado como terminado");
+            await cargarDetalle();
+            onGuardadoExitoso?.();
+          } else {
+            toast.error(res.mensaje || "Error al confirmar terminado");
+          }
+        } catch (error: any) {
+          const msg =
+            error?.response?.data?.mensaje ||
+            error?.response?.data?.message ||
+            error?.response?.data?.error ||
+            "Error al confirmar terminado";
+          toast.error(msg);
+        }
+      },
+    });
+  };
+
+  const renderBannerEstatus = () => {
+    if (!detalle) return null;
+    if (detalle.b_SinProgramar && detalle.i_CveEstatus !== 0) return null;
+
+    const estatus = detalle.i_CveEstatus ?? 1;
+    const { fechaInicio, fechaFin } = obtenerFechasExtremosSesiones(detalle.Sesiones);
+    const fInicioStr = fechaInicio
+      ? formatearFechaTexto(fechaInicio)
+      : (detalle as any).d_FechaInicio
+      ? formatearFechaTexto((detalle as any).d_FechaInicio)
+      : "";
+    const fFinStr = fechaFin
+      ? formatearFechaTexto(fechaFin)
+      : (detalle as any).d_FechaFin
+      ? formatearFechaTexto((detalle as any).d_FechaFin)
+      : "";
+
+    let config = {
+      bg: "#e7f1fb",
+      border: "#b6d4f2",
+      text: "#1f5f9e",
+      icon: Calendar,
+      texto: `Programado${fInicioStr ? ` · Inicia el ${fInicioStr}` : ""}`,
+    };
+
+    switch (estatus) {
+      case 0:
+        config = {
+          bg: "#fef3f2",
+          border: "#fecdca",
+          text: "#b42318",
+          icon: XCircle,
+          texto: "Cancelado",
+        };
+        break;
+      case 1:
+        config = {
+          bg: "#e7f1fb",
+          border: "#b6d4f2",
+          text: "#1f5f9e",
+          icon: Calendar,
+          texto: `Programado${fInicioStr ? ` · Inicia el ${fInicioStr}` : ""}`,
+        };
+        break;
+      case 2:
+        config = {
+          bg: "#fff8e1",
+          border: "#ffe08a",
+          text: "#8a6100",
+          icon: PlayCircle,
+          texto: `En curso${fFinStr ? ` · Finaliza el ${fFinStr}` : ""}`,
+        };
+        break;
+      case 3:
+        config = {
+          bg: "#ecfdf3",
+          border: "#abefc6",
+          text: "#067647",
+          icon: CheckCircle2,
+          texto: detalle.d_FechaConfirmacionTermino
+            ? `Terminado · Confirmado el ${formatearFechaTexto(detalle.d_FechaConfirmacionTermino)}`
+            : "Terminado",
+        };
+        break;
+      case 4:
+        config = {
+          bg: "#f2f4f7",
+          border: "#d0d5dd",
+          text: "#475467",
+          icon: RefreshCw,
+          texto: "Reprogramado",
+        };
+        break;
+      case 5:
+        config = {
+          bg: "#fff4ec",
+          border: "#ffd3b0",
+          text: "#b54708",
+          icon: AlertTriangle,
+          texto: "Por confirmar · Llegó la fecha de finalización estimada. ¿Ya terminó?",
+        };
+        break;
+      default:
+        break;
+    }
+
+    const IconComp = config.icon;
+
+    return (
+      <div
+        style={{
+          marginTop: "14px",
+          padding: "12px 14px",
+          backgroundColor: config.bg,
+          border: `1px solid ${config.border}`,
+          borderRadius: "8px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+          flexWrap: "wrap",
+          fontSize: "12px",
+          color: config.text,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 auto", minWidth: 0 }}>
+          <IconComp size={16} style={{ color: config.text, flexShrink: 0 }} />
+          <span style={{ fontWeight: 500, lineHeight: 1.4 }}>{config.texto}</span>
+        </div>
+
+        {estatus === 5 && (
+          <button
+            type="button"
+            className="btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              backgroundColor: "#16a34a",
+              color: "#ffffff",
+              fontSize: "12px",
+              fontWeight: 600,
+              padding: "6px 14px",
+              borderRadius: "6px",
+              border: "none",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            onClick={handleConfirmarTerminoClick}
+          >
+            <CheckCircle2 size={16} />
+            Confirmar terminado
+          </button>
+        )}
+      </div>
+    );
+  };
+
   useEffect(() => {
     if (abierto && iCveAgenda && iCveServAgendaDet) {
       cargarDetalle();
@@ -691,6 +990,167 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       cat.v_Nombre.toLowerCase().includes(busquedaEntregable.trim().toLowerCase())
     )
     .sort((a, b) => a.v_Nombre.localeCompare(b.v_Nombre, "es", { sensitivity: "base" }));
+
+  // --- Handlers para Editar montos ---
+  const abrirModalEditarMontos = () => {
+    setFormMontoCantidad(
+      detalle?.i_Cantidad !== undefined && detalle?.i_Cantidad !== null
+        ? String(detalle.i_Cantidad)
+        : ""
+    );
+    setFormMontoPrecioUnitario(
+      detalle?.d_PrecioUnitario !== undefined && detalle?.d_PrecioUnitario !== null
+        ? String(detalle.d_PrecioUnitario)
+        : ""
+    );
+    setSecuencialSesionesAjustadas([]);
+    setSesionesParaReenvio([]);
+    setEstadoConfirmaFacturas(false);
+    setEstadoConfirmaUtilidad(false);
+    setModalEditarMontosAbierto(true);
+  };
+
+  const ejecutarGuardarMontos = async (
+    sesiones: SesionHorario[],
+    confirmaFacturas: boolean,
+    confirmaUtilidad: boolean
+  ) => {
+    if (!detalle?.i_CveServAgendaDet) return;
+    setGuardandoMontos(true);
+
+    try {
+      const payload: EditarMontosPayload = {
+        i_Cantidad: parseFloat(formMontoCantidad),
+        d_PrecioUnitario: parseFloat(formMontoPrecioUnitario),
+        Sesiones: sesiones,
+        b_ConfirmaFacturas: confirmaFacturas,
+        b_ConfirmaUtilidad: confirmaUtilidad,
+      };
+
+      const res = await AgendaService.editarMontosServicio(detalle.i_CveServAgendaDet, payload);
+      if (res.exito || res.status === 200) {
+        toast.success("Montos actualizados");
+        setModalEditarMontosAbierto(false);
+        setModalFacturasAsociadasAbierto(false);
+        setModalUtilidadAbierto(false);
+        await cargarDetalle();
+        if (onGuardadoExitoso) onGuardadoExitoso();
+      } else {
+        const conflicto = res.conflicto;
+        if (conflicto?.codigo === "CONFIRMAR_FACTURAS") {
+          setEstadoConfirmaFacturas(confirmaFacturas);
+          setEstadoConfirmaUtilidad(confirmaUtilidad);
+          setSesionesParaReenvio(sesiones);
+
+          setCargandoFacturasAsociadas(true);
+          try {
+            const facturasData = await AgendaService.getFacturasAsociadas(detalle.i_CveServAgendaDet);
+            setDatosFacturasAsociadas(facturasData);
+            setModalFacturasAsociadasAbierto(true);
+          } catch (fErr: any) {
+            toast.error(fErr.message || "Error al consultar las facturas asociadas.");
+            setModalEditarMontosAbierto(true);
+          } finally {
+            setCargandoFacturasAsociadas(false);
+          }
+        } else if (conflicto?.codigo === "CONFIRMAR_UTILIDAD") {
+          setEstadoConfirmaFacturas(confirmaFacturas);
+          setEstadoConfirmaUtilidad(confirmaUtilidad);
+          setSesionesParaReenvio(sesiones);
+          setConflictoUtilidad(conflicto);
+          setModalUtilidadAbierto(true);
+        } else {
+          toast.error(conflicto?.error || "Error al actualizar los montos.");
+          setModalEditarMontosAbierto(true);
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error al actualizar los montos.");
+      setModalEditarMontosAbierto(true);
+    } finally {
+      setGuardandoMontos(false);
+    }
+  };
+
+  const handleGuardarMontos = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const cant = parseFloat(formMontoCantidad);
+    if (isNaN(cant) || cant <= 0) {
+      toast.warning("La cantidad debe ser mayor a 0.");
+      return;
+    }
+
+    const precio = parseFloat(formMontoPrecioUnitario);
+    if (isNaN(precio) || precio < 0) {
+      toast.warning("El precio unitario no puede ser negativo.");
+      return;
+    }
+
+    const cantOriginal = Number(detalle?.i_Cantidad ?? 0);
+    const cantidadCambio = Math.abs(cant - cantOriginal) > 0.0001;
+
+    if (esServicioPorHoras && cantidadCambio && sesionesVigentes.length > 0) {
+      setModalAdvertenciaHorasAbierto(true);
+    } else {
+      setSesionesParaReenvio([]);
+      ejecutarGuardarMontos([], false, false);
+    }
+  };
+
+  const handleContinuarAdvertenciaHoras = () => {
+    setModalAdvertenciaHorasAbierto(false);
+    setModalEditarMontosAbierto(false);
+    setSecuencialSesionesAjustadas([]);
+    setSecuencialIndex(0);
+    setModalSecuencialAbierto(true);
+  };
+
+  const handleSiguienteSecuencial = (sesionAjustada: SesionHorario) => {
+    const nuevasAjustadas = [
+      ...secuencialSesionesAjustadas.filter(
+        (s) => s.i_CveAgendaDetalle !== sesionAjustada.i_CveAgendaDetalle
+      ),
+      sesionAjustada,
+    ];
+    setSecuencialSesionesAjustadas(nuevasAjustadas);
+    setSecuencialIndex((prev) => prev + 1);
+  };
+
+  const handleTerminarSecuencial = (sesionFinal: SesionHorario) => {
+    const todasAjustadas = [
+      ...secuencialSesionesAjustadas.filter(
+        (s) => s.i_CveAgendaDetalle !== sesionFinal.i_CveAgendaDetalle
+      ),
+      sesionFinal,
+    ];
+    setSecuencialSesionesAjustadas(todasAjustadas);
+    setSesionesParaReenvio(todasAjustadas);
+    setModalSecuencialAbierto(false);
+    ejecutarGuardarMontos(todasAjustadas, false, false);
+  };
+
+  const handleConfirmarCancelarFacturas = () => {
+    setModalFacturasAsociadasAbierto(false);
+    setEstadoConfirmaFacturas(true);
+    ejecutarGuardarMontos(sesionesParaReenvio, true, estadoConfirmaUtilidad);
+  };
+
+  const handleCancelarFacturasModal = () => {
+    setModalFacturasAsociadasAbierto(false);
+    setModalEditarMontosAbierto(true);
+  };
+
+  const handleConfirmarUtilidad = () => {
+    setModalUtilidadAbierto(false);
+    setEstadoConfirmaUtilidad(true);
+    ejecutarGuardarMontos(sesionesParaReenvio, estadoConfirmaFacturas, true);
+  };
+
+  const handleCancelarUtilidadModal = () => {
+    setModalUtilidadAbierto(false);
+    setModalEditarMontosAbierto(true);
+  };
 
   if (!abierto) return null;
 
@@ -1003,6 +1463,26 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
         </span>
       );
     }
+
+    if ((sesion as any).i_CveEstatus === 5) {
+      return (
+        <span
+          title="Llegó la fecha de finalización estimada. Falta confirmar que terminó."
+          style={{
+            padding: "3px 14px",
+            borderRadius: "20px",
+            fontSize: "12px",
+            fontWeight: 700,
+            backgroundColor: "#ffe5d0",
+            color: "#984c0c",
+            display: "inline-block",
+          }}
+        >
+          Por confirmar
+        </span>
+      );
+    }
+
     const iCveReprograma =
       sesion.i_CveReprograma ??
       (sesion as any).i_cveReprograma ??
@@ -1073,6 +1553,36 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
     );
   };
 
+  const renderEstatusBadge = (estatus: number | null, sinProgramar?: boolean) => {
+    if (sinProgramar) {
+      return <span className="badge badge-warning">Pendiente</span>;
+    }
+    switch (estatus) {
+      case 0:
+        return <span className="badge badge-danger">Cancelado</span>;
+      case 1:
+        return <span className="badge badge-primary">Programado</span>;
+      case 2:
+        return <span className="badge badge-warning">En curso</span>;
+      case 3:
+        return <span className="badge badge-success">Terminado</span>;
+      case 4:
+        return <span className="badge badge-secondary">Reprogramado</span>;
+      case 5:
+        return (
+          <span
+            className="badge"
+            title="Llegó la fecha de finalización estimada. Falta confirmar que terminó."
+            style={{ backgroundColor: "#ffe5d0", color: "#984c0c" }}
+          >
+            Por confirmar
+          </span>
+        );
+      default:
+        return <span className="badge badge-primary">Programado</span>;
+    }
+  };
+
   const renderBadgeCobroFactura = (f: FacturaDetalleDto) => {
     if (f.b_Cancelada) {
       return (
@@ -1103,19 +1613,6 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
       </span>
     );
   };
-
-  // Obtener arreglo seguro de sesiones
-  const listaSesiones: SesionDetalleDto[] = detalle
-    ? detalle.Sesiones || (detalle as any).sesiones || (detalle as any).Detalles || (detalle as any).detalles || []
-    : [];
-
-  const tieneSesionConInstructorApoyo = listaSesiones.some((s) => {
-    const bCanc = Boolean(s.b_Cancelada || (s as any).b_cancelada || (s as any).bCancelada);
-    const iCveReprog = s.i_CveReprograma ?? (s as any).i_cveReprograma;
-    const esReprog = iCveReprog != null && Number(iCveReprog) > 0;
-    const esVig = !bCanc && !esReprog;
-    return esVig && s.i_CveApoyo != null && Number(s.i_CveApoyo) > 0 && s.b_TipoProvInsApoyo === false;
-  });
 
   return (
     <div
@@ -1233,6 +1730,8 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   </div>
                 </div>
 
+                {renderBannerEstatus()}
+
                 {detalle.b_SinProgramar && (
                   <div
                     style={{
@@ -1252,7 +1751,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <AlertTriangle size={16} style={{ color: "#d97706", flexShrink: 0 }} />
                       <span>
-                        Este servicio está <strong>pendiente de programar</strong> — falta definir fecha, hora e instructor.
+                        Este servicio está <strong>pendiente de programar</strong> — falta definir fecha, hora y personal.
                       </span>
                     </div>
                     <button
@@ -1411,24 +1910,32 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                                   <span style={{ fontWeight: 500, color: "#1e293b" }}>
                                     Sesión {sesion.i_Orden || sIdx + 1}
                                   </span>
-                                  <span style={{ color: "#475569" }}>
-                                    — {formatearFechaCorta(sesion.d_FechaHoraInicio)}
-                                  </span>
-
-                                  {detalle.b_TipoDato && (
-                                    <span style={{ color: "#64748b", fontFamily: "var(--font-mono)", fontSize: "12px" }}>
-                                      (
-                                      {new Date(sesion.d_FechaHoraInicio).toLocaleTimeString("en-US", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}{" "}
-                                      a{" "}
-                                      {new Date(sesion.d_FechaHoraFin).toLocaleTimeString("en-US", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
-                                      )
+                                  {detalle.i_CveTipoServicio === 3 || detalle.i_CveTipoServicio === 6 ? (
+                                    <span style={{ color: "#475569" }}>
+                                      — {formatearFechaTexto(sesion.d_FechaHoraInicio)} – {formatearFechaTexto(sesion.d_FechaHoraFin)}
                                     </span>
+                                  ) : (
+                                    <>
+                                      <span style={{ color: "#475569" }}>
+                                        — {formatearFechaCorta(sesion.d_FechaHoraInicio)}
+                                      </span>
+
+                                      {detalle.b_TipoDato && (
+                                        <span style={{ color: "#64748b", fontFamily: "var(--font-mono)", fontSize: "12px" }}>
+                                          (
+                                          {new Date(sesion.d_FechaHoraInicio).toLocaleTimeString("en-US", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })}{" "}
+                                          a{" "}
+                                          {new Date(sesion.d_FechaHoraFin).toLocaleTimeString("en-US", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })}
+                                          )
+                                        </span>
+                                      )}
+                                    </>
                                   )}
                                 </div>
 
@@ -1972,9 +2479,31 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
 
               {/* BLOQUE 1.4 — Montos (Con Card/Contenedor diferenciado surface-2) */}
               <div style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px" }}>
-                <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: "0 0 12px 0" }}>
-                  Información de montos
-                </h4>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
+                    Información de montos
+                  </h4>
+                  {!ocultarEditarMontos && (
+                    <button
+                      type="button"
+                      className="btn-icon"
+                      title="Editar montos"
+                      onClick={abrirModalEditarMontos}
+                      style={{
+                        padding: "4px",
+                        border: "none",
+                        background: "transparent",
+                        color: "#2B8FCC",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Edit2 size={15} />
+                    </button>
+                  )}
+                </div>
 
                 {detalle.v_TipoVenta === "proyecto" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -2000,6 +2529,20 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                     </div>
                     <p style={{ fontSize: "11px", color: "#64748b", fontStyle: "italic", margin: "4px 0 0 0" }}>
                       Nota: Este servicio forma parte de un proyecto con monto global — el monto se factura por grupo, no de forma individual.
+                    </p>
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#b45309",
+                        fontStyle: "italic",
+                        margin: "2px 0 0 0",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "5px",
+                      }}
+                    >
+                      <Lock size={12} style={{ flexShrink: 0, color: "#d97706" }} />
+                      <span>PARA CAMBIAR EL MONTO GLOBAL DEBE CANCELAR LA FACTURA</span>
                     </p>
                   </div>
                 ) : (
@@ -2038,7 +2581,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   <h4 style={{ fontSize: "12px", fontWeight: 500, color: "#64748b", margin: 0 }}>
                     Servicio externo contratado
                   </h4>
-                  {detalle.i_CveProveedor && Number(detalle.i_CveProveedor) > 0 ? (
+                  {!detalle.b_SinProgramar && detalle.i_CveProveedor && Number(detalle.i_CveProveedor) > 0 ? (
                     <button
                       type="button"
                       style={{
@@ -2062,7 +2605,13 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   ) : null}
                 </div>
 
-                {!detalle.i_CveProveedor || Number(detalle.i_CveProveedor) <= 0 ? (
+                {detalle.b_SinProgramar ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "4px" }}>
+                    <span style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>
+                      Primero programa el servicio para poder agregar un servicio externo.
+                    </span>
+                  </div>
+                ) : !detalle.i_CveProveedor || Number(detalle.i_CveProveedor) <= 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "4px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
                       <span style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>
@@ -3407,6 +3956,795 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
         onConfirmar={handleConfirmarEliminarGasto}
         cargando={eliminandoGasto}
       />
+
+      {/* Sub-modal Editar montos */}
+      {modalEditarMontosAbierto && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(3px)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "12px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              width: "100%",
+              maxWidth: "460px",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "16px 20px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: "#f8fafc",
+              }}
+            >
+              <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#0f172a", margin: 0 }}>
+                Editar montos
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalEditarMontosAbierto(false)}
+                disabled={guardandoMontos}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body Form */}
+            <form onSubmit={handleGuardarMontos} style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* Cantidad con unidad a la derecha */}
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                  Cantidad <span style={{ color: "#dc3545" }}>*</span>
+                </label>
+                <div style={{ display: "flex" }}>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0.0001"
+                    className="form-control"
+                    placeholder="0"
+                    value={formMontoCantidad}
+                    onChange={(e) => setFormMontoCantidad(e.target.value)}
+                    disabled={guardandoMontos}
+                    required
+                    style={{
+                      fontSize: "13px",
+                      height: "38px",
+                      borderTopRightRadius: 0,
+                      borderBottomRightRadius: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      backgroundColor: "#f1f5f9",
+                      border: "1px solid #cbd5e1",
+                      borderLeft: "none",
+                      padding: "0 12px",
+                      fontSize: "12px",
+                      color: "#475569",
+                      display: "flex",
+                      alignItems: "center",
+                      borderTopRightRadius: "6px",
+                      borderBottomRightRadius: "6px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {detalle?.v_Unidad || "unidad"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Precio unitario s/IVA con prefijo $ */}
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                  Precio unitario s/IVA <span style={{ color: "#dc3545" }}>*</span>
+                </label>
+                <div style={{ display: "flex" }}>
+                  <span
+                    style={{
+                      backgroundColor: "#f1f5f9",
+                      border: "1px solid #cbd5e1",
+                      borderRight: "none",
+                      padding: "0 12px",
+                      fontSize: "13px",
+                      color: "#64748b",
+                      display: "flex",
+                      alignItems: "center",
+                      borderTopLeftRadius: "6px",
+                      borderBottomLeftRadius: "6px",
+                    }}
+                  >
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    className="form-control"
+                    placeholder="0.00"
+                    value={formMontoPrecioUnitario}
+                    onChange={(e) => setFormMontoPrecioUnitario(e.target.value)}
+                    disabled={guardandoMontos}
+                    required
+                    style={{
+                      fontSize: "13px",
+                      height: "38px",
+                      borderTopLeftRadius: 0,
+                      borderBottomLeftRadius: 0,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Precio total s/IVA (Solo lectura) */}
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "#64748b", display: "block", marginBottom: "6px" }}>
+                  Precio total s/IVA
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  className="form-control"
+                  value={`$${montoSubtotalCalculado.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  style={{
+                    fontSize: "13px",
+                    height: "38px",
+                    backgroundColor: "#f8fafc",
+                    fontFamily: "var(--font-mono)",
+                    color: "#1e293b",
+                    cursor: "not-allowed",
+                  }}
+                />
+              </div>
+
+              {/* Precio final c/IVA (Solo lectura) */}
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "#64748b", display: "block", marginBottom: "6px" }}>
+                  Precio final c/IVA
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  className="form-control"
+                  value={`$${montoFinalConIvaCalculado.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  style={{
+                    fontSize: "14px",
+                    height: "38px",
+                    backgroundColor: "#f8fafc",
+                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
+                    color: "#2B8FCC",
+                    cursor: "not-allowed",
+                  }}
+                />
+              </div>
+
+              {/* Footer acciones */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setModalEditarMontosAbierto(false)}
+                  disabled={guardandoMontos}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  style={{ backgroundColor: "#2B8FCC" }}
+                  disabled={guardandoMontos}
+                >
+                  {guardandoMontos ? "Guardando..." : "Guardar cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Advertencia Ajuste de Horas */}
+      {modalAdvertenciaHorasAbierto && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(3px)",
+            zIndex: 1110,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "12px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              width: "100%",
+              maxWidth: "440px",
+              overflow: "hidden",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "10px",
+                  backgroundColor: "#fef3c7",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <AlertTriangle size={22} style={{ color: "#d97706" }} />
+              </div>
+              <h3 style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", margin: 0 }}>
+                Cambiaste las horas del servicio
+              </h3>
+            </div>
+
+            <p style={{ fontSize: "13px", color: "#475569", margin: 0, lineHeight: 1.5 }}>
+              El servicio pasa de <strong>{detalle?.i_Cantidad ?? 0} h</strong> a{" "}
+              <strong>{formMontoCantidad} h</strong>. Ajusta la fecha y hora de cada sesión para que sumen máximo{" "}
+              <strong>{formMontoCantidad} h</strong>.
+            </p>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setModalAdvertenciaHorasAbierto(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                style={{ backgroundColor: "#2B8FCC" }}
+                onClick={handleContinuarAdvertenciaHoras}
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Sesión - Modo Secuencial (Ajuste de Horas) */}
+      <ModalEditarInstructorSesion
+        abierto={modalSecuencialAbierto}
+        sesion={sesionesVigentes[secuencialIndex] || null}
+        iCveTipoServicio={detalle?.i_CveTipoServicio}
+        bTipoDato={detalle?.b_TipoDato}
+        cantidadTotal={parseFloat(formMontoCantidad) || detalle?.i_Cantidad}
+        unidad={detalle?.v_Unidad}
+        todasLasSesiones={listaSesiones}
+        modoSecuencial={true}
+        secuencialIndex={secuencialIndex}
+        secuencialTotal={sesionesVigentes.length}
+        cantidadNuevaHoras={parseFloat(formMontoCantidad) || 0}
+        sesionesAjustadasEnMemoria={secuencialSesionesAjustadas}
+        onCerrar={() => {
+          setModalSecuencialAbierto(false);
+        }}
+        onSiguienteSecuencial={handleSiguienteSecuencial}
+        onTerminarSecuencial={handleTerminarSecuencial}
+        onGuardadoExitoso={() => {}}
+      />
+
+      {/* Modal Facturas Asociadas (Conflicto 409 CONFIRMAR_FACTURAS) */}
+      {modalFacturasAsociadasAbierto && datosFacturasAsociadas && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(3px)",
+            zIndex: 1120,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "12px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              width: "100%",
+              maxWidth: "680px",
+              maxHeight: "90vh",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "16px 20px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: "#fef2f2",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <AlertTriangle size={18} style={{ color: "#dc2626" }} />
+                <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#991b1b", margin: 0 }}>
+                  El servicio tiene {datosFacturasAsociadas.Facturas?.length ?? 0} factura(s) asociada(s)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelarFacturasModal}
+                disabled={guardandoMontos}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content / Scrollable */}
+            <div style={{ padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+              <p style={{ fontSize: "13px", color: "#334155", margin: 0, lineHeight: 1.5 }}>
+                Para cambiar los montos se cancelarán <strong>estas facturas y todos sus abonos (pagados y programados)</strong>, con el motivo &quot;Cambio de montos del servicio&quot;. Después habrá que facturar de nuevo con el monto actualizado.
+              </p>
+
+              {/* Lista de facturas */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {datosFacturasAsociadas.Facturas?.map((fac) => {
+                  const serviciosFactura = (datosFacturasAsociadas.Servicios || []).filter(
+                    (s) => s.i_CveFactura === fac.i_CveFacturas
+                  );
+                  const abonosFactura = (datosFacturasAsociadas.Abonos || []).filter(
+                    (a) => a.i_CveFactura === fac.i_CveFacturas
+                  );
+
+                  return (
+                    <div
+                      key={`fac-${fac.i_CveFacturas}`}
+                      style={{
+                        backgroundColor: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        padding: "14px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                      }}
+                    >
+                      {/* 1. Línea principal */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: "8px",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontWeight: 600, color: "#0f172a" }}>
+                            {fac.v_NoFactura || "Sin folio"}
+                          </span>
+                          <span style={{ color: "#94a3b8" }}>·</span>
+                          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500, color: "#1e293b" }}>
+                            ${(fac.d_Monto ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          {fac.d_FechaHora && (
+                            <>
+                              <span style={{ color: "#94a3b8" }}>·</span>
+                              <span style={{ color: "#64748b" }}>
+                                {formatearFechaTexto(fac.d_FechaHora)}
+                              </span>
+                            </>
+                          )}
+                          {fac.v_EstadoCobro && (
+                            <>
+                              <span style={{ color: "#94a3b8" }}>·</span>
+                              <span style={{ color: "#475569", fontWeight: 500 }}>
+                                {fac.v_EstadoCobro}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        {fac.b_Timbrada && (
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              padding: "2px 8px",
+                              borderRadius: "12px",
+                              backgroundColor: "#e0f2fe",
+                              color: "#0369a1",
+                              border: "1px solid #bae6fd",
+                            }}
+                          >
+                            Timbrada
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 2. Tabla Servicios que cubre esta factura */}
+                      <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", display: "block", marginBottom: "6px" }}>
+                          Servicios que cubre esta factura:
+                        </span>
+                        {serviciosFactura.length === 0 ? (
+                          <p style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic", margin: 0 }}>
+                            Sin servicios detallados
+                          </p>
+                        ) : (
+                          <>
+                            <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "6px", backgroundColor: "#ffffff" }}>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
+                                <thead>
+                                  <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#64748b" }}>
+                                    <th style={{ padding: "6px 10px", fontWeight: 600 }}>Servicio</th>
+                                    <th style={{ padding: "6px 10px", fontWeight: 600 }}>Tipo</th>
+                                    <th style={{ padding: "6px 10px", fontWeight: 600 }}>Cot. GI</th>
+                                    <th style={{ padding: "6px 10px", fontWeight: 600 }}>Cantidad</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {serviciosFactura.map((srv, sIdx) => (
+                                    <tr
+                                      key={`srv-${srv.i_CveServAgendaDet || sIdx}`}
+                                      style={{
+                                        borderBottom: sIdx < serviciosFactura.length - 1 ? "1px solid #f1f5f9" : "none",
+                                        backgroundColor: srv.b_OtroServicio ? "#fffdf5" : "transparent",
+                                      }}
+                                    >
+                                      <td style={{ padding: "6px 10px", color: "#1e293b", fontWeight: 500 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                                          <span>{srv.v_Servicio || "—"}</span>
+                                          {srv.b_OtroServicio && (
+                                            <span
+                                              style={{
+                                                fontSize: "10px",
+                                                fontWeight: 600,
+                                                padding: "1px 6px",
+                                                borderRadius: "10px",
+                                                backgroundColor: "#fef3c7",
+                                                color: "#b45309",
+                                                border: "1px solid #fde68a",
+                                                whiteSpace: "nowrap",
+                                              }}
+                                            >
+                                              Otro servicio
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td style={{ padding: "6px 10px", color: "#475569" }}>
+                                        {srv.v_TipoServicio || "—"}
+                                      </td>
+                                      <td style={{ padding: "6px 10px", color: "#475569", fontFamily: "var(--font-mono)" }}>
+                                        {srv.v_NoCotizacionGI || "—"}
+                                      </td>
+                                      <td style={{ padding: "6px 10px", color: "#1e293b", whiteSpace: "nowrap" }}>
+                                        {srv.i_Cantidad} {srv.v_Unidad || ""}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            {serviciosFactura.some((s) => s.b_OtroServicio) && (
+                              <div
+                                style={{
+                                  marginTop: "6px",
+                                  padding: "6px 10px",
+                                  backgroundColor: "#fffbeb",
+                                  border: "1px solid #fde68a",
+                                  borderRadius: "6px",
+                                  fontSize: "11px",
+                                  color: "#92400e",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                }}
+                              >
+                                <AlertTriangle size={13} style={{ color: "#d97706", flexShrink: 0 }} />
+                                <span>Esta factura también cubre otros servicios; se cancelará también para ellos.</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* 3. Tabla Abonos que se cancelarán */}
+                      <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", display: "block", marginBottom: "6px" }}>
+                          Abonos que se cancelarán:
+                        </span>
+                        {abonosFactura.length === 0 ? (
+                          <p style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic", margin: 0 }}>
+                            Sin abonos
+                          </p>
+                        ) : (
+                          <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "6px", backgroundColor: "#ffffff" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
+                              <thead>
+                                <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#64748b" }}>
+                                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>Monto</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>Fecha programada</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>Estado</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>Fecha de pago</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {abonosFactura.map((abono, aIdx) => (
+                                  <tr
+                                    key={`abono-${abono.i_CveAbono || aIdx}`}
+                                    style={{
+                                      borderBottom: aIdx < abonosFactura.length - 1 ? "1px solid #f1f5f9" : "none",
+                                    }}
+                                  >
+                                    <td style={{ padding: "6px 10px", fontFamily: "var(--font-mono)", fontWeight: 500, color: "#0f172a", whiteSpace: "nowrap" }}>
+                                      ${(abono.d_Monto ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td style={{ padding: "6px 10px", color: "#475569", whiteSpace: "nowrap" }}>
+                                      {abono.d_FechaProgramada ? formatearFechaTexto(abono.d_FechaProgramada) : "—"}
+                                    </td>
+                                    <td style={{ padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                      {abono.i_Estado === 1 ? (
+                                        <span
+                                          style={{
+                                            fontSize: "10px",
+                                            fontWeight: 600,
+                                            padding: "2px 6px",
+                                            borderRadius: "10px",
+                                            backgroundColor: "#dcfce7",
+                                            color: "#15803d",
+                                            border: "1px solid #bbf7d0",
+                                          }}
+                                        >
+                                          Pagado
+                                        </span>
+                                      ) : (
+                                        <span
+                                          style={{
+                                            fontSize: "10px",
+                                            fontWeight: 600,
+                                            padding: "2px 6px",
+                                            borderRadius: "10px",
+                                            backgroundColor: "#f1f5f9",
+                                            color: "#475569",
+                                            border: "1px solid #e2e8f0",
+                                          }}
+                                        >
+                                          Programado
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                      {abono.i_Estado === 1 ? (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                                          <span style={{ color: "#1e293b" }}>
+                                            {abono.d_FechaAbono ? formatearFechaTexto(abono.d_FechaAbono) : "—"}
+                                          </span>
+                                          <span style={{ fontSize: "10px", color: "#15803d", fontWeight: 500 }}>
+                                            Pago ya recibido
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span style={{ color: "#94a3b8" }}>—</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pregunta final */}
+              <div
+                style={{
+                  padding: "12px 14px",
+                  backgroundColor: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "8px",
+                  marginTop: "4px",
+                }}
+              >
+                <p style={{ fontSize: "13px", fontWeight: 600, color: "#991b1b", margin: 0, textAlign: "center" }}>
+                  ¿Desea cancelar todas las facturas asociadas?
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: "14px 20px",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+                backgroundColor: "#f8fafc",
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleCancelarFacturasModal}
+                disabled={guardandoMontos}
+              >
+                No
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ backgroundColor: "#dc2626", color: "#ffffff", borderColor: "#dc2626" }}
+                onClick={handleConfirmarCancelarFacturas}
+                disabled={guardandoMontos}
+              >
+                {guardandoMontos ? "Cancelando y guardando..." : "Sí, cancelar facturas"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Advertencia de Utilidad (Conflicto 409 CONFIRMAR_UTILIDAD) */}
+      {modalUtilidadAbierto && conflictoUtilidad && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(3px)",
+            zIndex: 1130,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "12px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              width: "100%",
+              maxWidth: "460px",
+              overflow: "hidden",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "12px",
+                backgroundColor: "#fef3c7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "14px",
+              }}
+            >
+              <AlertTriangle size={26} style={{ color: "#d97706" }} />
+            </div>
+
+            <h3 style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", margin: "0 0 8px 0" }}>
+              Utilidad del servicio
+            </h3>
+
+            <p style={{ fontSize: "13px", color: "#475569", margin: "0 0 16px 0", lineHeight: 1.5 }}>
+              {conflictoUtilidad.error}
+            </p>
+
+            {conflictoUtilidad.d_Utilidad !== null && conflictoUtilidad.d_Utilidad !== undefined && (
+              <div
+                style={{
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  width: "100%",
+                  marginBottom: "20px",
+                }}
+              >
+                <span style={{ fontSize: "11px", fontWeight: 500, color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>
+                  Utilidad proyectada (sin IVA)
+                </span>
+                <p
+                  style={{
+                    fontSize: "26px",
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                    color: conflictoUtilidad.d_Utilidad < 0 ? "#dc2626" : "#16a34a",
+                    margin: 0,
+                  }}
+                >
+                  {conflictoUtilidad.d_Utilidad < 0 ? "-" : ""}$
+                  {Math.abs(conflictoUtilidad.d_Utilidad).toLocaleString("es-MX", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", width: "100%" }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleCancelarUtilidadModal}
+                disabled={guardandoMontos}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                style={{ backgroundColor: "#2B8FCC" }}
+                onClick={handleConfirmarUtilidad}
+                disabled={guardandoMontos}
+              >
+                {guardandoMontos ? "Guardando..." : "Aceptar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -232,6 +232,7 @@ export const ConsultorService = {
       v_KeyVoBo: cabeceraRaw.v_KeyVoBo ?? null,
       i_CveTipoServicio: cabeceraRaw.i_CveTipoServicio ?? 0,
       v_Notas: cabeceraRaw.v_Notas ?? null,
+      d_FechaConfirmacionTermino: cabeceraRaw.d_FechaConfirmacionTermino ?? null,
     };
 
     const sesiones = (Array.isArray(sesionesRaw) ? sesionesRaw : []).map((s: any) => ({
@@ -293,5 +294,36 @@ export const ConsultorService = {
       i_CveAgendaEntregables,
       b_Entregado,
     });
+  },
+
+  /**
+   * POST instructores/consultor/confirmarTermino/{i_CveServAgendaDet}
+   * Confirma la terminación de un servicio desde Mis servicios
+   */
+  async confirmarTermino(
+    iCveServAgendaDet: number
+  ): Promise<{ exito: boolean; mensaje?: string; status?: number }> {
+    try {
+      const resp = await apiClient.post(
+        `instructores/consultor/confirmarTermino/${iCveServAgendaDet}`
+      );
+      return {
+        exito: true,
+        mensaje: resp.data?.mensaje || resp.data?.v_Mensaje || "Servicio confirmado como terminado",
+        status: resp.status,
+      };
+    } catch (error: any) {
+      const msg =
+        error.response?.data?.mensaje ||
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Error al confirmar terminado";
+      return {
+        exito: false,
+        mensaje: msg,
+        status: error?.response?.status,
+      };
+    }
   },
 };

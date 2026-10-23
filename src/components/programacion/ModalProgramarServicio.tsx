@@ -28,6 +28,7 @@ interface Props {
 
 interface SesionRowState {
   fecha: string;
+  fechaFinEstimada?: string;
   horaInicio: string;
   horaFin: string;
   i_CveArea: string;
@@ -151,6 +152,7 @@ function generarSesiones(
       const horaFin = sumarMinutosAHorario(horaInicio, duraciones[i]);
       resultado.push({
         fecha: prev.fecha || todayStr,
+        fechaFinEstimada: prev.fechaFinEstimada || prev.fecha || todayStr,
         horaInicio,
         horaFin,
         i_CveArea: prev.i_CveArea || defaultAreaId,
@@ -162,6 +164,7 @@ function generarSesiones(
       const horaFin = sumarMinutosAHorario(horaInicio, duraciones[i]);
       resultado.push({
         fecha: fechaNueva,
+        fechaFinEstimada: fechaNueva,
         horaInicio,
         horaFin,
         i_CveArea: resultado[0]?.i_CveArea || defaultAreaId,
@@ -228,8 +231,14 @@ export const ModalProgramarServicio: React.FC<Props> = ({
     return 6;
   }, [detalle]);
 
-  const config = GROUP_CONFIG[tipoId] || GROUP_CONFIG[6];
   const esCapacitacion = tipoId === 2;
+  const esEstudioOServicio = tipoId === 3 || tipoId === 6;
+  const config = GROUP_CONFIG[tipoId] || {
+    nombre: "SERVICIO",
+    colorBorder: "#10b981",
+    bg: "#f0fdf4",
+    colorText: "#15803d",
+  };
 
   const esUnidadHoras = useMemo(() => {
     if (!detalle) return false;
@@ -402,8 +411,18 @@ export const ModalProgramarServicio: React.FC<Props> = ({
     for (let i = 0; i < sesiones.length; i++) {
       const s = sesiones[i];
       if (!s.fecha) {
-        toast.warning(`Selecciona la fecha para la Sesión ${i + 1}.`);
+        toast.warning(esEstudioOServicio ? `Ingresa la fecha de inicio para la Sesión ${i + 1}.` : `Selecciona la fecha para la Sesión ${i + 1}.`);
         return;
+      }
+      if (esEstudioOServicio) {
+        if (!s.fechaFinEstimada) {
+          toast.warning(`Ingresa la fecha de finalización estimada para la Sesión ${i + 1}.`);
+          return;
+        }
+        if (s.fechaFinEstimada < s.fecha) {
+          toast.warning(`La fecha de finalización estimada debe ser mayor o igual que la de inicio en la Sesión ${i + 1}.`);
+          return;
+        }
       }
       if (bTipoDatoManejaHorario) {
         if (!s.horaInicio || !s.horaFin) {
@@ -462,7 +481,9 @@ export const ModalProgramarServicio: React.FC<Props> = ({
           : `${ses.fecha}T00:00:00`,
         d_FechaHoraFin: bTipoDatoManejaHorario
           ? `${ses.fecha}T${ses.horaFin}:00`
-          : `${ses.fecha}T23:59:59`,
+          : esEstudioOServicio
+          ? `${ses.fechaFinEstimada || ses.fecha}T23:59:59`
+          : `${ses.fecha}T00:00:00`,
         i_CveArea: ses.i_CveArea ? Number(ses.i_CveArea) : null,
       })),
     };
@@ -1104,8 +1125,18 @@ export const ModalProgramarServicio: React.FC<Props> = ({
                                 fontWeight: 700,
                               }}
                             >
-                              Fecha
+                              {esEstudioOServicio ? "Fecha de inicio" : "Fecha"}
                             </th>
+                            {esEstudioOServicio && (
+                              <th
+                                style={{
+                                  padding: "8px 12px",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                Fecha de finalización estimada
+                              </th>
+                            )}
                             {bTipoDatoManejaHorario && (
                               <>
                                 <th
@@ -1179,6 +1210,36 @@ export const ModalProgramarServicio: React.FC<Props> = ({
                                   }
                                 />
                               </td>
+                              {esEstudioOServicio && (
+                                <td
+                                  style={{
+                                    padding: "8px 12px",
+                                    verticalAlign: "middle",
+                                  }}
+                                >
+                                  <InputFechaTexto
+                                    height="30px"
+                                    value={ses.fechaFinEstimada || ""}
+                                    onChange={(val) =>
+                                      handleUpdateSesion(sIdx, "fechaFinEstimada", val)
+                                    }
+                                  />
+                                  {ses.fecha &&
+                                    ses.fechaFinEstimada &&
+                                    ses.fechaFinEstimada < ses.fecha && (
+                                      <span
+                                        style={{
+                                          color: "#dc2626",
+                                          fontSize: "11px",
+                                          display: "block",
+                                          marginTop: "2px",
+                                        }}
+                                      >
+                                        Debe ser mayor o igual que la de inicio
+                                      </span>
+                                    )}
+                                </td>
+                              )}
                               {bTipoDatoManejaHorario && (
                                 <>
                                   <td

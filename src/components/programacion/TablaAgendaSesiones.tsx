@@ -6,7 +6,7 @@ import { AgendaGetDto } from "@/types/calendario";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
 import { isToday, isSameDay, addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
-import { limpiarDecimales } from "@/lib/date-utils";
+import { limpiarDecimales, formatearFechaTexto } from "@/lib/date-utils";
 
 interface Props {
   datos: AgendaGetDto[];
@@ -62,6 +62,16 @@ const renderEstatusBadge = (cveEstatus: number | null) => {
       return <span className="badge badge-success">Terminado</span>;
     case 4:
       return <span className="badge badge-secondary">Reprogramado</span>;
+    case 5:
+      return (
+        <span
+          className="badge"
+          title="Llegó la fecha de finalización estimada. Falta confirmar que terminó."
+          style={{ backgroundColor: "#ffe5d0", color: "#984c0c" }}
+        >
+          Por confirmar
+        </span>
+      );
     default:
       return <span className="badge badge-primary">Programado</span>;
   }
@@ -144,6 +154,12 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
 
               const tieneTitular = item.v_Titular && item.v_Titular.trim().length > 0 && item.v_Titular.trim() !== "—";
               const tieneApoyo = item.v_Apoyo && item.v_Apoyo.trim().length > 0 && item.v_Apoyo.trim() !== "—";
+              const tipoUpper = (item.v_TipoServicio || "").toUpperCase();
+              const esEstudioOServicio =
+                (item as any).i_CveTipoServicio === 3 ||
+                (item as any).i_CveTipoServicio === 6 ||
+                tipoUpper.includes("ESTUDIO") ||
+                tipoUpper.includes("SERVICIO");
 
               return (
                 <tr
@@ -153,18 +169,20 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
                   {/* 1. Fecha inicio */}
                   <td>
                     <div style={{ fontWeight: esHoy ? 700 : 400, color: esHoy ? "#188ae2" : "#1e3a5f" }}>
-                      {fechaTexto}
+                      {esEstudioOServicio && item.d_FechaInicio && item.d_FechaFin
+                        ? `${formatearFechaTexto(item.d_FechaInicio)} – ${formatearFechaTexto(item.d_FechaFin)}`
+                        : fechaTexto}
                     </div>
                   </td>
 
                   {/* 2. Hora inicio */}
                   <td>
-                    <span>{horaIniStr || "—"}</span>
+                    <span>{esEstudioOServicio ? "—" : (horaIniStr || "—")}</span>
                   </td>
 
                   {/* 3. Hora fin */}
                   <td>
-                    <span>{horaFinStr || "—"}</span>
+                    <span>{esEstudioOServicio ? "—" : (horaFinStr || "—")}</span>
                   </td>
 
                   {/* 4. Cliente */}

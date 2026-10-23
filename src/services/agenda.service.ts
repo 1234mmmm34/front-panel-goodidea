@@ -18,6 +18,12 @@ import {
   GastoServicio,
   GuardarGastoPayload,
   ProveedorRapidoPayload,
+  EditarMontosPayload,
+  EditarMontosConflicto,
+  FacturasAsociadas,
+  FacturaAsociada,
+  AbonoAsociado,
+  ServicioFactura,
 } from "@/types/servicios";
 
 export const AgendaService = {
@@ -911,6 +917,126 @@ export const AgendaService = {
    */
   async actualizarCupoServicio(i_CveServAgendaDet: number, i_NumAlumnos: number | null): Promise<void> {
     await apiClient.put(`agenda/servicio/${i_CveServAgendaDet}/cupo`, { i_NumAlumnos });
+  },
+
+  /**
+   * Edita los montos de un servicio agendado.
+   * Endpoint: PUT agenda/servicio/{id}/montos
+   */
+  async editarMontosServicio(
+    id: number,
+    payload: EditarMontosPayload
+  ): Promise<{
+    status: number;
+    exito: boolean;
+    conflicto?: EditarMontosConflicto;
+    mensaje?: string;
+  }> {
+    try {
+      const resp = await apiClient.put(`agenda/servicio/${id}/montos`, payload);
+      if (resp.status >= 200 && resp.status < 300) {
+        return { status: resp.status, exito: true };
+      }
+      return {
+        status: resp.status,
+        exito: false,
+        mensaje: resp.data?.mensaje || resp.data?.message || resp.data?.error || "Error al actualizar montos",
+      };
+    } catch (err: any) {
+      const status = err?.response?.status || 500;
+      const data = err?.response?.data;
+
+      if (status === 409) {
+        const codigo = (data?.codigo || data?.v_Codigo || data?.Codigo || "ERROR") as any;
+        const errorMsg = data?.error || data?.mensaje || data?.message || data?.v_Mensaje || "Conflicto al actualizar montos";
+        const dUtilidad =
+          data?.d_Utilidad != null
+            ? Number(data.d_Utilidad)
+            : data?.dUtilidad != null
+            ? Number(data.dUtilidad)
+            : null;
+        return {
+          status: 409,
+          exito: false,
+          conflicto: {
+            codigo,
+            error: errorMsg,
+            d_Utilidad: dUtilidad,
+          },
+          mensaje: errorMsg,
+        };
+      }
+
+      let msg = "";
+      if (data && typeof data === "object") {
+        if (data.error && typeof data.error === "string") {
+          msg = data.error;
+        } else if (data.errors && typeof data.errors === "object") {
+          const fieldErrors: string[] = [];
+          Object.entries(data.errors).forEach(([field, msgs]) => {
+            if (Array.isArray(msgs)) fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+            else if (typeof msgs === "string") fieldErrors.push(`${field}: ${msgs}`);
+          });
+          if (fieldErrors.length > 0) msg = fieldErrors.join(" | ");
+        }
+        if (!msg) {
+          msg = data.mensaje || data.message || (typeof data === "string" ? data : "");
+        }
+      } else if (typeof data === "string" && data.trim()) {
+        msg = data;
+      }
+      if (!msg) {
+        msg = err?.message || "Ocurrió un error al actualizar los montos.";
+      }
+      return { status, exito: false, mensaje: msg };
+    }
+  },
+
+  /**
+   * Obtiene las facturas y abonos asociados a un servicio agendado.
+   * Endpoint: GET agenda/servicio/{id}/facturasAsociadas
+   */
+  async getFacturasAsociadas(id: number): Promise<FacturasAsociadas> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.get<any>(`agenda/servicio/${id}/facturasAsociadas`);
+      const data = resp.data || {};
+      const facturasRaw = data.Facturas || data.facturas || [];
+      const abonosRaw = data.Abonos || data.abonos || [];
+      const serviciosRaw = data.Servicios || data.servicios || [];
+
+      const Facturas: FacturaAsociada[] = (Array.isArray(facturasRaw) ? facturasRaw : []).map((f: any) => ({
+        i_CveFacturas: Number(f.i_CveFacturas ?? f.i_cveFacturas ?? f.iCveFacturas ?? f.id ?? 0),
+        v_NoFactura: f.v_NoFactura ?? f.v_noFactura ?? f.vNoFactura ?? null,
+        d_Monto: f.d_Monto != null ? Number(f.d_Monto) : null,
+        b_Timbrada: Boolean(f.b_Timbrada ?? f.b_timbrada ?? f.bTimbrada),
+        v_EstadoCobro: f.v_EstadoCobro ?? f.v_estadoCobro ?? f.vEstadoCobro ?? null,
+        d_FechaHora: f.d_FechaHora ?? f.d_fechaHora ?? f.dFechaHora ?? null,
+        v_OtrosServicios: f.v_OtrosServicios ?? f.v_otrosServicios ?? f.vOtrosServicios ?? null,
+      }));
+
+      const Abonos: AbonoAsociado[] = (Array.isArray(abonosRaw) ? abonosRaw : []).map((a: any) => ({
+        i_CveAbono: Number(a.i_CveAbono ?? a.i_cveAbono ?? a.iCveAbono ?? a.id ?? 0),
+        i_CveFactura: Number(a.i_CveFactura ?? a.i_cveFactura ?? a.iCveFactura ?? a.i_CveFacturas ?? 0),
+        d_Monto: Number(a.d_Monto ?? a.d_monto ?? a.dMonto ?? 0),
+        i_Estado: Number(a.i_Estado ?? a.i_estado ?? a.iEstado ?? 0),
+        d_FechaProgramada: a.d_FechaProgramada ?? a.d_fechaProgramada ?? a.dFechaProgramada ?? null,
+        d_FechaAbono: a.d_FechaAbono ?? a.d_fechaAbono ?? a.dFechaAbono ?? null,
+        v_Referencia: a.v_Referencia ?? a.v_referencia ?? a.vReferencia ?? null,
+      }));
+
+      const Servicios: ServicioFactura[] = (Array.isArray(serviciosRaw) ? serviciosRaw : []).map((s: any) => ({
+        i_CveFactura: Number(s.i_CveFactura ?? s.i_cveFactura ?? s.iCveFactura ?? s.i_CveFacturas ?? 0),
+        i_CveServAgendaDet: Number(s.i_CveServAgendaDet ?? s.i_cveServAgendaDet ?? s.iCveServAgendaDet ?? 0),
+        v_Servicio: s.v_Servicio ?? s.v_servicio ?? s.vServicio ?? null,
+        v_TipoServicio: s.v_TipoServicio ?? s.v_tipoServicio ?? s.vTipoServicio ?? null,
+        v_NoCotizacionGI: s.v_NoCotizacionGI ?? s.v_noCotizacionGI ?? s.vNoCotizacionGI ?? null,
+        i_Cantidad: Number(s.i_Cantidad ?? s.i_cantidad ?? s.iCantidad ?? 0),
+        v_Unidad: s.v_Unidad ?? s.v_unidad ?? s.vUnidad ?? null,
+        b_OtroServicio: Boolean(s.b_OtroServicio ?? s.b_otroServicio ?? s.bOtroServicio),
+      }));
+
+      return { Facturas, Abonos, Servicios };
+    }, { Facturas: [], Abonos: [], Servicios: [] });
   },
 };
 

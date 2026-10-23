@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { X, Calendar, Clock, User, Users } from "lucide-react";
-import { SesionDetalleDto, InstructorGetDto, CambiarTitularesSesionDto } from "@/types/servicios";
+import { SesionDetalleDto, InstructorGetDto, CambiarTitularesSesionDto, SesionHorario } from "@/types/servicios";
 import { AgendaService } from "@/services/agenda.service";
-import { formatearFechaCorta } from "@/lib/date-utils";
+import { formatearFechaCorta, formatearFechaTexto } from "@/lib/date-utils";
 import InputFechaTexto from "@/components/ui/InputFechaTexto";
 import { useToast } from "@/context/ToastContext";
 
@@ -65,7 +65,15 @@ interface Props {
   unidad?: string | null;
   todasLasSesiones?: SesionDetalleDto[];
   onCerrar: () => void;
-  onGuardadoExitoso: () => void;
+  onGuardadoExitoso?: () => void;
+  // Modo secuencial para ajuste de horas al editar montos
+  modoSecuencial?: boolean;
+  secuencialIndex?: number;
+  secuencialTotal?: number;
+  cantidadNuevaHoras?: number;
+  sesionesAjustadasEnMemoria?: SesionHorario[];
+  onSiguienteSecuencial?: (sesionAjustada: SesionHorario) => void;
+  onTerminarSecuencial?: (sesionAjustada: SesionHorario) => void;
 }
 
 export const ModalEditarInstructorSesion: React.FC<Props> = ({
@@ -78,6 +86,13 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
   todasLasSesiones,
   onCerrar,
   onGuardadoExitoso,
+  modoSecuencial,
+  secuencialIndex,
+  secuencialTotal,
+  cantidadNuevaHoras,
+  sesionesAjustadasEnMemoria,
+  onSiguienteSecuencial,
+  onTerminarSecuencial,
 }) => {
   const { toast } = useToast();
   const [instructores, setInstructores] = useState<InstructorGetDto[]>([]);
@@ -86,6 +101,7 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
 
   // Estados de Fecha y Horario
   const [formFecha, setFormFecha] = useState<string>("");
+  const [formFechaFinEstimada, setFormFechaFinEstimada] = useState<string>("");
   const [formHoraInicio, setFormHoraInicio] = useState<string>("09:00");
   const [formHoraFin, setFormHoraFin] = useState<string>("13:00");
 
@@ -94,6 +110,7 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
   const [formApoyo, setFormApoyo] = useState<string>("");
 
   const esCapacitacion = Number(iCveTipoServicio) === 2;
+  const esEstudioOServicio = Number(iCveTipoServicio) === 3 || Number(iCveTipoServicio) === 6;
   const tieneProveedor = Boolean(sesion?.b_TipoProvInsApoyo);
 
   const bTipoDatoManejaHorario =
@@ -113,6 +130,7 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
   useEffect(() => {
     if (!abierto || !sesion) {
       setFormFecha("");
+      setFormFechaFinEstimada("");
       setFormHoraInicio("09:00");
       setFormHoraFin("13:00");
       setFormTitular("");
@@ -124,24 +142,44 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
     const fechaIni = sesion.d_FechaHoraInicio || (sesion as any).f_FechaHoraInicio;
     const fechaFin = sesion.d_FechaHoraFin || (sesion as any).f_FechaHoraFin;
 
-    if (fechaIni) {
-      setFormFecha(fechaIni.split("T")[0]);
-      const timeIni = fechaIni.includes("T") ? fechaIni.split("T")[1].substring(0, 5) : "09:00";
-      setFormHoraInicio(timeIni);
+    const fechaIniStr = fechaIni ? fechaIni.split("T")[0] : "";
+    const fechaFinStr = fechaFin ? fechaFin.split("T")[0] : "";
+    const tieneHoraFin235959 = Boolean(fechaFin && fechaFin.includes("23:59:59"));
+    const sonMismaFecha = Boolean(fechaIniStr && fechaFinStr && fechaIniStr === fechaFinStr);
+
+    if (esEstudioOServicio) {
+      setFormFecha(fechaIniStr || new Date().toISOString().split("T")[0]);
+      if (Number(iCveTipoServicio) === 3) {
+        // Estudio: al editar, precargar inicio con la fecha que tiene y dejar fin vacío y obligatorio si inicio y fin son iguales (sin 23:59:59)
+        if (sonMismaFecha && !tieneHoraFin235959) {
+          setFormFechaFinEstimada("");
+        } else {
+          setFormFechaFinEstimada(fechaFinStr || "");
+        }
+      } else {
+        // Servicio: precargar las dos fechas con la fecha que ya tiene
+        setFormFechaFinEstimada(fechaFinStr || fechaIniStr || new Date().toISOString().split("T")[0]);
+      }
     } else {
-      setFormFecha(new Date().toISOString().split("T")[0]);
-      setFormHoraInicio("09:00");
+      if (fechaIni) {
+        setFormFecha(fechaIni.split("T")[0]);
+        const timeIni = fechaIni.includes("T") ? fechaIni.split("T")[1].substring(0, 5) : "09:00";
+        setFormHoraInicio(timeIni);
+      } else {
+        setFormFecha(new Date().toISOString().split("T")[0]);
+        setFormHoraInicio("09:00");
+      }
+
+      if (fechaFin) {
+        const timeFin = fechaFin.includes("T") ? fechaFin.split("T")[1].substring(0, 5) : "13:00";
+        setFormHoraFin(timeFin);
+      } else {
+        setFormHoraFin("13:00");
+      }
     }
 
-    if (fechaFin) {
-      const timeFin = fechaFin.includes("T") ? fechaFin.split("T")[1].substring(0, 5) : "13:00";
-      setFormHoraFin(timeFin);
-    } else {
-      setFormHoraFin("13:00");
-    }
-
-    // Cargar catálogo de instructores si no está cargado
-    if (instructores.length === 0) {
+    // Cargar catálogo de instructores si no está cargado (solo en modo normal)
+    if (!modoSecuencial && instructores.length === 0) {
       setCargandoInstructores(true);
       AgendaService.getInstructores()
         .then((list) => setInstructores(list || []))
@@ -149,20 +187,20 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
         .finally(() => setCargandoInstructores(false));
     }
 
-    // Precargar titular solo si es capacitación
-    if (esCapacitacion && sesion.i_CveTitular && Number(sesion.i_CveTitular) > 0) {
+    // Precargar titular solo si es capacitación y modo normal
+    if (!modoSecuencial && esCapacitacion && sesion.i_CveTitular && Number(sesion.i_CveTitular) > 0) {
       setFormTitular(String(sesion.i_CveTitular));
     } else {
       setFormTitular("");
     }
 
-    // Precargar apoyo solo si b_TipoProvInsApoyo es false
-    if (!sesion.b_TipoProvInsApoyo && sesion.i_CveApoyo && Number(sesion.i_CveApoyo) > 0) {
+    // Precargar apoyo solo si b_TipoProvInsApoyo es false y modo normal
+    if (!modoSecuencial && !sesion.b_TipoProvInsApoyo && sesion.i_CveApoyo && Number(sesion.i_CveApoyo) > 0) {
       setFormApoyo(String(sesion.i_CveApoyo));
     } else {
       setFormApoyo("");
     }
-  }, [abierto, sesion, iCveTipoServicio, esCapacitacion]);
+  }, [abierto, sesion, iCveTipoServicio, esCapacitacion, modoSecuencial]);
 
   // Al cambiar hora de inicio, mover hora fin automáticamente conservando duración
   const handleCambiarHoraInicio = (nuevaHoraInicio: string) => {
@@ -182,6 +220,53 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
       (sesion as any)?.iCveAgendaDetalle ??
       0
     );
+
+    if (modoSecuencial) {
+      let mins = 0;
+      (todasLasSesiones || []).forEach((s) => {
+        const bCancelada = Boolean(s.b_Cancelada || (s as any).b_cancelada || (s as any).bCancelada);
+        const iCveReprog = s.i_CveReprograma ?? (s as any).i_cveReprograma;
+        if (bCancelada || (iCveReprog != null && Number(iCveReprog) > 0)) return;
+
+        const cveIter = Number(
+          s.i_CveAgendaDetalle ??
+          (s as any)?.I_CveAgendaDetalle ??
+          (s as any)?.iCveAgendaDetalle ??
+          0
+        );
+
+        if (cveIter === cveActual) {
+          // Sesión actual en edición en el formulario
+          if (bTipoDatoManejaHorario && formHoraInicio && formHoraFin) {
+            const [h1, m1] = formHoraInicio.split(":").map(Number);
+            const [h2, m2] = formHoraFin.split(":").map(Number);
+            const diff = (h2 * 60 + (m2 || 0)) - (h1 * 60 + (m1 || 0));
+            if (diff > 0) mins += diff;
+          }
+        } else {
+          // Revisar si ya fue ajustada en memoria en este flujo
+          const ajustada = sesionesAjustadasEnMemoria?.find((a) => a.i_CveAgendaDetalle === cveIter);
+          if (ajustada) {
+            const diffM = Math.round(
+              (new Date(ajustada.d_FechaHoraFin).getTime() - new Date(ajustada.d_FechaHoraInicio).getTime()) /
+                (1000 * 60)
+            );
+            if (diffM > 0) mins += diffM;
+          } else {
+            // Aún no ajustada, usar valor original
+            const ini = s.d_FechaHoraInicio || (s as any).f_FechaHoraInicio;
+            const fin = s.d_FechaHoraFin || (s as any).f_FechaHoraFin;
+            if (ini && fin) {
+              const diffM = Math.round(
+                (new Date(fin).getTime() - new Date(ini).getTime()) / (1000 * 60)
+              );
+              if (diffM > 0) mins += diffM;
+            }
+          }
+        }
+      });
+      return mins;
+    }
 
     // 1. Sumar las otras sesiones vigentes en minutos
     const minsOtras = (todasLasSesiones || []).reduce((acc, s) => {
@@ -220,9 +305,22 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
     }
 
     return minsOtras + minsActual;
-  }, [esUnidadHoras, todasLasSesiones, sesion, bTipoDatoManejaHorario, formHoraInicio, formHoraFin]);
+  }, [
+    esUnidadHoras,
+    todasLasSesiones,
+    sesion,
+    bTipoDatoManejaHorario,
+    formHoraInicio,
+    formHoraFin,
+    modoSecuencial,
+    sesionesAjustadasEnMemoria,
+  ]);
 
-  const minutosContratados = Math.round((Number(cantidadTotal) || 0) * 60);
+  const cantEfectiva =
+    modoSecuencial && cantidadNuevaHoras != null
+      ? cantidadNuevaHoras
+      : Number(cantidadTotal) || 0;
+  const minutosContratados = Math.round(cantEfectiva * 60);
   const diffMinutos = minutosProgramados - minutosContratados;
 
   const faltanHoras = minutosContratados > 0 && diffMinutos < 0;
@@ -286,6 +384,21 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
       return;
     }
 
+    if (esEstudioOServicio) {
+      if (!formFecha) {
+        toast.warning("Captura la fecha de inicio.");
+        return;
+      }
+      if (!formFechaFinEstimada) {
+        toast.warning("Captura la fecha de finalización estimada.");
+        return;
+      }
+      if (formFechaFinEstimada < formFecha) {
+        toast.warning("La fecha de finalización estimada debe ser mayor o igual que la de inicio.");
+        return;
+      }
+    }
+
     const cveAgendaDetalle = Number(
       sesion.i_CveAgendaDetalle ??
       (sesion as any).I_CveAgendaDetalle ??
@@ -295,13 +408,55 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
       0
     );
 
-    const dFechaHoraInicio = bTipoDatoManejaHorario
+    const dFechaHoraInicio = esEstudioOServicio
+      ? `${formFecha}T00:00:00`
+      : bTipoDatoManejaHorario
       ? `${formFecha}T${formHoraInicio}:00`
       : `${formFecha}T00:00:00`;
 
-    const dFechaHoraFin = bTipoDatoManejaHorario
+    const dFechaHoraFin = esEstudioOServicio
+      ? `${formFechaFinEstimada}T23:59:59`
+      : bTipoDatoManejaHorario
       ? `${formFecha}T${formHoraFin}:00`
       : `${formFecha}T23:59:59`;
+
+    // MODO SECUENCIAL (ajuste de montos):
+    if (modoSecuencial) {
+      const esUltima = Boolean((secuencialIndex ?? 0) >= (secuencialTotal ?? 1) - 1);
+      if (esUltima) {
+        if (esUnidadHoras && minutosProgramados > minutosContratados) {
+          toast.error("Las sesiones programadas exceden las horas contratadas.");
+          return;
+        }
+        if (onTerminarSecuencial) {
+          onTerminarSecuencial({
+            i_CveAgendaDetalle: cveAgendaDetalle,
+            d_FechaHoraInicio: dFechaHoraInicio,
+            d_FechaHoraFin: dFechaHoraFin,
+          });
+        }
+      } else {
+        if (onSiguienteSecuencial) {
+          onSiguienteSecuencial({
+            i_CveAgendaDetalle: cveAgendaDetalle,
+            d_FechaHoraInicio: dFechaHoraInicio,
+            d_FechaHoraFin: dFechaHoraFin,
+          });
+        }
+      }
+      return;
+    }
+
+    if (esUnidadHoras && sePasaHoras) {
+      toast.warning("Las sesiones programadas exceden las horas contratadas.");
+      return;
+    }
+
+    // Validación: No permitir elegir al mismo instructor como titular y apoyo
+    if (esCapacitacion && formTitular && formApoyo && formTitular === formApoyo) {
+      toast.warning("No puedes elegir al mismo instructor como titular y apoyo.");
+      return;
+    }
 
     const payload: CambiarTitularesSesionDto = {
       i_CveAgendaDetalle: cveAgendaDetalle,
@@ -316,7 +471,7 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
       const res = await AgendaService.cambiarTitularesSesion(payload);
       if (res.exito || res.status === 200) {
         toast.success("Sesión actualizada");
-        onGuardadoExitoso();
+        if (onGuardadoExitoso) onGuardadoExitoso();
         onCerrar();
       } else if (res.status === 409) {
         toast.warning(res.mensaje || "Conflicto al actualizar la sesión.");
@@ -400,7 +555,11 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
                 Editar sesión
               </h3>
               <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>
-                Sesión {sesion.i_Orden || 1} — {formatearFechaCorta(sesion.d_FechaHoraInicio)}
+                {modoSecuencial
+                  ? `Sesión ${(secuencialIndex ?? 0) + 1} de ${secuencialTotal ?? 1} — ${formatearFechaTexto(sesion.d_FechaHoraInicio)}`
+                  : esEstudioOServicio
+                  ? `Sesión ${sesion.i_Orden || 1} — ${formatearFechaTexto(sesion.d_FechaHoraInicio)}${sesion.d_FechaHoraFin ? ` – ${formatearFechaTexto(sesion.d_FechaHoraFin)}` : ""}`
+                  : `Sesión ${sesion.i_Orden || 1} — ${formatearFechaCorta(sesion.d_FechaHoraInicio)}`}
               </p>
             </div>
           </div>
@@ -436,35 +595,95 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: bTipoDatoManejaHorario
+                  gridTemplateColumns: esEstudioOServicio
+                    ? "repeat(auto-fit, minmax(180px, 1fr))"
+                    : bTipoDatoManejaHorario
                     ? "repeat(auto-fit, minmax(120px, 1fr))"
                     : "1fr",
                   gap: "12px",
                 }}
               >
-                <div>
-                  <label
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#334155",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    <Calendar size={13} style={{ color: "#0284c7" }} />
-                    Fecha <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <InputFechaTexto
-                    height="36px"
-                    value={formFecha}
-                    onChange={(val) => setFormFecha(val)}
-                  />
-                </div>
+                {esEstudioOServicio ? (
+                  <>
+                    <div>
+                      <label
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#334155",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          marginBottom: "6px",
+                        }}
+                      >
+                        <Calendar size={13} style={{ color: "#0284c7" }} />
+                        Fecha de inicio <span style={{ color: "#dc2626" }}>*</span>
+                      </label>
+                      <InputFechaTexto
+                        height="36px"
+                        value={formFecha}
+                        onChange={(val) => setFormFecha(val)}
+                      />
+                    </div>
 
-                {bTipoDatoManejaHorario && (
+                    <div>
+                      <label
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#334155",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          marginBottom: "6px",
+                        }}
+                      >
+                        <Calendar size={13} style={{ color: "#0284c7" }} />
+                        Fecha de finalización estimada <span style={{ color: "#dc2626" }}>*</span>
+                      </label>
+                      <InputFechaTexto
+                        height="36px"
+                        value={formFechaFinEstimada}
+                        onChange={(val) => setFormFechaFinEstimada(val)}
+                      />
+                      {Number(iCveTipoServicio) === 3 && !formFechaFinEstimada && (
+                        <span style={{ fontSize: "11px", color: "#64748b", fontStyle: "italic", marginTop: "4px", display: "block" }}>
+                          Captura la fecha de finalización estimada
+                        </span>
+                      )}
+                      {formFecha && formFechaFinEstimada && formFechaFinEstimada < formFecha && (
+                        <span style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px", display: "block" }}>
+                          La fecha de finalización estimada debe ser mayor o igual que la de inicio
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: "#334155",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      <Calendar size={13} style={{ color: "#0284c7" }} />
+                      Fecha <span style={{ color: "#dc2626" }}>*</span>
+                    </label>
+                    <InputFechaTexto
+                      height="36px"
+                      value={formFecha}
+                      onChange={(val) => setFormFecha(val)}
+                    />
+                  </div>
+                )}
+
+                {!esEstudioOServicio && bTipoDatoManejaHorario && (
                   <>
                     <div>
                       <label
@@ -557,8 +776,8 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* 2. Instructor Titular (solo si i_CveTipoServicio === 2) */}
-              {esCapacitacion && (
+              {/* 2. Personal Titular (solo si i_CveTipoServicio === 2 y NO es modo secuencial) */}
+              {!modoSecuencial && esCapacitacion && (
                 <div>
                   <label
                     style={{
@@ -572,7 +791,7 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
                     }}
                   >
                     <User size={13} style={{ color: "#0284c7" }} />
-                    Instructor titular
+                    Personal titular
                   </label>
                   <select
                     className="form-select"
@@ -596,63 +815,65 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* 3. Instructor de Apoyo */}
-              <div>
-                <label
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#334155",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    marginBottom: "6px",
-                  }}
-                >
-                  <Users size={13} style={{ color: "#64748b" }} />
-                  Instructor de apoyo
-                </label>
-                <select
-                  className="form-select"
-                  value={tieneProveedor ? "" : formApoyo}
-                  onChange={(e) => setFormApoyo(e.target.value)}
-                  disabled={guardando || tieneProveedor}
-                  style={{
-                    fontSize: "13px",
-                    height: "36px",
-                    borderRadius: "8px",
-                    backgroundColor: tieneProveedor ? "#f1f5f9" : "#ffffff",
-                    cursor: tieneProveedor ? "not-allowed" : "default",
-                  }}
-                >
-                  <option value="">— Sin apoyo —</option>
-                  {!tieneProveedor &&
-                    instructores.map((ins: any) => {
-                      const cve = ins.i_CveInstructor ?? ins.iD_Instructor ?? ins.id_instructor ?? ins.iCveInstructor;
-                      const nombre = getNombreInstructor(ins);
-                      const isSelectedAsTitular = esCapacitacion && formTitular !== "" && String(cve) === formTitular;
-                      return (
-                        <option key={cve} value={cve} disabled={isSelectedAsTitular}>
-                          {nombre} {isSelectedAsTitular ? "(Seleccionado en titular)" : ""}
-                        </option>
-                      );
-                    })}
-                </select>
-
-                {tieneProveedor && (
-                  <p
+              {/* 3. Personal de Apoyo (solo si NO es modo secuencial) */}
+              {!modoSecuencial && (
+                <div>
+                  <label
                     style={{
-                      fontSize: "11px",
-                      color: "#64748b",
-                      marginTop: "6px",
-                      marginBottom: 0,
-                      lineHeight: "1.4",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "#334155",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      marginBottom: "6px",
                     }}
                   >
-                    Este servicio tiene proveedor asignado. Quítalo para poder agregar un instructor de apoyo.
-                  </p>
-                )}
-              </div>
+                    <Users size={13} style={{ color: "#64748b" }} />
+                    Personal de apoyo
+                  </label>
+                  <select
+                    className="form-select"
+                    value={tieneProveedor ? "" : formApoyo}
+                    onChange={(e) => setFormApoyo(e.target.value)}
+                    disabled={guardando || tieneProveedor}
+                    style={{
+                      fontSize: "13px",
+                      height: "36px",
+                      borderRadius: "8px",
+                      backgroundColor: tieneProveedor ? "#f1f5f9" : "#ffffff",
+                      cursor: tieneProveedor ? "not-allowed" : "default",
+                    }}
+                  >
+                    <option value="">— Sin apoyo —</option>
+                    {!tieneProveedor &&
+                      instructores.map((ins: any) => {
+                        const cve = ins.i_CveInstructor ?? ins.iD_Instructor ?? ins.id_instructor ?? ins.iCveInstructor;
+                        const nombre = getNombreInstructor(ins);
+                        const isSelectedAsTitular = esCapacitacion && formTitular !== "" && String(cve) === formTitular;
+                        return (
+                          <option key={cve} value={cve} disabled={isSelectedAsTitular}>
+                            {nombre} {isSelectedAsTitular ? "(Seleccionado en titular)" : ""}
+                          </option>
+                        );
+                      })}
+                  </select>
+
+                  {tieneProveedor && (
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#64748b",
+                        marginTop: "6px",
+                        marginBottom: 0,
+                        lineHeight: "1.4",
+                      }}
+                    >
+                      Este servicio tiene proveedor asignado. Quítalo para poder agregar un instructor de apoyo.
+                    </p>
+                  )}
+                </div>
+              )}
             </>
           )}
 
@@ -670,9 +891,13 @@ export const ModalEditarInstructorSesion: React.FC<Props> = ({
               type="submit"
               className="btn btn-primary btn-sm"
               style={{ backgroundColor: "#2B8FCC" }}
-              disabled={guardando || cargandoInstructores || (esUnidadHoras && sePasaHoras)}
+              disabled={guardando || (!modoSecuencial && (cargandoInstructores || (esUnidadHoras && sePasaHoras)))}
             >
-              {guardando ? "Guardando..." : "Guardar cambios"}
+              {guardando
+                ? "Guardando..."
+                : modoSecuencial
+                ? ((secuencialIndex ?? 0) >= (secuencialTotal ?? 1) - 1 ? "Terminar" : "Siguiente")
+                : "Guardar cambios"}
             </button>
           </div>
         </form>

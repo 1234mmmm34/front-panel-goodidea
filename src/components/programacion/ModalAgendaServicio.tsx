@@ -73,6 +73,7 @@ export interface ProgramacionItemState {
   v_NoOCProveedor: string;
   d_PrecioProveedor: number;
   d_FechaInicioEntrega: string;
+  d_FechaFinEstimada: string;
   sesiones: SesionProgramacionState[];
   cantidadAplicada: number;
   sesionesAplicadas: number;
@@ -377,11 +378,13 @@ export const ModalAgendaServicio: React.FC<Props> = ({
     updateProgState(itemTempId, { d_FechaInicioEntrega: val });
 
     if (val) {
+      const prog = programacionMap[itemTempId];
+      const fin = prog?.d_FechaFinEstimada || val;
       const rango: RangoFechaDto = {
         d_FechaHoraInicio: `${val}T00:00:00`,
-        d_FechaHoraFin: `${val}T23:59:59`,
+        d_FechaHoraFin: `${fin}T23:59:59`,
         FechaHoraInicio: `${val}T00:00:00`,
-        FechaHoraFin: `${val}T23:59:59`,
+        FechaHoraFin: `${fin}T23:59:59`,
       };
       const [insDisp, prvDisp] = await Promise.all([
         AgendaService.getInstructoresDisponibles([rango]),
@@ -396,6 +399,27 @@ export const ModalAgendaServicio: React.FC<Props> = ({
       AgendaService.getProveedores().then((res) => {
         if (res && res.length > 0) setProveedoresCatalogo(res);
       });
+    }
+  };
+
+  const handleFechaFinNonCapacitacionChange = async (itemTempId: string, val: string) => {
+    updateProgState(itemTempId, { d_FechaFinEstimada: val });
+
+    const prog = programacionMap[itemTempId];
+    const ini = prog?.d_FechaInicioEntrega || val;
+    if (ini && val) {
+      const rango: RangoFechaDto = {
+        d_FechaHoraInicio: `${ini}T00:00:00`,
+        d_FechaHoraFin: `${val}T23:59:59`,
+        FechaHoraInicio: `${ini}T00:00:00`,
+        FechaHoraFin: `${val}T23:59:59`,
+      };
+      const [insDisp, prvDisp] = await Promise.all([
+        AgendaService.getInstructoresDisponibles([rango]),
+        AgendaService.getProveedoresDisponibles([rango]),
+      ]);
+      if (insDisp && insDisp.length > 0) setInstructoresCatalogo(insDisp);
+      if (prvDisp && prvDisp.length > 0) setProveedoresCatalogo(prvDisp);
     }
   };
 
@@ -616,6 +640,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
       v_NoOCProveedor: "",
       d_PrecioProveedor: 0,
       d_FechaInicioEntrega: todayStr,
+      d_FechaFinEstimada: todayStr,
       sesiones: sesionesInit,
       cantidadAplicada: item.cantidad || 1,
       sesionesAplicadas: numSesiones,
@@ -928,10 +953,18 @@ export const ModalAgendaServicio: React.FC<Props> = ({
             }
           });
         } else {
-          const fechaEntrega = progState.d_FechaInicioEntrega || new Date().toISOString().split("T")[0];
+          const tId = tipoId;
+          const fechaInicio = progState.d_FechaInicioEntrega || new Date().toISOString().split("T")[0];
+          const esEstudioOServicio = tId === 3 || tId === 6;
+          const fechaFin = esEstudioOServicio
+            ? (progState.d_FechaFinEstimada || fechaInicio)
+            : fechaInicio;
+
           sesiones.push({
-            d_FechaHoraInicio: `${fechaEntrega}T00:00:00`,
-            d_FechaHoraFin: `${fechaEntrega}T00:00:00`,
+            d_FechaHoraInicio: `${fechaInicio}T00:00:00`,
+            d_FechaHoraFin: esEstudioOServicio
+              ? `${fechaFin}T23:59:59`
+              : `${fechaFin}T00:00:00`,
             i_Orden: 1,
             i_CveServAgendaDet: 0,
             i_CveTitular: null,
@@ -2712,10 +2745,21 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                                   width: "160px",
                                                 }}
                                               >
-                                                {tipoId === 3
+                                                {(tipoId === 3 || tipoId === 6)
                                                   ? "Fecha de inicio"
                                                   : "Fecha de entrega"}
                                               </th>
+                                              {(tipoId === 3 || tipoId === 6) && (
+                                                <th
+                                                  style={{
+                                                    padding: "8px 12px",
+                                                    fontWeight: 700,
+                                                    width: "180px",
+                                                  }}
+                                                >
+                                                  Fecha de finalización estimada
+                                                </th>
+                                              )}
                                               <th
                                                 style={{
                                                   padding: "8px 12px",
@@ -2741,7 +2785,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                           <tbody>
                                             <tr>
                                               {/* Fecha */}
-                                              <td style={{ padding: "8px 12px" }}>
+                                              <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
                                                 <InputFechaTexto
                                                   height="32px"
                                                   value={
@@ -2755,6 +2799,38 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                                   }
                                                 />
                                               </td>
+                                              {(tipoId === 3 || tipoId === 6) && (
+                                                <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
+                                                  <InputFechaTexto
+                                                    height="32px"
+                                                    value={
+                                                      progState.d_FechaFinEstimada || ""
+                                                    }
+                                                    onChange={(val) =>
+                                                      handleFechaFinNonCapacitacionChange(
+                                                        item.idTemp,
+                                                        val
+                                                      )
+                                                    }
+                                                  />
+                                                  {progState.d_FechaInicioEntrega &&
+                                                    progState.d_FechaFinEstimada &&
+                                                    progState.d_FechaFinEstimada <
+                                                      progState.d_FechaInicioEntrega && (
+                                                      <span
+                                                        style={{
+                                                          color: "#dc2626",
+                                                          fontSize: "11px",
+                                                          display: "block",
+                                                          marginTop: "4px",
+                                                          lineHeight: 1.2,
+                                                        }}
+                                                      >
+                                                        La fecha de fin debe ser mayor o igual que la de inicio
+                                                      </span>
+                                                    )}
+                                                </td>
+                                              )}
 
                                               {/* Apoyo / Proveedor */}
                                               <td style={{ padding: "8px 12px" }}>
@@ -3446,7 +3522,34 @@ export const ModalAgendaServicio: React.FC<Props> = ({
               ) : (
                 <button
                   type="button"
-                  onClick={() => setMostrarModalConfirmar(true)}
+                  onClick={() => {
+                    for (const s of serviciosAgregados) {
+                      const prog = programacionMap[s.idTemp];
+                      if (!prog?.b_ProgramarDespues) {
+                        const tId = getTipoServicioId(s);
+                        if (tId === 3 || tId === 6) {
+                          if (!prog?.d_FechaInicioEntrega) {
+                            toast.error(`Captura la fecha de inicio para ${s.v_Nombre}`);
+                            return;
+                          }
+                          if (!prog?.d_FechaFinEstimada) {
+                            toast.error(`Captura la fecha de finalización estimada para ${s.v_Nombre}`);
+                            return;
+                          }
+                          if (prog.d_FechaFinEstimada < prog.d_FechaInicioEntrega) {
+                            toast.error(`La fecha de finalización estimada debe ser mayor o igual que la de inicio en ${s.v_Nombre}`);
+                            return;
+                          }
+                        } else if (tId === 5) {
+                          if (!prog?.d_FechaInicioEntrega) {
+                            toast.error(`Captura la fecha de entrega para ${s.v_Nombre}`);
+                            return;
+                          }
+                        }
+                      }
+                    }
+                    setMostrarModalConfirmar(true);
+                  }}
                   style={{
                     height: "36px",
                     padding: "0 22px",

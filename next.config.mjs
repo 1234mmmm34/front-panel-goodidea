@@ -6,7 +6,8 @@ const nextConfig = {
     return [
       {
         source: "/api-proxy/:path*",
-        destination: "https://api.panel.good-idea.com.mx/api/:path*",
+        //  destination: "https://api.panel.good-idea.com.mx/api/:path*",
+        destination: "https://localhost:7036/api/:path*",
       },
     ];
   },

@@ -4,7 +4,7 @@ import React from "react";
 import { Eye, Trash2 } from "lucide-react";
 import { AgendaServicioGetDto, EntregableResumenDto } from "@/types/servicios";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
-import { formatearFechaCorta, limpiarDecimales } from "@/lib/date-utils";
+import { formatearFechaCorta, formatearFechaTexto, limpiarDecimales } from "@/lib/date-utils";
 import { VerDocumento } from "@/services/archivos.service";
 
 interface Props {
@@ -35,6 +35,16 @@ export const TablaAgendaServicios: React.FC<Props> = ({
         return <span className="badge badge-success">Terminado</span>;
       case 4:
         return <span className="badge badge-secondary">Reprogramado</span>;
+      case 5:
+        return (
+          <span
+            className="badge"
+            title="Llegó la fecha de finalización estimada. Falta confirmar que terminó."
+            style={{ backgroundColor: "#ffe5d0", color: "#984c0c" }}
+          >
+            Por confirmar
+          </span>
+        );
       default:
         return <span className="badge badge-primary">Programado</span>;
     }
@@ -48,7 +58,7 @@ export const TablaAgendaServicios: React.FC<Props> = ({
             <th>Cliente</th>
             <th>Servicio</th>
             <th>Tipo</th>
-            <th>Fecha de inicio</th>
+            <th>Fechas</th>
             <th>Estatus</th>
             <th>Titular / Apoyo</th>
             <th>Entregables</th>
@@ -136,13 +146,28 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                     <BadgeTipoServicio tipoServicio={row.v_TipoServicio} />
                   </td>
 
-                  {/* 4. Fecha de inicio */}
+                  {/* 4. Fechas */}
                   <td>
                     {row.b_SinProgramar ? (
                       <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>Pendiente de programar</span>
-                    ) : (
-                      <span>{formatearFechaCorta(row.d_FechaInicio)}</span>
-                    )}
+                    ) : (() => {
+                      const tipoUpper = (row.v_TipoServicio || "").toUpperCase();
+                      const esEstudioOServicio =
+                        (row as any).i_CveTipoServicio === 3 ||
+                        (row as any).i_CveTipoServicio === 6 ||
+                        tipoUpper.includes("ESTUDIO") ||
+                        tipoUpper.includes("SERVICIO");
+                      if (esEstudioOServicio && row.d_FechaInicio && row.d_FechaFin) {
+                        return (
+                          <span>
+                            {formatearFechaTexto(row.d_FechaInicio)} – {formatearFechaTexto(row.d_FechaFin)}
+                          </span>
+                        );
+                      }
+                      return (
+                        <span>{formatearFechaTexto(row.d_FechaInicio) || formatearFechaCorta(row.d_FechaInicio)}</span>
+                      );
+                    })()}
                   </td>
 
 

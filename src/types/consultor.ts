@@ -28,6 +28,7 @@ export interface AgendaServicioConsultorGetDto {
   v_EntregablesJson: string | null; // JSON string -> EntregableResumen[]
   i_TotalRegistros: number;
   entregablesParseados?: EntregableResumen[];
+  d_FechaConfirmacionTermino?: string | null;
 }
 
 export interface AgendaDetalleConsultorCabeceraDto {
@@ -50,6 +51,7 @@ export interface AgendaDetalleConsultorCabeceraDto {
   v_KeyVoBo: string | null;
   i_CveTipoServicio: number; // 2 Capacitación, 3 Estudios, 5 Productos, 6 Servicios
   v_Notas: string | null;
+  d_FechaConfirmacionTermino: string | null;
 }
 
 export interface SesionConsultorDto {

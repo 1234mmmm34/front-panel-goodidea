@@ -46,6 +46,20 @@ export interface AgendaServicioGetDto {
   v_Entregables?: string | null;
   entregablesParseados?: EntregableResumenDto[];
   v_Notas?: string | null;
+  d_FechaConfirmacionTermino?: string | null;
+}
+
+export interface TerminoServicioDto {
+  i_CveServAgendaDet: number;
+  v_Empresa: string;
+  v_Planta: string | null;
+  v_Servicio: string;
+  v_TipoServicio: string;
+  d_FechaInicio: string | null;
+  d_FechaFin: string | null;
+  v_Responsable: string | null;
+  d_FechaConfirmacionTermino: string | null;
+  b_Confirmado: boolean;
 }
 
 export interface SesionDetalleDto {
@@ -154,6 +168,7 @@ export interface AgendaDetalleGetDto {
   d_FechaVoBo?: string | null;
   v_KeyVoBo?: string | null;
   v_Notas?: string | null;
+  d_FechaConfirmacionTermino?: string | null;
 }
 
 export interface CambiarTitularesSesionDto {
@@ -424,5 +439,62 @@ export interface ReprogramacionInsertDto {
   CambiaProveedor: boolean;
   CambiaInstructor: boolean;
   d_NuevoPrecioProveedor: number;
+}
+
+export interface SesionHorario {
+  i_CveAgendaDetalle: number;
+  d_FechaHoraInicio: string;
+  d_FechaHoraFin: string;
+}
+
+export interface EditarMontosPayload {
+  i_Cantidad: number;
+  d_PrecioUnitario: number;      // sin IVA
+  Sesiones: SesionHorario[];
+  b_ConfirmaFacturas: boolean;
+  b_ConfirmaUtilidad: boolean;
+}
+
+export interface EditarMontosConflicto {
+  codigo: 'CONFIRMAR_FACTURAS' | 'CONFIRMAR_UTILIDAD' | 'ERROR';
+  error: string;
+  d_Utilidad: number | null;     // solo en CONFIRMAR_UTILIDAD (sin IVA)
+}
+
+export interface FacturaAsociada {
+  i_CveFacturas: number;
+  v_NoFactura: string | null;
+  d_Monto: number | null;
+  b_Timbrada: boolean;
+  v_EstadoCobro: string | null;
+  d_FechaHora: string | null;
+  v_OtrosServicios?: string | null;
+}
+
+export interface AbonoAsociado {
+  i_CveAbono: number;
+  i_CveFactura: number;
+  d_Monto: number;
+  i_Estado: number;              // 0 programado, 1 pagado
+  d_FechaProgramada: string | null;
+  d_FechaAbono: string | null;
+  v_Referencia: string | null;
+}
+
+export interface ServicioFactura {
+  i_CveFactura: number;
+  i_CveServAgendaDet: number;
+  v_Servicio: string | null;
+  v_TipoServicio: string | null;
+  v_NoCotizacionGI: string | null;
+  i_Cantidad: number;
+  v_Unidad: string | null;
+  b_OtroServicio: boolean;       // true = no es el servicio que se edita
+}
+
+export interface FacturasAsociadas {
+  Facturas: FacturaAsociada[];
+  Abonos: AbonoAsociado[];       // ligados a la factura por i_CveFactura
+  Servicios: ServicioFactura[];  // ligados a la factura por i_CveFactura
 }
 

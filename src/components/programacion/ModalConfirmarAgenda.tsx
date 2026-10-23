@@ -54,6 +54,7 @@ export interface ProgramacionItemConfirmation {
   v_NoOCProveedor: string;
   d_PrecioProveedor: number;
   d_FechaInicioEntrega: string;
+  d_FechaFinEstimada?: string;
   sesiones: SesionProgramacionConfirmation[];
 }
 
@@ -762,6 +763,15 @@ export const ModalConfirmarAgenda: React.FC<ModalConfirmarAgendaProps> = ({
                           detalleElementos.push(
                             <div key="fecha_pend" style={{ color: "#94a3b8", fontStyle: "italic" }}>
                               Fecha pendiente de programar
+                            </div>
+                          );
+                        } else if (tipoId === 3 || tipoId === 6) {
+                          const fIni = formatearFechaTexto(progState.d_FechaInicioEntrega);
+                          const fFin = formatearFechaTexto(progState.d_FechaFinEstimada || progState.d_FechaInicioEntrega);
+                          detalleElementos.push(
+                            <div key="f_rango">
+                              <span style={{ color: "#64748b" }}>Fechas:</span>{" "}
+                              <strong>{fIni} – {fFin}</strong>
                             </div>
                           );
                         } else {

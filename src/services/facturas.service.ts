@@ -13,7 +13,7 @@ import {
   CrearVentaFacturasResponse,
   SubirArchivosFacturaResponse,
 } from "@/types/facturas";
-import { PaginadoResponse } from "@/types/servicios";
+import { PaginadoResponse, TerminoServicioDto } from "@/types/servicios";
 
 function extraerMensajeError(error: any, defaultMsg: string): string {
   if (!error?.response?.data) {
@@ -526,5 +526,48 @@ export const FacturasService = {
         "No se pudo cancelar el abono";
       return { exito: false, mensaje: msg };
     }
+  },
+
+  /**
+   * POST facturas/confirmarTermino/{i_CveServAgendaDet}
+   * Confirma la terminación de un servicio agendado
+   */
+  async confirmarTermino(
+    iCveServAgendaDet: number
+  ): Promise<{ exito: boolean; mensaje?: string; status?: number }> {
+    try {
+      const resp = await apiClient.post(`facturas/confirmarTermino/${iCveServAgendaDet}`);
+      return {
+        exito: true,
+        mensaje: resp.data?.mensaje || resp.data?.v_Mensaje || "Servicio confirmado como terminado",
+        status: resp.status,
+      };
+    } catch (error: any) {
+      return {
+        exito: false,
+        mensaje: extraerMensajeError(error, "Error al confirmar terminado"),
+        status: error?.response?.status,
+      };
+    }
+  },
+
+  /**
+   * GET facturas/termino/{token}
+   * Endpoint público para consultar los datos del servicio a confirmar término
+   */
+  async getTerminoPublico(token: string): Promise<TerminoServicioDto> {
+    const resp = await apiClient.get<TerminoServicioDto>(`facturas/termino/${encodeURIComponent(token)}`);
+    return resp.data;
+  },
+
+  /**
+   * POST facturas/termino/{token}/confirmar
+   * Endpoint público para confirmar el término del servicio
+   */
+  async confirmarTerminoPublico(token: string): Promise<{ b_YaConfirmado: boolean }> {
+    const resp = await apiClient.post<{ b_YaConfirmado: boolean }>(
+      `facturas/termino/${encodeURIComponent(token)}/confirmar`
+    );
+    return resp.data;
   },
 };

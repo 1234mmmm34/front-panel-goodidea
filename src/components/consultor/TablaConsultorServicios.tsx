@@ -32,17 +32,29 @@ export const TablaConsultorServicios: React.FC<Props> = ({
         return <span className="badge badge-success">Terminado</span>;
       case 4:
         return <span className="badge badge-secondary">Reprogramado</span>;
+      case 5:
+        return (
+          <span
+            className="badge"
+            title="Llegó la fecha de finalización estimada. Falta confirmar que terminó."
+            style={{ backgroundColor: "#ffe5d0", color: "#984c0c" }}
+          >
+            Por confirmar
+          </span>
+        );
       default:
         return <span className="badge badge-primary">Programado</span>;
     }
   };
 
-  const formatearRangoFechas = (inicio: string | null, fin: string | null) => {
+  const formatearRangoFechas = (inicio: string | null, fin: string | null, esEstudioOServicio?: boolean) => {
     const txtInicio = inicio ? formatearFechaTexto(inicio) : "";
     const txtFin = fin ? formatearFechaTexto(fin) : "";
 
-    if (txtInicio && txtFin && txtInicio !== txtFin) {
-      return `${txtInicio} – ${txtFin}`;
+    if (txtInicio && txtFin) {
+      if (esEstudioOServicio || txtInicio !== txtFin) {
+        return `${txtInicio} – ${txtFin}`;
+      }
     }
     return txtInicio || txtFin || "—";
   };
@@ -148,9 +160,19 @@ export const TablaConsultorServicios: React.FC<Props> = ({
 
                   {/* 3. Fechas */}
                   <td>
-                    <span style={{ fontSize: "12px", color: "#334155" }}>
-                      {formatearRangoFechas(row.d_FechaInicio, row.d_FechaFin)}
-                    </span>
+                    {(() => {
+                      const tipoUpper = (row.v_TipoServicio || "").toUpperCase();
+                      const esEstudioOServicio =
+                        (row as any).i_CveTipoServicio === 3 ||
+                        (row as any).i_CveTipoServicio === 6 ||
+                        tipoUpper.includes("ESTUDIO") ||
+                        tipoUpper.includes("SERVICIO");
+                      return (
+                        <span style={{ fontSize: "12px", color: "#334155" }}>
+                          {formatearRangoFechas(row.d_FechaInicio, row.d_FechaFin, esEstudioOServicio)}
+                        </span>
+                      );
+                    })()}
                   </td>
 
                   {/* 4. Estatus */}
