@@ -42,6 +42,8 @@ export const TablaConsultorServicios: React.FC<Props> = ({
             Por confirmar
           </span>
         );
+      case 6:
+        return <span className="badge badge-primary">PIPC en proceso</span>;
       default:
         return <span className="badge badge-primary">Programado</span>;
     }
@@ -181,7 +183,12 @@ export const TablaConsultorServicios: React.FC<Props> = ({
                   {/* 5. Titular / Apoyo */}
                   <td>
                     {!tieneTitular && !tieneApoyo ? (
-                      <span className="text-slate-400">—</span>
+                      <span
+                        style={{ color: "#DC3545", fontWeight: 600, fontSize: "12px" }}
+                        title="Pendiente de asignar"
+                      >
+                        Pendiente
+                      </span>
                     ) : (
                       <div>
                         {tieneTitular && <div className="font-medium text-xs text-slate-800">{row.v_Titular}</div>}

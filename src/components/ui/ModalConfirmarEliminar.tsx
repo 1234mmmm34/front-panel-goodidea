@@ -7,7 +7,7 @@ interface Props {
   onCerrar: () => void;
   onConfirmar: () => void;
   cargando?: boolean;
-  mensajePersonalizado?: string;
+  mensajePersonalizado?: React.ReactNode;
 }
 
 export const ModalConfirmarEliminar: React.FC<Props> = ({

@@ -6,7 +6,7 @@ import { AgendaGetDto } from "@/types/calendario";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
 import { isToday, isSameDay, addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
-import { limpiarDecimales, formatearFechaTexto } from "@/lib/date-utils";
+import { limpiarDecimales } from "@/lib/date-utils";
 
 interface Props {
   datos: AgendaGetDto[];
@@ -19,7 +19,13 @@ interface Props {
 function formatearFechaSesion(fechaStr: string | null): { texto: string; esHoy: boolean } {
   if (!fechaStr) return { texto: "—", esHoy: false };
   try {
-    const d = new Date(fechaStr);
+    let d: Date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
+      const [year, month, day] = fechaStr.split("-").map(Number);
+      d = new Date(year, month - 1, day);
+    } else {
+      d = new Date(fechaStr);
+    }
     if (isNaN(d.getTime())) return { texto: fechaStr, esHoy: false };
 
     if (isToday(d)) return { texto: "Hoy", esHoy: true };
@@ -57,6 +63,7 @@ const renderEstatusBadge = (cveEstatus: number | null) => {
     case 1:
       return <span className="badge badge-primary">Programado</span>;
     case 2:
+    case 6:
       return <span className="badge badge-warning">En curso</span>;
     case 3:
       return <span className="badge badge-success">Terminado</span>;
@@ -169,9 +176,7 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
                   {/* 1. Fecha inicio */}
                   <td>
                     <div style={{ fontWeight: esHoy ? 700 : 400, color: esHoy ? "#188ae2" : "#1e3a5f" }}>
-                      {esEstudioOServicio && item.d_FechaInicio && item.d_FechaFin
-                        ? `${formatearFechaTexto(item.d_FechaInicio)} – ${formatearFechaTexto(item.d_FechaFin)}`
-                        : fechaTexto}
+                      {fechaTexto}
                     </div>
                   </td>
 
@@ -213,7 +218,12 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
                   {/* 8. Titular / Apoyo */}
                   <td>
                     {!tieneTitular && !tieneApoyo ? (
-                      <span className="text-slate-400">—</span>
+                      <span
+                        style={{ color: "#DC3545", fontWeight: 600, fontSize: "13px" }}
+                        title="Pendiente de asignar"
+                      >
+                        Pendiente
+                      </span>
                     ) : (
                       <div>
                         {tieneTitular && <div className="font-medium">{item.v_Titular}</div>}

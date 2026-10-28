@@ -224,7 +224,12 @@ export const TablaConsultorSesiones: React.FC<Props> = ({
                   {/* 6. Titular / Apoyo */}
                   <td>
                     {!tieneTitular && !tieneApoyo ? (
-                      <span className="text-slate-400">—</span>
+                      <span
+                        style={{ color: "#DC3545", fontWeight: 600, fontSize: "12px" }}
+                        title="Pendiente de asignar"
+                      >
+                        Pendiente
+                      </span>
                     ) : (
                       <div>
                         {tieneTitular && <div className="font-medium text-xs text-slate-800">{item.v_Titular}</div>}

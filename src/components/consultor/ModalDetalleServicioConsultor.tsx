@@ -195,6 +195,7 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
         };
         break;
       case 2:
+      case 6:
         config = {
           bg: "#fff8e1",
           border: "#ffe08a",
@@ -441,6 +442,7 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
       case 1:
         return <span className="badge badge-primary">Programado</span>;
       case 2:
+      case 6:
         return <span className="badge badge-warning">En curso</span>;
       case 3:
         return <span className="badge badge-success">Terminado</span>;

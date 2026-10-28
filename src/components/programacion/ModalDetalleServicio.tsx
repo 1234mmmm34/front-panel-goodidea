@@ -59,6 +59,10 @@ import { VerDocumento } from "@/services/archivos.service";
 import { formatearFechaCorta, formatearFechaTexto, esFechaPasada } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
 import { obtenerSesionActual } from "@/lib/api-client";
+import { BloquePipcEntregable } from "@/components/pipc/CardPipcDetalleServicio";
+import { PipcService, extraerMensajeError } from "@/services/pipc.service";
+import { PipcResumen } from "@/types/pipc";
+import { normalizarTexto } from "@/components/pipc/pipcCalculos";
 
 interface Props {
   abierto: boolean;
@@ -197,6 +201,8 @@ export const ModalDetalleServicio: React.FC<Props> = ({
 
   const [facturas, setFacturas] = useState<FacturaDetalleDto[]>([]);
   const [entregables, setEntregables] = useState<EntregableDetalleDto[]>([]);
+  const [pipcResumen, setPipcResumen] = useState<PipcResumen | null>(null);
+
 
   // Estados de notas del servicio
   const [notas, setNotas] = useState<string>("");
@@ -656,10 +662,22 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     }
   };
 
+  const cargarResumenPipc = async (servicioId: number) => {
+    try {
+      const data = await PipcService.getResumen(servicioId);
+      setPipcResumen(data);
+    } catch (err: any) {
+      if (err?.response?.status !== 404) {
+        toast.error(extraerMensajeError(err, "Error al cargar resumen PIPC"));
+      }
+      setPipcResumen(null);
+    }
+  };
+
   const cargarDetalle = async () => {
-    if (!iCveAgenda || !iCveServAgendaDet) return;
+    if (!iCveServAgendaDet) return;
     setCargando(true);
-    const data = await AgendaService.getAgendaDetalle(iCveAgenda, iCveServAgendaDet);
+    const data = await AgendaService.getAgendaDetalle(iCveAgenda || 0, iCveServAgendaDet);
     setDetalle(data);
 
     if (data) {
@@ -677,6 +695,9 @@ export const ModalDetalleServicio: React.FC<Props> = ({
 
     // Cargar alumnos inscritos desde el endpoint específico
     cargarAlumnosInscritos(iCveServAgendaDet);
+
+    // Cargar resumen PIPC al abrir modal (sin caché) para el entregable
+    cargarResumenPipc(iCveServAgendaDet);
   };
 
   const handleConfirmarTerminoClick = () => {
@@ -754,6 +775,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
         };
         break;
       case 2:
+      case 6:
         config = {
           bg: "#fff8e1",
           border: "#ffe08a",
@@ -851,7 +873,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   };
 
   useEffect(() => {
-    if (abierto && iCveAgenda && iCveServAgendaDet) {
+    if (abierto && iCveServAgendaDet) {
       cargarDetalle();
       setEditandoCotizacion(false);
       setEditandoOC(false);
@@ -879,6 +901,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       setGuardarEnCatalogo(true);
       setAgregandoEntregables(false);
       setCatalogoCargado(false);
+      setPipcResumen(null);
     }
   }, [abierto, iCveAgenda, iCveServAgendaDet]);
 
@@ -1565,6 +1588,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
       case 1:
         return <span className="badge badge-primary">Programado</span>;
       case 2:
+      case 6:
         return <span className="badge badge-warning">En curso</span>;
       case 3:
         return <span className="badge badge-success">Terminado</span>;
@@ -3144,6 +3168,10 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "8px" }}>
                     {entregables.map((ent, idx) => {
                       const keyArchivo = ent.v_Key || (ent.i_CveArchivo ? String(ent.i_CveArchivo) : null);
+                      const esPlanContingenciaPipc =
+                        normalizarTexto(ent.v_Nombre).startsWith("PLAN DE CONTINGENCIA") &&
+                        pipcResumen?.b_TienePlanContingencia === true;
+
                       return (
                         <div
                           key={`ent-${ent.i_CveAgendaEntregables || 'x'}-${idx}`}
@@ -3151,6 +3179,8 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: "12px",
                             padding: "10px 12px",
                             backgroundColor: "#ffffff",
                             border: "1px solid #e2e8f0",
@@ -3158,53 +3188,65 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                             fontSize: "13px",
                             cursor: "pointer",
                             transition: "background-color 0.2s ease",
+                            gridColumn: esPlanContingenciaPipc ? "1 / -1" : undefined,
                           }}
                           onClick={() => handleToggleEntregable(idx)}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            {ent.b_Entregado ? (
-                              <CheckCircle2 size={14} style={{ color: "#10b981", flexShrink: 0 }} />
-                            ) : (
-                              <Circle size={14} style={{ color: "#cbd5e1", flexShrink: 0 }} />
-                            )}
-                            <div style={{ display: "flex", flexDirection: "column" }}>
-                              <span style={{ fontWeight: 400, color: "#1e293b" }}>{ent.v_Nombre}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", flex: esPlanContingenciaPipc ? "1 1 240px" : undefined }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                               {ent.b_Entregado ? (
-                                <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 500 }}>
-                                  Entregado el {formatearFechaVoBo(ent.f_FechaEntregable)}
-                                </span>
+                                <CheckCircle2 size={14} style={{ color: "#10b981", flexShrink: 0 }} />
                               ) : (
-                                <span style={{ fontSize: "11px", color: "#dc3545", fontWeight: 500 }}>Pendiente</span>
+                                <Circle size={14} style={{ color: "#cbd5e1", flexShrink: 0 }} />
                               )}
+                              <div style={{ display: "flex", flexDirection: "column" }}>
+                                <span style={{ fontWeight: 400, color: "#1e293b" }}>{ent.v_Nombre}</span>
+                                {ent.b_Entregado ? (
+                                  <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 500 }}>
+                                    Entregado el {formatearFechaVoBo(ent.f_FechaEntregable)}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: "11px", color: "#dc3545", fontWeight: 500 }}>Pendiente</span>
+                                )}
+                              </div>
                             </div>
+
+                            {keyArchivo && (
+                              <button
+                                type="button"
+                                className="btn-icon"
+                                style={{
+                                  padding: "4px 8px",
+                                  color: "#2B8FCC",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  fontSize: "12px",
+                                  fontWeight: 500,
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  textDecoration: "underline",
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  VerDocumento(keyArchivo);
+                                }}
+                                title={`Ver archivo de ${ent.v_Nombre}`}
+                              >
+                                <Paperclip size={14} />
+                                <span>Ver archivo</span>
+                              </button>
+                            )}
                           </div>
 
-                          {keyArchivo && (
-                            <button
-                              type="button"
-                              className="btn-icon"
-                              style={{
-                                padding: "4px 8px",
-                                color: "#2B8FCC",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                fontSize: "12px",
-                                fontWeight: 500,
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                textDecoration: "underline",
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                VerDocumento(keyArchivo);
-                              }}
-                              title={`Ver archivo de ${ent.v_Nombre}`}
-                            >
-                              <Paperclip size={14} />
-                              <span>Ver archivo</span>
-                            </button>
+                          {esPlanContingenciaPipc && pipcResumen && detalle && (
+                            <BloquePipcEntregable
+                              servicioId={detalle.i_CveServAgendaDet}
+                              resumen={pipcResumen}
+                              d_FechaFin={(detalle as any).d_FechaFin || obtenerFechasExtremosSesiones(detalle.Sesiones).fechaFin || pipcResumen.d_FechaFin}
+                              onCerrarModal={onCerrar}
+                            />
                           )}
                         </div>
                       );

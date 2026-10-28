@@ -48,6 +48,8 @@ export interface AgendaServicioGetDto {
   v_Notas?: string | null;
   d_FechaConfirmacionTermino?: string | null;
   v_ConfirmadoPor?: string | null;
+  b_TienePlanContingencia?: boolean;
+  i_AvancePipc?: number | null;
 }
 
 export interface TerminoServicioDto {

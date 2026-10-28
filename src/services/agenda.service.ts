@@ -216,6 +216,17 @@ export const AgendaService = {
           b_AplicaVoBo: Boolean(item.b_AplicaVoBo ?? item.b_aplicaVoBo ?? item.bAplicaVoBo),
           b_VoBoEntregado: Boolean(item.b_VoBoEntregado ?? item.b_voBoEntregado ?? item.bVoBoEntregado),
           v_KeyVoBo: item.v_KeyVoBo ?? item.v_keyVoBo ?? item.vKeyVoBo ?? null,
+          b_TienePlanContingencia: Boolean(
+            item.b_TienePlanContingencia ?? item.b_tienePlanContingencia ?? item.bTienePlanContingencia
+          ),
+          i_AvancePipc:
+            item.i_AvancePipc !== undefined
+              ? item.i_AvancePipc
+              : item.i_avancePipc !== undefined
+              ? item.i_avancePipc
+              : item.iAvancePipc !== undefined
+              ? item.iAvancePipc
+              : null,
           entregablesParseados: entregablesParseados ?? [],
         };
       });
