@@ -6,6 +6,7 @@ import { AgendaServicioConsultorGetDto } from "@/types/consultor";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
 import { formatearFechaTexto } from "@/lib/date-utils";
 import { VerDocumento } from "@/services/archivos.service";
+import { CeldaEstatusPipc, CeldaEstatusPipcBadge } from "@/components/pipc/CeldaEstatusPipc";
 
 interface Props {
   datos: AgendaServicioConsultorGetDto[];
@@ -69,7 +70,7 @@ export const TablaConsultorServicios: React.FC<Props> = ({
             <th>Cliente</th>
             <th>Servicio</th>
             <th>Fechas</th>
-            <th>Estatus</th>
+            <th style={{ minWidth: "135px" }}>Estatus</th>
             <th>Titular / Apoyo</th>
             <th>Entregables</th>
             <th className="text-center whitespace-nowrap" style={{ width: "90px", minWidth: "90px" }}>Acciones</th>
@@ -178,7 +179,32 @@ export const TablaConsultorServicios: React.FC<Props> = ({
                   </td>
 
                   {/* 4. Estatus */}
-                  <td>{renderEstatusBadge(row.i_CveEstatus)}</td>
+                  <td>
+                    {(() => {
+                      if (!row.b_TienePlanContingencia) {
+                        return renderEstatusBadge(row.i_CveEstatus);
+                      }
+
+                      if (row.i_CveEstatus === 6) {
+                        return (
+                          <CeldaEstatusPipc
+                            row={row}
+                            rutaChecklist={(id) => `/mis-servicios/pipc/${id}`}
+                            sessionStorageKey="pipc_origen_mis_servicios"
+                          />
+                        );
+                      }
+
+                      return (
+                        <CeldaEstatusPipcBadge
+                          row={row}
+                          badgeNode={renderEstatusBadge(row.i_CveEstatus)}
+                          rutaChecklist={(id) => `/mis-servicios/pipc/${id}`}
+                          sessionStorageKey="pipc_origen_mis_servicios"
+                        />
+                      );
+                    })()}
+                  </td>
 
                   {/* 5. Titular / Apoyo */}
                   <td>

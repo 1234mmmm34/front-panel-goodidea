@@ -27,6 +27,7 @@ interface Props {
   servicioId?: number;
   expedienteId?: number;
   soloLectura?: boolean;
+  moduloOrigen?: "programacion" | "mis-servicios";
 }
 
 const CONFIG_SECCIONES = [
@@ -143,6 +144,7 @@ export const ExpedientePipc: React.FC<Props> = ({
   servicioId,
   expedienteId,
   soloLectura: propSoloLectura = false,
+  moduloOrigen,
 }) => {
   const { toast } = useToast();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -394,6 +396,7 @@ export const ExpedientePipc: React.FC<Props> = ({
           v_Estado={resumen?.v_Estado ?? (expediente?.form?.expediente_estado as any) ?? null}
           pendientesAltaCount={pendientesAlta.length}
           onScrollAExportar={() => handleScrollASeccion(10)}
+          moduloOrigen={moduloOrigen}
         />
 
         {/* Aviso de solo lectura (§5.5) */}

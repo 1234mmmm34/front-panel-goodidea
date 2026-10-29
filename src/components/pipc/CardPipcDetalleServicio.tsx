@@ -13,6 +13,8 @@ interface Props {
   resumen?: PipcResumen | null;
   d_FechaFin?: string | null;
   onCerrarModal?: () => void;
+  rutaChecklist?: (id: number) => string;
+  sessionStorageKey?: string;
 }
 
 export const BloquePipcEntregable: React.FC<Props> = ({
@@ -20,6 +22,8 @@ export const BloquePipcEntregable: React.FC<Props> = ({
   resumen: resumenProp,
   d_FechaFin,
   onCerrarModal,
+  rutaChecklist = (id) => `/programacion/pipc/${id}`,
+  sessionStorageKey = "pipc_origen_programacion",
 }) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -80,9 +84,9 @@ export const BloquePipcEntregable: React.FC<Props> = ({
     try {
       await PipcService.iniciarChecklist(servicioId);
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("pipc_origen_programacion", "1");
+        sessionStorage.setItem(sessionStorageKey, "1");
       }
-      router.push(`/programacion/pipc/${servicioId}`);
+      router.push(rutaChecklist(servicioId));
     } catch (err: any) {
       toast.error(extraerMensajeError(err, "No se pudo iniciar el checklist PIPC"));
       setIniciando(false);
@@ -92,9 +96,9 @@ export const BloquePipcEntregable: React.FC<Props> = ({
   const handleNavegar = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("pipc_origen_programacion", "1");
+      sessionStorage.setItem(sessionStorageKey, "1");
     }
-    router.push(`/programacion/pipc/${servicioId}`);
+    router.push(rutaChecklist(servicioId));
   };
 
   // Cálculo de días restantes

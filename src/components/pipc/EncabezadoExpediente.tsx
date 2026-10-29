@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { obtenerEstadoInfo, getColorSemaforo, diasRestantes } from "./pipcCalculos";
 import { formatearFechaTexto } from "@/lib/date-utils";
@@ -25,6 +25,7 @@ interface Props {
   v_Estado?: string | null;
   pendientesAltaCount?: number;
   onScrollAExportar?: () => void;
+  moduloOrigen?: "programacion" | "mis-servicios";
 }
 
 export const EncabezadoExpediente: React.FC<Props> = ({
@@ -42,6 +43,7 @@ export const EncabezadoExpediente: React.FC<Props> = ({
   v_Estado,
   pendientesAltaCount = 0,
   onScrollAExportar,
+  moduloOrigen,
 }) => {
   const estadoInfo = obtenerEstadoInfo(estado);
   const ringColor = getColorSemaforo(avanceGlobal);
@@ -108,21 +110,37 @@ export const EncabezadoExpediente: React.FC<Props> = ({
   const fechaFinTexto = d_FechaFin ? formatearFechaTexto(d_FechaFin) : null;
 
   const router = useRouter();
+  const pathname = usePathname();
+  const esMisServicios =
+    moduloOrigen === "mis-servicios" ||
+    (pathname !== null && pathname.startsWith("/mis-servicios"));
 
-  const handleVolverProgramacion = (e: React.MouseEvent) => {
+  const handleVolver = (e: React.MouseEvent) => {
     e.preventDefault();
     if (typeof window !== "undefined") {
-      const vinoDeProgramacion =
-        sessionStorage.getItem("pipc_origen_programacion") === "1" ||
-        (document.referrer && document.referrer.includes("/programacion"));
+      const storageKey = esMisServicios
+        ? "pipc_origen_mis_servicios"
+        : "pipc_origen_programacion";
+      const modulePath = esMisServicios ? "/mis-servicios" : "/programacion";
 
-      if (vinoDeProgramacion && window.history.length > 1) {
-        sessionStorage.removeItem("pipc_origen_programacion");
+      const vinoDelModulo =
+        sessionStorage.getItem(storageKey) === "1" ||
+        (typeof document !== "undefined" &&
+          document.referrer &&
+          document.referrer.includes(modulePath));
+
+      if (vinoDelModulo && window.history.length > 1) {
+        sessionStorage.removeItem(storageKey);
         router.back();
         return;
       }
     }
-    router.push(`/programacion?vista=servicios${servicioId ? `&detalle=${servicioId}` : ""}`);
+
+    if (esMisServicios) {
+      router.push(`/mis-servicios?vista=servicios${servicioId ? `&detalle=${servicioId}` : ""}`);
+    } else {
+      router.push(`/programacion?vista=servicios${servicioId ? `&detalle=${servicioId}` : ""}`);
+    }
   };
 
   return (
@@ -139,12 +157,12 @@ export const EncabezadoExpediente: React.FC<Props> = ({
         }}
       >
         <a
-          href="/programacion"
-          onClick={handleVolverProgramacion}
+          href={esMisServicios ? "/mis-servicios" : "/programacion"}
+          onClick={handleVolver}
           style={{ color: "#7a96b0", textDecoration: "none", cursor: "pointer" }}
           className="hover:text-slate-900 transition-colors"
         >
-          Programación
+          {esMisServicios ? "Mis servicios" : "Programación"}
         </a>
         <ChevronRight size={13} style={{ color: "#b5cfe8" }} />
         <span style={{ color: "#1e293b", fontWeight: 500 }}>

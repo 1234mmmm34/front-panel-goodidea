@@ -175,6 +175,8 @@ export const ConsultorService = {
         v_EntregablesJson: item.v_EntregablesJson ?? null,
         i_TotalRegistros: item.i_TotalRegistros ?? 0,
         entregablesParseados,
+        b_TienePlanContingencia: item.b_TienePlanContingencia !== undefined ? Boolean(item.b_TienePlanContingencia) : false,
+        i_AvancePipc: item.i_AvancePipc !== undefined && item.i_AvancePipc !== null ? Number(item.i_AvancePipc) : null,
       };
     });
 

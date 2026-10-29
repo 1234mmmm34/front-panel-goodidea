@@ -26,6 +26,10 @@ import { ConsultorService } from "@/services/consultor.service";
 import { VerDocumento } from "@/services/archivos.service";
 import { formatearFechaTexto } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
+import { BloquePipcEntregable } from "@/components/pipc/CardPipcDetalleServicio";
+import { PipcService, extraerMensajeError } from "@/services/pipc.service";
+import { PipcResumen } from "@/types/pipc";
+import { normalizarTexto } from "@/components/pipc/pipcCalculos";
 
 function obtenerFechasExtremosSesiones(sesiones?: Array<{
   d_FechaHoraInicio?: string | null;
@@ -80,6 +84,7 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
   const [sesiones, setSesiones] = useState<SesionConsultorDto[]>([]);
   const [entregables, setEntregables] = useState<EntregableConsultorDto[]>([]);
   const [alumnos, setAlumnos] = useState<AlumnoConsultorDto[]>([]);
+  const [pipcResumen, setPipcResumen] = useState<PipcResumen | null>(null);
 
   // Estados de guardado de entregables
   const [entregablesGuardando, setEntregablesGuardando] = useState<Set<number>>(new Set());
@@ -89,24 +94,38 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
   const [acordeonAlumnos, setAcordeonAlumnos] = useState<boolean>(true);
   const [sesionAbiertaIdx, setSesionAbiertaIdx] = useState<number | null>(0);
 
+  const cargarResumenPipc = async (servicioId: number) => {
+    try {
+      const data = await PipcService.getResumen(servicioId);
+      setPipcResumen(data);
+    } catch (err: any) {
+      if (err?.response?.status !== 404) {
+        toast.error(extraerMensajeError(err, "Error al cargar resumen PIPC"));
+      }
+      setPipcResumen(null);
+    }
+  };
+
   useEffect(() => {
-    if (abierto && iCveAgenda && iCveServAgendaDet) {
+    if (abierto && iCveServAgendaDet) {
       cargarDetalle();
+      cargarResumenPipc(iCveServAgendaDet);
     } else {
       setCabecera(null);
       setSesiones([]);
       setEntregables([]);
       setAlumnos([]);
       setErrorCarga(null);
+      setPipcResumen(null);
     }
   }, [abierto, iCveAgenda, iCveServAgendaDet]);
 
   const cargarDetalle = async () => {
-    if (!iCveAgenda || !iCveServAgendaDet) return;
+    if (!iCveServAgendaDet) return;
     setCargando(true);
     setErrorCarga(null);
     try {
-      const data = await ConsultorService.getDetalle(iCveAgenda, iCveServAgendaDet);
+      const data = await ConsultorService.getDetalle(iCveAgenda || 0, iCveServAgendaDet);
       setCabecera(data.cabecera);
       setSesiones(data.sesiones || []);
       setEntregables(data.entregables || []);
@@ -1018,6 +1037,10 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                     {entregables.map((ent) => {
                       const keyArchivo = ent.v_Key || (ent.i_CveArchivo ? String(ent.i_CveArchivo) : null);
                       const estaGuardando = entregablesGuardando.has(ent.i_CveAgendaEntregables);
+                      const esPlanContingenciaPipc =
+                        normalizarTexto(ent.v_Nombre).startsWith("PLAN DE CONTINGENCIA") &&
+                        pipcResumen?.b_TienePlanContingencia === true;
+
                       return (
                         <div
                           key={`ent-${ent.i_CveAgendaEntregables}`}
@@ -1025,6 +1048,8 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: "12px",
                             padding: "10px 12px",
                             backgroundColor: "#ffffff",
                             border: "1px solid #e2e8f0",
@@ -1032,55 +1057,69 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                             fontSize: "13px",
                             cursor: estaGuardando ? "wait" : "pointer",
                             transition: "background-color 0.2s ease",
+                            gridColumn: esPlanContingenciaPipc ? "1 / -1" : undefined,
                           }}
                           onClick={() => !estaGuardando && handleToggleEntregable(ent)}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            {estaGuardando ? (
-                              <Loader2 size={14} className="animate-spin text-sky-600" />
-                            ) : ent.b_Entregado ? (
-                              <CheckCircle2 size={14} style={{ color: "#10b981", flexShrink: 0 }} />
-                            ) : (
-                              <Circle size={14} style={{ color: "#cbd5e1", flexShrink: 0 }} />
-                            )}
-                            <div style={{ display: "flex", flexDirection: "column" }}>
-                              <span style={{ fontWeight: 400, color: "#1e293b" }}>{ent.v_Nombre}</span>
-                              {ent.b_Entregado ? (
-                                <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 500 }}>
-                                  Entregado el {formatearFechaTexto(ent.f_FechaEntregable)}
-                                </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", flex: esPlanContingenciaPipc ? "1 1 240px" : undefined }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              {estaGuardando ? (
+                                <Loader2 size={14} className="animate-spin text-sky-600" />
+                              ) : ent.b_Entregado ? (
+                                <CheckCircle2 size={14} style={{ color: "#10b981", flexShrink: 0 }} />
                               ) : (
-                                <span style={{ fontSize: "11px", color: "#dc3545", fontWeight: 500 }}>Pendiente</span>
+                                <Circle size={14} style={{ color: "#cbd5e1", flexShrink: 0 }} />
                               )}
+                              <div style={{ display: "flex", flexDirection: "column" }}>
+                                <span style={{ fontWeight: 400, color: "#1e293b" }}>{ent.v_Nombre}</span>
+                                {ent.b_Entregado ? (
+                                  <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 500 }}>
+                                    Entregado el {formatearFechaTexto(ent.f_FechaEntregable)}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: "11px", color: "#dc3545", fontWeight: 500 }}>Pendiente</span>
+                                )}
+                              </div>
                             </div>
+
+                            {keyArchivo && (
+                              <button
+                                type="button"
+                                className="btn-icon"
+                                style={{
+                                  padding: "4px 8px",
+                                  color: "#2B8FCC",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  fontSize: "12px",
+                                  fontWeight: 500,
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  textDecoration: "underline",
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  VerDocumento(keyArchivo);
+                                }}
+                                title={`Ver archivo de ${ent.v_Nombre}`}
+                              >
+                                <Paperclip size={14} />
+                                <span>Ver archivo</span>
+                              </button>
+                            )}
                           </div>
 
-                          {keyArchivo && (
-                            <button
-                              type="button"
-                              className="btn-icon"
-                              style={{
-                                padding: "4px 8px",
-                                color: "#2B8FCC",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                fontSize: "12px",
-                                fontWeight: 500,
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                textDecoration: "underline",
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                VerDocumento(keyArchivo);
-                              }}
-                              title={`Ver archivo de ${ent.v_Nombre}`}
-                            >
-                              <Paperclip size={14} />
-                              <span>Ver archivo</span>
-                            </button>
+                          {esPlanContingenciaPipc && pipcResumen && iCveServAgendaDet && (
+                            <BloquePipcEntregable
+                              servicioId={iCveServAgendaDet}
+                              resumen={pipcResumen}
+                              d_FechaFin={obtenerFechasExtremosSesiones(sesiones).fechaFin || pipcResumen.d_FechaFin}
+                              onCerrarModal={onCerrar}
+                              rutaChecklist={(id) => `/mis-servicios/pipc/${id}`}
+                              sessionStorageKey="pipc_origen_mis_servicios"
+                            />
                           )}
                         </div>
                       );

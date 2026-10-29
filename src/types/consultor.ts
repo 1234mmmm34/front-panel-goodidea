@@ -30,6 +30,8 @@ export interface AgendaServicioConsultorGetDto {
   entregablesParseados?: EntregableResumen[];
   d_FechaConfirmacionTermino?: string | null;
   v_ConfirmadoPor?: string | null;
+  b_TienePlanContingencia?: boolean;
+  i_AvancePipc?: number | null;
 }
 
 export interface AgendaDetalleConsultorCabeceraDto {

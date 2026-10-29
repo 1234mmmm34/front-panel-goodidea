@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { RefreshCw, UserX } from "lucide-react";
 import { AgendaGetDto } from "@/types/calendario";
 import {
@@ -18,18 +19,36 @@ import { TablaConsultorServicios } from "@/components/consultor/TablaConsultorSe
 import { ModalDetalleServicioConsultor } from "@/components/consultor/ModalDetalleServicioConsultor";
 import { useToast } from "@/context/ToastContext";
 
-export default function MisServiciosPage() {
+function MisServiciosContent() {
   const { toast } = useToast();
   const toastRef = useRef(toast);
   useEffect(() => {
     toastRef.current = toast;
   }, [toast]);
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Lectura de query params (§5)
+  const paramVista = searchParams.get("vista");
+  const paramDesde = searchParams.get("desde");
+  const paramHasta = searchParams.get("hasta");
+  const paramQ = searchParams.get("q");
+  const paramPagina = searchParams.get("pagina");
+  const paramDetalle = searchParams.get("detalle");
+
+  const hoy = useMemo(() => new Date().toISOString().split("T")[0], []);
+
   // Selector "Visualizar" ("sesiones" | "servicios")
-  const [vista, setVista] = useState<"sesiones" | "servicios">("sesiones");
+  const [vista, setVista] = useState<"sesiones" | "servicios">(() => {
+    return paramVista === "servicios" ? "servicios" : "sesiones";
+  });
 
   // Estado Paginación Común
-  const [paginaActual, setPaginaActual] = useState<number>(1);
+  const [paginaActual, setPaginaActual] = useState<number>(() => {
+    const p = paramPagina ? parseInt(paramPagina, 10) : 1;
+    return isNaN(p) || p < 1 ? 1 : p;
+  });
   const [tamanoPagina, setTamanoPagina] = useState<number>(10);
   const [totalRegistros, setTotalRegistros] = useState<number>(0);
   const [totalPaginas, setTotalPaginas] = useState<number>(1);
@@ -44,29 +63,117 @@ export default function MisServiciosPage() {
 
   // --- ESTADO VISTA SESIONES ---
   const [datosSesiones, setDatosSesiones] = useState<AgendaGetDto[]>([]);
-  const [filtrosSesiones, setFiltrosSesiones] = useState<FiltrosConsultorSesionesState>({
+  const [filtrosSesiones, setFiltrosSesiones] = useState<FiltrosConsultorSesionesState>(() => ({
     visualizar: "sesiones",
-    fechaInicio: new Date().toISOString().split("T")[0],
-    fechaFin: "",
-    usarRango: false,
-    searchTerm: "",
-  });
+    fechaInicio: paramDesde !== null && paramDesde !== undefined ? paramDesde : hoy,
+    fechaFin: paramHasta || "",
+    usarRango: Boolean(paramHasta),
+    searchTerm: paramQ || "",
+  }));
 
   // --- ESTADO VISTA SERVICIOS ---
   const [datosServicios, setDatosServicios] = useState<AgendaServicioConsultorGetDto[]>([]);
-  const [filtrosServicios, setFiltrosServicios] = useState<FiltrosConsultorServiciosState>({
+  const [filtrosServicios, setFiltrosServicios] = useState<FiltrosConsultorServiciosState>(() => ({
     visualizar: "servicios",
-    fechaInicio: new Date().toISOString().split("T")[0],
-    fechaFin: "",
-    usarRango: false,
-    searchTerm: "",
-  });
+    fechaInicio: paramDesde !== null && paramDesde !== undefined ? paramDesde : hoy,
+    fechaFin: paramHasta || "",
+    usarRango: Boolean(paramHasta),
+    searchTerm: paramQ || "",
+  }));
 
   // --- MODAL DETALLE ---
   const [itemDetalle, setItemDetalle] = useState<{
     iCveAgenda: number;
     iCveServAgendaDet: number;
   } | null>(null);
+
+  const modalYaAbiertoParaDetalleRef = useRef<string | null>(null);
+
+  // Helper para mantener URL en sincronía con replace sin llenar el historial (§5)
+  const actualizarUrl = useCallback(
+    (cambios: {
+      nuevaVista?: "sesiones" | "servicios";
+      nuevosFiltrosSesiones?: FiltrosConsultorSesionesState;
+      nuevosFiltrosServicios?: FiltrosConsultorServiciosState;
+      nuevaPagina?: number;
+      detalleId?: number | null;
+    }) => {
+      const targetVista = cambios.nuevaVista ?? vista;
+      const targetPagina = cambios.nuevaPagina ?? paginaActual;
+      const targetDetalle =
+        cambios.detalleId !== undefined
+          ? cambios.detalleId
+          : itemDetalle?.iCveServAgendaDet ?? null;
+
+      const params = new URLSearchParams();
+      params.set("vista", targetVista);
+
+      if (targetVista === "servicios") {
+        const fs = cambios.nuevosFiltrosServicios ?? filtrosServicios;
+        if (fs.fechaInicio) params.set("desde", fs.fechaInicio);
+        if (fs.usarRango && fs.fechaFin) params.set("hasta", fs.fechaFin);
+        if (fs.searchTerm && fs.searchTerm.trim() !== "") params.set("q", fs.searchTerm.trim());
+      } else {
+        const fses = cambios.nuevosFiltrosSesiones ?? filtrosSesiones;
+        if (fses.fechaInicio) params.set("desde", fses.fechaInicio);
+        if (fses.usarRango && fses.fechaFin) params.set("hasta", fses.fechaFin);
+        if (fses.searchTerm && fses.searchTerm.trim() !== "") params.set("q", fses.searchTerm.trim());
+      }
+
+      if (targetPagina > 1) {
+        params.set("pagina", String(targetPagina));
+      }
+
+      if (targetDetalle) {
+        params.set("detalle", String(targetDetalle));
+      }
+
+      const qs = params.toString();
+      const url = qs ? `/mis-servicios?${qs}` : `/mis-servicios`;
+      router.replace(url, { scroll: false });
+    },
+    [vista, paginaActual, itemDetalle, filtrosServicios, filtrosSesiones, router]
+  );
+
+  const handleAbrirModalDetalle = (item: { iCveAgenda: number; iCveServAgendaDet: number }) => {
+    setItemDetalle(item);
+    actualizarUrl({ detalleId: item.iCveServAgendaDet });
+  };
+
+  const handleCerrarModalDetalle = () => {
+    setItemDetalle(null);
+    actualizarUrl({ detalleId: null });
+  };
+
+  // Si al cargar viene detalle, abrir el modal de ese servicio al terminar de cargar la tabla (§5)
+  useEffect(() => {
+    if (!cargando && paramDetalle) {
+      if (modalYaAbiertoParaDetalleRef.current !== paramDetalle) {
+        modalYaAbiertoParaDetalleRef.current = paramDetalle;
+        const detalleId = Number(paramDetalle);
+        if (detalleId) {
+          if (vista === "servicios") {
+            const encontrado = datosServicios.find((s) => s.i_CveServAgendaDet === detalleId);
+            setItemDetalle({
+              iCveAgenda: encontrado?.i_CveAgenda ?? 0,
+              iCveServAgendaDet: detalleId,
+            });
+          } else {
+            const sesionMatch = datosSesiones.find((s) => s.i_CveServAgendaDet === detalleId);
+            setItemDetalle({
+              iCveAgenda: sesionMatch?.i_CveAgenda ?? 0,
+              iCveServAgendaDet: detalleId,
+            });
+          }
+        }
+      }
+    } else if (!paramDetalle) {
+      modalYaAbiertoParaDetalleRef.current = null;
+      if (itemDetalle) {
+        setItemDetalle(null);
+      }
+    }
+  }, [cargando, paramDetalle, itemDetalle, vista, datosServicios, datosSesiones]);
 
   // --- Cargar datos de Sesiones ---
   const cargarSesiones = useCallback(async () => {
@@ -182,6 +289,29 @@ export default function MisServiciosPage() {
     setErrorSesiones(null);
     setErrorServicios(null);
     setNoLigadoPersonal(false);
+
+    const hoyStr = new Date().toISOString().split("T")[0];
+    if (nuevaVista === "sesiones") {
+      const nf: FiltrosConsultorSesionesState = {
+        visualizar: "sesiones",
+        fechaInicio: hoyStr,
+        fechaFin: "",
+        usarRango: false,
+        searchTerm: "",
+      };
+      setFiltrosSesiones(nf);
+      actualizarUrl({ nuevaVista, nuevosFiltrosSesiones: nf, nuevaPagina: 1 });
+    } else {
+      const nf: FiltrosConsultorServiciosState = {
+        visualizar: "servicios",
+        fechaInicio: hoyStr,
+        fechaFin: "",
+        usarRango: false,
+        searchTerm: "",
+      };
+      setFiltrosServicios(nf);
+      actualizarUrl({ nuevaVista, nuevosFiltrosServicios: nf, nuevaPagina: 1 });
+    }
   };
 
   const handleRecargar = () => {
@@ -257,9 +387,13 @@ export default function MisServiciosPage() {
             onCambiarFiltros={(nuevos) => {
               setFiltrosSesiones(nuevos);
               setPaginaActual(1);
+              actualizarUrl({ nuevosFiltrosSesiones: nuevos, nuevaPagina: 1 });
             }}
             onCambiarVisualizar={handleCambiarVisualizar}
-            onBuscar={() => setPaginaActual(1)}
+            onBuscar={() => {
+              setPaginaActual(1);
+              actualizarUrl({ nuevaPagina: 1 });
+            }}
           />
 
           <TablaConsultorSesiones
@@ -267,7 +401,7 @@ export default function MisServiciosPage() {
             cargando={cargando}
             error={errorSesiones}
             onVerDetalle={(item) =>
-              setItemDetalle({
+              handleAbrirModalDetalle({
                 iCveAgenda: item.i_CveAgenda,
                 iCveServAgendaDet: item.i_CveServAgendaDet,
               })
@@ -279,10 +413,14 @@ export default function MisServiciosPage() {
             totalPaginas={totalPaginas}
             totalRegistros={totalRegistros}
             tamano={tamanoPagina}
-            onCambioPagina={(pag) => setPaginaActual(pag)}
+            onCambioPagina={(pag) => {
+              setPaginaActual(pag);
+              actualizarUrl({ nuevaPagina: pag });
+            }}
             onCambioTamano={(tam) => {
               setTamanoPagina(tam);
               setPaginaActual(1);
+              actualizarUrl({ nuevaPagina: 1 });
             }}
           />
         </>
@@ -293,9 +431,13 @@ export default function MisServiciosPage() {
             onCambiarFiltros={(nuevos) => {
               setFiltrosServicios(nuevos);
               setPaginaActual(1);
+              actualizarUrl({ nuevosFiltrosServicios: nuevos, nuevaPagina: 1 });
             }}
             onCambiarVisualizar={handleCambiarVisualizar}
-            onBuscar={() => setPaginaActual(1)}
+            onBuscar={() => {
+              setPaginaActual(1);
+              actualizarUrl({ nuevaPagina: 1 });
+            }}
           />
 
           <TablaConsultorServicios
@@ -303,7 +445,7 @@ export default function MisServiciosPage() {
             cargando={cargando}
             error={errorServicios}
             onVerDetalle={(item) =>
-              setItemDetalle({
+              handleAbrirModalDetalle({
                 iCveAgenda: item.i_CveAgenda,
                 iCveServAgendaDet: item.i_CveServAgendaDet,
               })
@@ -315,10 +457,14 @@ export default function MisServiciosPage() {
             totalPaginas={totalPaginas}
             totalRegistros={totalRegistros}
             tamano={tamanoPagina}
-            onCambioPagina={(pag) => setPaginaActual(pag)}
+            onCambioPagina={(pag) => {
+              setPaginaActual(pag);
+              actualizarUrl({ nuevaPagina: pag });
+            }}
             onCambioTamano={(tam) => {
               setTamanoPagina(tam);
               setPaginaActual(1);
+              actualizarUrl({ nuevaPagina: 1 });
             }}
           />
         </>
@@ -329,7 +475,7 @@ export default function MisServiciosPage() {
         abierto={!!itemDetalle}
         iCveAgenda={itemDetalle?.iCveAgenda ?? null}
         iCveServAgendaDet={itemDetalle?.iCveServAgendaDet ?? null}
-        onCerrar={() => setItemDetalle(null)}
+        onCerrar={handleCerrarModalDetalle}
         onGuardadoExitoso={() => {
           if (vista === "sesiones") {
             cargarSesiones();
@@ -339,5 +485,13 @@ export default function MisServiciosPage() {
         }}
       />
     </AppLayout>
+  );
+}
+
+export default function MisServiciosPage() {
+  return (
+    <Suspense fallback={<div className="p-4 text-sm text-slate-500">Cargando mis servicios...</div>}>
+      <MisServiciosContent />
+    </Suspense>
   );
 }
