@@ -8,6 +8,9 @@ import {
   HistorialAlumnosResponse,
   HistorialAlumnoPutDto,
   HistorialResumenDto,
+  CursoHistorial,
+  CargaHistorialPayload,
+  CargaHistorialResultado,
 } from "@/types/alumnosCatalogo";
 
 export const AlumnosCatalogoService = {
@@ -257,6 +260,80 @@ export const AlumnosCatalogoService = {
       );
     } catch (err: any) {
       console.error("[AlumnosCatalogoService.getHistorialResumen] Error:", err);
+      throw err;
+    }
+  },
+
+  /**
+   * 3.9 Cursos de la empresa con alumnos inscritos (búsqueda manual en carga masiva de historial)
+   * GET api/alumnos/historial/cursos/empresa/{i_CveEmpresa}
+   */
+  async getHistorialCursosEmpresa(
+    i_CveEmpresa: number,
+    params?: {
+      fechaInicio?: string;
+      fechaFin?: string;
+      searchTerm?: string;
+    }
+  ): Promise<CursoHistorial[]> {
+    try {
+      const queryParams: Record<string, string> = {};
+      if (params?.fechaInicio && params.fechaInicio.trim()) {
+        queryParams.fechaInicio = params.fechaInicio.trim();
+      }
+      if (params?.fechaFin && params.fechaFin.trim()) {
+        queryParams.fechaFin = params.fechaFin.trim();
+      }
+      if (params?.searchTerm !== undefined && params.searchTerm.trim() !== "") {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+
+      const resp = await apiClient.get<CursoHistorial[]>(
+        `alumnos/historial/cursos/empresa/${i_CveEmpresa}`,
+        { params: queryParams }
+      );
+
+      return Array.isArray(resp.data) ? resp.data : [];
+    } catch (err: any) {
+      console.error("[AlumnosCatalogoService.getHistorialCursosEmpresa] Error:", err);
+      throw err;
+    }
+  },
+
+  /**
+   * 3.10 Validar carga masiva de historial (vista previa, no guarda nada)
+   * POST api/alumnos/historial/carga-masiva/validar
+   */
+  async validarCargaMasivaHistorial(
+    payload: CargaHistorialPayload
+  ): Promise<CargaHistorialResultado> {
+    try {
+      const resp = await apiClient.post<CargaHistorialResultado>(
+        "alumnos/historial/carga-masiva/validar",
+        payload
+      );
+      return resp.data;
+    } catch (err: any) {
+      console.error("[AlumnosCatalogoService.validarCargaMasivaHistorial] Error:", err);
+      throw err;
+    }
+  },
+
+  /**
+   * 3.11 Importar carga masiva de historial
+   * POST api/alumnos/historial/carga-masiva
+   */
+  async postCargaMasivaHistorial(
+    payload: CargaHistorialPayload
+  ): Promise<CargaHistorialResultado> {
+    try {
+      const resp = await apiClient.post<CargaHistorialResultado>(
+        "alumnos/historial/carga-masiva",
+        payload
+      );
+      return resp.data;
+    } catch (err: any) {
+      console.error("[AlumnosCatalogoService.postCargaMasivaHistorial] Error:", err);
       throw err;
     }
   },

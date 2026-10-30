@@ -19,6 +19,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ModalConfirmarEliminar } from "@/components/ui/ModalConfirmarEliminar";
 import { ModalNuevoAlumno } from "@/components/personal/ModalNuevoAlumno";
 import { ModalCargaMasivaPersonal } from "@/components/personal/ModalCargaMasivaPersonal";
+import { ModalCargaMasivaHistorial } from "@/components/personal/ModalCargaMasivaHistorial";
 import { ModalEvaluacionAlumno } from "@/components/personal/ModalEvaluacionAlumno";
 import { ModalConfirmarMarcarEntregables } from "@/components/personal/ModalConfirmarMarcarEntregables";
 import { TarjetasResumenHistorial } from "@/components/personal/TarjetasResumenHistorial";
@@ -89,6 +90,7 @@ export default function CatalogosPersonalPage() {
   const [modalEvaluacionAbierto, setModalEvaluacionAbierto] = useState<boolean>(false);
   const [alumnosModalEvaluacion, setAlumnosModalEvaluacion] = useState<HistorialAlumno[]>([]);
   const [guardandoEntregables, setGuardandoEntregables] = useState<Set<string>>(new Set());
+  const [modalCargaHistorialAbierto, setModalCargaHistorialAbierto] = useState<boolean>(false);
 
   // Filtro de rango de fechas para historial
   const [fechaInicio, setFechaInicio] = useState<string>("");
@@ -705,6 +707,20 @@ export default function CatalogosPersonalPage() {
               </div>
             )}
 
+            {/* Botón Carga Masiva en vista Historial */}
+            {vista === "historial" && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setModalCargaHistorialAbierto(true)}
+                style={{ height: "32px", fontSize: "13px", padding: "0 14px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                title="Carga masiva de historial desde Excel"
+              >
+                <FileSpreadsheet size={16} />
+                <span>Carga masiva</span>
+              </button>
+            )}
+
             {/* Botones sólo visibles en la vista Catálogo */}
             {vista === "catalogo" && (
               <>
@@ -1160,9 +1176,7 @@ export default function CatalogosPersonalPage() {
 
                         {/* Entregables */}
                         <td style={{ padding: "6px 12px", verticalAlign: "middle" }}>
-                          {(!row.entregables || row.entregables.length === 0) ? (
-                            <span style={{ color: "#94a3b8", fontSize: "11px", fontStyle: "italic" }}>Sin entregables</span>
-                          ) : (
+                          {row.entregables && row.entregables.length > 0 && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
                               {row.entregables.map((ent) => {
                                 const clave = `${row.i_CveAlumnoAgenda}_${ent.i_CveAgendaEntregable}`;
@@ -1275,6 +1289,18 @@ export default function CatalogosPersonalPage() {
         idEmpresa={idEmpresa}
         onCerrar={() => setModalCargaAbierto(false)}
         onGuardadoExitoso={cargarAlumnos}
+      />
+
+      {/* Modal Carga Masiva (Historial) */}
+      <ModalCargaMasivaHistorial
+        abierto={modalCargaHistorialAbierto}
+        idEmpresa={idEmpresa}
+        onCerrar={() => setModalCargaHistorialAbierto(false)}
+        onImportacionExitosa={() => {
+          setSeleccionados(new Map());
+          cargarHistorial();
+          cargarResumen();
+        }}
       />
 
       {/* Modal Confirmar Eliminar (Catálogo) */}

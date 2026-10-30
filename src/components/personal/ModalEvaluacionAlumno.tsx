@@ -732,17 +732,7 @@ export const ModalEvaluacionAlumno: React.FC<ModalEvaluacionAlumnoProps> = ({
 
                         {/* Entregables */}
                         <td style={{ padding: "6px 12px", verticalAlign: "middle" }}>
-                          {!f.entregables || f.entregables.length === 0 ? (
-                            <span
-                              style={{
-                                color: "#94a3b8",
-                                fontSize: "11px",
-                                fontStyle: "italic",
-                              }}
-                            >
-                              Sin entregables
-                            </span>
-                          ) : (
+                          {f.entregables && f.entregables.length > 0 && (
                             <div
                               style={{
                                 display: "flex",

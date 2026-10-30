@@ -105,3 +105,62 @@ export interface HistorialResumenDto {
   i_SinEvaluar: number;
 }
 
+// 1.1 Cursos de la empresa (búsqueda manual en carga masiva de historial)
+export interface CursoHistorial {
+  i_CveServAgendaDet: number;
+  d_FechaInicio: string | null;   // fecha de la 1ª sesión vigente
+  v_Curso: string;
+  i_Inscritos: number;
+  Entregables: { i_CveAgendaEntregable: number; v_Entregable: string }[];
+}
+
+// 1.2 y 1.3 Carga masiva de historial (validar e importar)
+export interface CargaHistorialPayload {
+  i_CveEmpresa: number;
+  Cursos: CargaHistorialCurso[];
+}
+
+export interface CargaHistorialCurso {
+  i_Grupo: number;                      // índice del grupo en el front (0,1,2…)
+  d_FechaInicio: string | null;         // yyyy-MM-dd leída del Excel
+  v_Curso: string | null;               // nombre del curso tal como viene en el Excel (trim)
+  i_CveServAgendaDet: number | null;    // null = detección automática; número = curso elegido a mano
+  Alumnos: CargaHistorialAlumno[];
+}
+
+export interface CargaHistorialAlumno {
+  i_Renglon: number;                    // número de fila real del Excel (encabezado = 1)
+  v_Nomina: string | null;
+  v_EvTeorica: string | null;
+  v_EvPractica: string | null;
+  v_EvFinal: string | null;
+  Entregables: Record<string, string | null>; // { "DIPLOMA": "ENTREGADO", "DC-3": "N/A", ... } encabezado original → valor
+}
+
+export interface CargaHistorialResultado {
+  b_Importado: boolean;
+  i_CursosValidos: number;
+  i_CursosNoValidos: number;
+  i_AlumnosDetectados: number;
+  i_AlumnosActualizados: number;
+  Cursos: CargaHistorialCursoResultado[];
+}
+
+export interface CargaHistorialCursoResultado {
+  i_Grupo: number;
+  d_FechaExcel: string | null;
+  v_CursoExcel: string | null;
+  b_Valido: boolean;
+  b_Manual: boolean;
+  v_Motivo: string | null;              // por qué no es válido
+  i_CveServAgendaDet: number | null;    // curso detectado/elegido
+  d_FechaInicio: string | null;
+  v_Curso: string | null;
+  i_Detectados: number;                 // renglones válidos que coinciden con inscritos
+  i_Inscritos: number;
+  i_Renglones: number;                  // renglones del grupo en el Excel
+  v_ColumnasIgnoradas: string[];        // columnas de entregable que el curso no tiene
+  Errores: { i_Renglon: number; v_Nomina: string | null; v_Motivo: string }[];
+}
+
+
