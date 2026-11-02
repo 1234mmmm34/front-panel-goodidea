@@ -71,6 +71,8 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
   const [rfc, setRfc] = useState<string>("");
   const [diasCredito, setDiasCredito] = useState<string>("0");
   const [estatus, setEstatus] = useState<"Activo" | "Inactivo">("Activo");
+  const [b_AvisoInscritos, setB_AvisoInscritos] = useState<boolean>(false);
+  const [guardandoAvisoInscritos, setGuardandoAvisoInscritos] = useState<boolean>(false);
 
   // Domicilio
   const [codigoPostal, setCodigoPostal] = useState<string>("");
@@ -127,6 +129,7 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
       setRfc(empresaEditar.s_RFC || "");
       setDiasCredito(String(empresaEditar.d_DiasCredito ?? 0));
       setEstatus(empresaEditar.d_FechaBaja ? "Inactivo" : "Activo");
+      setB_AvisoInscritos(Boolean(empresaEditar.b_AvisoInscritos));
 
       setCodigoPostal(empresaEditar.i_CodigoPostal ? String(empresaEditar.i_CodigoPostal) : "");
       setEstado(empresaEditar.v_NombreEstado || "");
@@ -265,6 +268,32 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
   };
 
   // Card 5 — Generación de Link de Capacitaciones
+  const handleToggleAvisoInscritos = async (nuevoValor: boolean) => {
+    if (!empresaEditar?.iD_Empresa || guardandoAvisoInscritos) return;
+    const valorAnterior = b_AvisoInscritos;
+    setB_AvisoInscritos(nuevoValor);
+    setGuardandoAvisoInscritos(true);
+
+    try {
+      await EmpresasService.actualizarAvisoInscritos(empresaEditar.iD_Empresa, nuevoValor);
+      toast.success(
+        nuevoValor
+          ? "Envío de lista de alumnos activado"
+          : "Envío de lista de alumnos desactivado"
+      );
+    } catch (err: any) {
+      setB_AvisoInscritos(valorAnterior);
+      const errorMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.mensaje ||
+        err?.response?.data?.message ||
+        "Ocurrió un error al actualizar la configuración de envío.";
+      toast.error(errorMsg);
+    } finally {
+      setGuardandoAvisoInscritos(false);
+    }
+  };
+
   const handleGenerarLink = async () => {
     const idPlanta = Number(plantaSeleccionada);
     if (!idPlanta || idPlanta === 0) {
@@ -942,6 +971,49 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
             >
               {generandoLink ? "Generando..." : "Generar link"}
             </button>
+          </div>
+
+          {/* Casilla de envío periódico de lista de alumnos por correo */}
+          <div style={{ marginTop: "16px" }}>
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#1e3a5f",
+                cursor: guardandoAvisoInscritos ? "not-allowed" : "pointer",
+                userSelect: "none",
+                opacity: guardandoAvisoInscritos ? 0.65 : 1,
+                margin: 0,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={b_AvisoInscritos}
+                disabled={guardandoAvisoInscritos}
+                onChange={(e) => handleToggleAvisoInscritos(e.target.checked)}
+                style={{
+                  accentColor: "#2B8FCC",
+                  width: "15px",
+                  height: "15px",
+                  cursor: guardandoAvisoInscritos ? "not-allowed" : "pointer",
+                  flexShrink: 0,
+                }}
+              />
+              <span>¿Enviar lista de alumnos por correo, periódicamente?</span>
+            </label>
+            <p
+              style={{
+                fontSize: "11px",
+                color: "#6c757d",
+                margin: "3px 0 0 23px",
+                lineHeight: 1.35,
+              }}
+            >
+              Se envía 14, 7 y 4 días antes de cada capacitación.
+            </p>
           </div>
 
           {/* Resultado del link generado */}

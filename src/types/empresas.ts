@@ -47,6 +47,7 @@ export interface EmpresaGetDto {
   i_TipoContacto: number;
   v_Municipio: string | null;
   v_NombreEstado: string | null;
+  b_AvisoInscritos: boolean;
 }
 
 export interface EmpresaPostPayload {

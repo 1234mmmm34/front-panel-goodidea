@@ -168,5 +168,20 @@ export const EmpresasService = {
       return resp.status >= 200 && resp.status < 300;
     }, false);
   },
+
+  /**
+   * Actualiza la configuración de envío periódico de lista de alumnos inscritos.
+   * POST empresas/aviso-inscritos/{id}
+   */
+  async actualizarAvisoInscritos(
+    idEmpresa: number,
+    b_AvisoInscritos: boolean
+  ): Promise<{ ID_Empresa: number; b_AvisoInscritos: boolean }> {
+    const resp = await apiClient.post<{ ID_Empresa: number; b_AvisoInscritos: boolean }>(
+      `empresas/aviso-inscritos/${idEmpresa}`,
+      { b_AvisoInscritos }
+    );
+    return resp.data;
+  },
 };
 
