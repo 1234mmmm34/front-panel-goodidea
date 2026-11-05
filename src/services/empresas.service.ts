@@ -127,6 +127,17 @@ export const EmpresasService = {
   },
 
   /**
+   * Listar contactos para reprogramación (EXTERNO + GI)
+   * GET ContactosXEmpresa/GetContactosReprograma/{id_empresa}
+   */
+  async getContactosReprograma(id_empresa: number): Promise<import("@/types/empresas").ContactoReprograma[]> {
+    const resp = await apiClient.get<import("@/types/empresas").ContactoReprograma[]>(
+      `ContactosXEmpresa/GetContactosReprograma/${id_empresa}`
+    );
+    return resp.data || [];
+  },
+
+  /**
    * 2.2 Cargar un contacto por ID (GET ContactosXEmpresa/{id_contacto})
    */
   async getContactoById(idContacto: number): Promise<import("@/types/empresas").ContactoXEmpresa | null> {

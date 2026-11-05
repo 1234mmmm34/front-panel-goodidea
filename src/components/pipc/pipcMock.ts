@@ -14,6 +14,7 @@ import {
   AgenteEvaluado,
   ProgramaMantenimientoEquipos,
   BrigadistaRow,
+  analizarEquiposRepetidos,
 } from "./pipcCalculos";
 
 export const MESES_PROG = [
@@ -52,11 +53,13 @@ export function crearAgentesDefault(): Record<string, AgenteEvaluado> {
 
 export function crearProgramaEquiposDefault(equipos: { equipo: string }[]): ProgramaMantenimientoEquipos {
   const prog: ProgramaMantenimientoEquipos = {};
-  equipos.forEach((e) => {
-    if (e.equipo && e.equipo.trim()) {
-      prog[e.equipo] = {};
+  const { equiposUnicos } = analizarEquiposRepetidos(equipos);
+  equiposUnicos.forEach((e) => {
+    const nombre = (e.equipo || "").trim();
+    if (nombre) {
+      prog[nombre] = {};
       MESES_PROG.forEach((m) => {
-        prog[e.equipo][m] = { p: 0, r: 0 };
+        prog[nombre][m] = { p: 0, r: 0 };
       });
     }
   });

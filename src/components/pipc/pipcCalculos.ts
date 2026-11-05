@@ -935,3 +935,66 @@ export function getPipcYearFromFechaElaboracion(fecha?: string | null): number {
   }
   return new Date().getFullYear();
 }
+
+export interface AnalisisEquiposRepetidos<T extends { equipo: string }> {
+  indicesRepetidos: Set<number>;
+  nombresRepetidos: string[];
+  equiposUnicos: T[];
+}
+
+/**
+ * Analiza una tabla de equipos (emergencia o alto riesgo por separado):
+ * - Normaliza nombres (trim, sin espacios dobles, sin mayúsculas ni acentos).
+ * - Renglones con nombre vacío no se validan.
+ * - Devuelve índices repetidos, lista de nombres repetidos para avisos y lista deduplicada.
+ */
+export function analizarEquiposRepetidos<T extends { equipo: string }>(
+  filas: T[] = []
+): AnalisisEquiposRepetidos<T> {
+  const conteoPorNorm = new Map<string, number>();
+  const primerNombrePorNorm = new Map<string, string>();
+
+  filas.forEach((f) => {
+    const raw = (f?.equipo || "").trim().replace(/\s+/g, " ");
+    const norm = normalizarTexto(raw);
+    if (!norm) return;
+    conteoPorNorm.set(norm, (conteoPorNorm.get(norm) || 0) + 1);
+    if (!primerNombrePorNorm.has(norm)) {
+      primerNombrePorNorm.set(norm, raw);
+    }
+  });
+
+  const indicesRepetidos = new Set<number>();
+  const vistosUnicos = new Set<string>();
+  const equiposUnicos: T[] = [];
+
+  filas.forEach((f, idx) => {
+    const raw = (f?.equipo || "").trim().replace(/\s+/g, " ");
+    const norm = normalizarTexto(raw);
+    if (!norm) return;
+
+    if ((conteoPorNorm.get(norm) || 0) > 1) {
+      indicesRepetidos.add(idx);
+    }
+
+    if (!vistosUnicos.has(norm)) {
+      vistosUnicos.add(norm);
+      equiposUnicos.push(f);
+    }
+  });
+
+  const nombresRepetidos: string[] = [];
+  conteoPorNorm.forEach((count, norm) => {
+    if (count > 1) {
+      const display = primerNombrePorNorm.get(norm);
+      if (display) nombresRepetidos.push(display);
+    }
+  });
+
+  return {
+    indicesRepetidos,
+    nombresRepetidos,
+    equiposUnicos,
+  };
+}
+

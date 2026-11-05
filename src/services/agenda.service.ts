@@ -833,63 +833,57 @@ export const AgendaService = {
 
   /**
    * 3. Confirmar reprogramación de sesión
-   * Prueba endpoints alternativos (agenda/PostReprogramacion, agenda/reprogramar, agenda/Reprogramar)
+   * Endpoint: POST agenda/PostReprogramacion
    */
   async postReprogramacion(payload: ReprogramacionInsertDto): Promise<{ exito: boolean; mensaje?: string }> {
-    const endpoints = [
-      "agenda/PostReprogramacion",
-      "agenda/reprogramar",
-      "agenda/Reprogramar",
-      "agenda/postReprogramar",
-    ];
-
     let ultimoMensaje = "Ocurrió un error al reprogramar la sesión";
 
-    for (const ep of endpoints) {
-      try {
-        const resp = await apiClient.post(ep, payload);
-        if (resp.status >= 200 && resp.status < 300) {
-          if (resp.data && typeof resp.data === "object") {
-            if (resp.data.exito === false || resp.data.success === false) {
-              ultimoMensaje = resp.data.mensaje || resp.data.message || resp.data.error || ultimoMensaje;
-              continue;
-            }
+    try {
+      const resp = await apiClient.post("agenda/PostReprogramacion", payload);
+      if (resp.status >= 200 && resp.status < 300) {
+        if (resp.data && typeof resp.data === "object") {
+          if (resp.data.exito === false || resp.data.success === false) {
+            return {
+              exito: false,
+              mensaje: resp.data.mensaje || resp.data.message || resp.data.error || ultimoMensaje,
+            };
           }
-          return { exito: true };
         }
-      } catch (err: any) {
-        const status = err?.response?.status;
-        console.warn(`[postReprogramacion] Endpoint '${ep}' falló (Status ${status || "red"}):`, err?.response?.data || err?.message);
-        if (err?.response?.data) {
-          const data = err.response.data;
-          let detailedMsg = "";
+        return { exito: true };
+      }
+    } catch (err: any) {
+      const status = err?.response?.status;
+      console.warn(`[postReprogramacion] Endpoint 'agenda/PostReprogramacion' falló (Status ${status || "red"}):`, err?.response?.data || err?.message);
+      if (err?.response?.data) {
+        const data = err.response.data;
+        let detailedMsg = "";
 
-          // 1. Extraer errores de validación de ASP.NET Core ValidationProblem (data.errors)
-          if (data.errors && typeof data.errors === "object") {
-            const fieldErrors: string[] = [];
-            Object.entries(data.errors).forEach(([field, msgs]) => {
-              if (Array.isArray(msgs)) {
-                fieldErrors.push(`${field}: ${msgs.join(", ")}`);
-              } else if (typeof msgs === "string") {
-                fieldErrors.push(`${field}: ${msgs}`);
-              }
-            });
-            if (fieldErrors.length > 0) {
-              detailedMsg = fieldErrors.join(" | ");
+        // 1. Extraer errores de validación de ASP.NET Core ValidationProblem (data.errors)
+        if (data.errors && typeof data.errors === "object") {
+          const fieldErrors: string[] = [];
+          Object.entries(data.errors).forEach(([field, msgs]) => {
+            if (Array.isArray(msgs)) {
+              fieldErrors.push(`${field}: ${msgs.join(", ")}`);
+            } else if (typeof msgs === "string") {
+              fieldErrors.push(`${field}: ${msgs}`);
             }
+          });
+          if (fieldErrors.length > 0) {
+            detailedMsg = fieldErrors.join(" | ");
           }
-
-          // 2. Fallbacks estándar si no hay data.errors
-          if (!detailedMsg) {
-            detailedMsg =
-              data?.mensaje ||
-              data?.message ||
-              (data?.title && data.title !== "One or more validation errors occurred." ? data.title : null) ||
-              (typeof data === "string" ? data : null);
-          }
-
-          if (detailedMsg) ultimoMensaje = detailedMsg;
         }
+
+        // 2. Fallbacks estándar si no hay data.errors
+        if (!detailedMsg) {
+          detailedMsg =
+            data?.mensaje ||
+            data?.message ||
+            data?.error ||
+            (data?.title && data.title !== "One or more validation errors occurred." ? data.title : null) ||
+            (typeof data === "string" ? data : null);
+        }
+
+        if (detailedMsg) ultimoMensaje = detailedMsg;
       }
     }
 

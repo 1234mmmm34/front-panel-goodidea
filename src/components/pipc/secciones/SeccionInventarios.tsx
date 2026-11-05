@@ -8,8 +8,9 @@ import {
   AreaInmuebleRow,
   EquipoRow,
   ProgramaMantenimientoEquipos,
+  analizarEquiposRepetidos,
 } from "../pipcCalculos";
-import { VULNERABILIDAD_OPTS, APOYO_OPTS } from "../pipcCatalogos";
+import { VULNERABILIDAD_OPTS, APOYO_OPTS, MESES_PROG } from "../pipcCatalogos";
 import { TablaEditable, ColumnaEditable } from "../comunes/TablaEditable";
 import { TablaProgramaPR } from "../comunes/TablaProgramaPR";
 import { ZonaFotos } from "../comunes/ZonaFotos";
@@ -72,6 +73,41 @@ export const SeccionInventarios: React.FC<Props> = ({
   quitarFoto,
   soloLectura = false,
 }) => {
+  const analisisEmergencia = analizarEquiposRepetidos(expediente.equiposEmergencia);
+  const analisisAltoRiesgo = analizarEquiposRepetidos(expediente.equiposAltoRiesgo);
+
+  const handleSincronizarPrograma = (tipo: "emergencia" | "alto_riesgo") => {
+    if (soloLectura) return;
+    const unicos =
+      tipo === "emergencia"
+        ? analisisEmergencia.equiposUnicos
+        : analisisAltoRiesgo.equiposUnicos;
+    const actual =
+      tipo === "emergencia"
+        ? expediente.programaEquiposEmergencia || {}
+        : expediente.programaEquiposAltoRiesgo || {};
+
+    const nuevoProg: ProgramaMantenimientoEquipos = {};
+    unicos.forEach((e) => {
+      const nombre = (e.equipo || "").trim();
+      if (!nombre) return;
+      if (actual[nombre]) {
+        nuevoProg[nombre] = { ...actual[nombre] };
+      } else {
+        nuevoProg[nombre] = {};
+        MESES_PROG.forEach((m) => {
+          nuevoProg[nombre][m] = { p: 0, r: 0 };
+        });
+      }
+    });
+
+    if (tipo === "emergencia") {
+      setProgramaEquiposEmergencia(nuevoProg);
+    } else {
+      setProgramaEquiposAltoRiesgo(nuevoProg);
+    }
+  };
+
   const handleChangePR = (
     tipo: "emergencia" | "alto_riesgo",
     equipo: string,
@@ -294,7 +330,7 @@ export const SeccionInventarios: React.FC<Props> = ({
       </div>
 
       {/* 6. Equipos de Emergencia */}
-      <div className="card p-4">
+      <div id="inventarios-equipos-emergencia" className="card p-4">
         <div style={{ borderLeft: "3px solid #2B8FCC", paddingLeft: "10px", marginBottom: "14px" }}>
           <h3 style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", margin: 0 }}>
             Equipos de emergencia
@@ -321,6 +357,12 @@ export const SeccionInventarios: React.FC<Props> = ({
           onQuitarFila={(i) => {
             setEquiposEmergencia(expediente.equiposEmergencia.filter((_, idx) => idx !== i));
           }}
+          getCellError={(row, rowIdx, colKey) => {
+            if (colKey !== "equipo") return null;
+            if (!analisisEmergencia.indicesRepetidos.has(rowIdx)) return null;
+            const nombreReal = (row?.equipo || "").trim().replace(/\s+/g, " ");
+            return `Nombre repetido. Agrega un número, ej. ${nombreReal} 2.`;
+          }}
           textoBotonAgregar="+ Agregar equipo de emergencia"
           soloLectura={soloLectura}
         />
@@ -336,6 +378,7 @@ export const SeccionInventarios: React.FC<Props> = ({
               onChangePR={(eq: string, mes: string, campo: "p" | "r", val: number) =>
                 handleChangePR("emergencia", eq, mes, campo, val)
               }
+              onSincronizar={() => handleSincronizarPrograma("emergencia")}
               soloLectura={soloLectura}
             />
           </div>
@@ -343,7 +386,7 @@ export const SeccionInventarios: React.FC<Props> = ({
       </div>
 
       {/* 7. Equipos de Alto Riesgo */}
-      <div className="card p-4">
+      <div id="inventarios-equipos-alto-riesgo" className="card p-4">
         <div style={{ borderLeft: "3px solid #2B8FCC", paddingLeft: "10px", marginBottom: "14px" }}>
           <h3 style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", margin: 0 }}>
             Equipos de alto riesgo
@@ -370,6 +413,12 @@ export const SeccionInventarios: React.FC<Props> = ({
           onQuitarFila={(i) => {
             setEquiposAltoRiesgo(expediente.equiposAltoRiesgo.filter((_, idx) => idx !== i));
           }}
+          getCellError={(row, rowIdx, colKey) => {
+            if (colKey !== "equipo") return null;
+            if (!analisisAltoRiesgo.indicesRepetidos.has(rowIdx)) return null;
+            const nombreReal = (row?.equipo || "").trim().replace(/\s+/g, " ");
+            return `Nombre repetido. Agrega un número, ej. ${nombreReal} 2.`;
+          }}
           textoBotonAgregar="+ Agregar equipo de alto riesgo"
           soloLectura={soloLectura}
         />
@@ -385,6 +434,7 @@ export const SeccionInventarios: React.FC<Props> = ({
               onChangePR={(eq: string, mes: string, campo: "p" | "r", val: number) =>
                 handleChangePR("alto_riesgo", eq, mes, campo, val)
               }
+              onSincronizar={() => handleSincronizarPrograma("alto_riesgo")}
               soloLectura={soloLectura}
             />
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PipcExpediente, PendienteItem, ESTADOS_PIPC } from "../pipcCalculos";
+import { PipcExpediente, PendienteItem, ESTADOS_PIPC, analizarEquiposRepetidos } from "../pipcCalculos";
 import { generarZipExport } from "../pipcExport";
 import { PipcService, extraerMensajeError } from "@/services/pipc.service";
 import { useToast } from "@/context/ToastContext";
@@ -11,7 +11,7 @@ interface Props {
   pendientes: PendienteItem[];
   pendientesAlta: PendienteItem[];
   setFormField: (field: any, value: any) => void;
-  onScrollASeccion?: (seccionIdx: number) => void;
+  onScrollASeccion?: (seccionIdx: number | string) => void;
   soloLectura?: boolean;
   forzarGuardadoPendiente?: () => Promise<boolean>;
 }
@@ -33,7 +33,40 @@ export const SeccionExportar: React.FC<Props> = ({
   const [pasoProgreso, setPasoProgreso] = useState<string>("Preparando expediente...");
   const [pctProgreso, setPctProgreso] = useState<number>(5);
 
+  const validarEquiposRepetidosAntesDeExportar = (): boolean => {
+    const repEmergencia = analizarEquiposRepetidos(expediente.equiposEmergencia || []);
+    const repAltoRiesgo = analizarEquiposRepetidos(expediente.equiposAltoRiesgo || []);
+
+    const tieneRepEmergencia = repEmergencia.nombresRepetidos.length > 0;
+    const tieneRepAltoRiesgo = repAltoRiesgo.nombresRepetidos.length > 0;
+
+    if (!tieneRepEmergencia && !tieneRepAltoRiesgo) {
+      return true;
+    }
+
+    const todosNombres = [
+      ...repEmergencia.nombresRepetidos,
+      ...repAltoRiesgo.nombresRepetidos,
+    ];
+    toast.error(
+      `Hay equipos con nombre repetido: ${todosNombres.join(", ")}. Corrígelos en Inventarios antes de exportar.`
+    );
+
+    if (onScrollASeccion) {
+      const targetId = tieneRepEmergencia
+        ? "inventarios-equipos-emergencia"
+        : "inventarios-equipos-alto-riesgo";
+      onScrollASeccion(targetId);
+    }
+
+    return false;
+  };
+
   const ejecutarExportacionZip = async () => {
+    if (!validarEquiposRepetidosAntesDeExportar()) {
+      setModalConfirmarCriticos(false);
+      return;
+    }
     setModalConfirmarCriticos(false);
     setModalProgresoExport(true);
     setPasoProgreso("Guardando secciones pendientes...");
@@ -62,6 +95,10 @@ export const SeccionExportar: React.FC<Props> = ({
   };
 
   const handleBotonExportarZip = async () => {
+    if (!validarEquiposRepetidosAntesDeExportar()) {
+      return;
+    }
+
     if (forzarGuardadoPendiente) {
       await forzarGuardadoPendiente();
     }

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { MESES_PROG } from "../pipcCatalogos";
-import { ProgramaMantenimientoEquipos } from "../pipcCalculos";
+import { ProgramaMantenimientoEquipos, analizarEquiposRepetidos } from "../pipcCalculos";
 import { TextoPendiente } from "./TextoPendiente";
 
 interface Props {
@@ -22,10 +22,32 @@ export const TablaProgramaPR: React.FC<Props> = ({
   titulo = "Programa anual de mantenimiento (P = Programado / R = Realizado)",
   soloLectura = false,
 }) => {
-  const equiposValidos = equipos.filter((e) => e.equipo && e.equipo.trim().length > 0);
+  const { equiposUnicos: equiposValidos, nombresRepetidos } = analizarEquiposRepetidos(equipos);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {nombresRepetidos.length > 0 && (
+        <div
+          style={{
+            backgroundColor: "#fffbeb",
+            border: "1px solid #fde68a",
+            borderRadius: "8px",
+            padding: "8px 12px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            color: "#92400e",
+            fontSize: "11.5px",
+            fontWeight: 500,
+          }}
+        >
+          <i className="bi bi-exclamation-triangle-fill" style={{ fontSize: "14px", color: "#d97706", flexShrink: 0 }} />
+          <span>
+            Hay equipos con nombre repetido en el inventario ({nombresRepetidos.join(", ")}). Corrígelos para que cada uno tenga su propio programa.
+          </span>
+        </div>
+      )}
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
         <span style={{ fontSize: "12px", fontWeight: 600, color: "#334155" }}>{titulo}</span>
         {!soloLectura && onSincronizar && (

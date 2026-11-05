@@ -24,6 +24,7 @@ interface Props {
   className?: string;
   isRowPending?: (row: any) => boolean;
   pendingTitle?: string;
+  getCellError?: (row: any, rowIndex: number, colKey: string) => string | null | undefined;
 }
 
 export const TablaEditable: React.FC<Props> = ({
@@ -37,6 +38,7 @@ export const TablaEditable: React.FC<Props> = ({
   className = "",
   isRowPending,
   pendingTitle = "Selecciona al menos un mes",
+  getCellError,
 }) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }} className={className}>
@@ -97,9 +99,10 @@ export const TablaEditable: React.FC<Props> = ({
                       const valor = row[col.key] ?? "";
                       const isReadOnly = soloLectura || col.readOnly;
                       const isFirstEditableField = colIdx === 0;
+                      const cellError = getCellError ? getCellError(row, idx, col.key) : null;
 
                       return (
-                        <td key={`${col.key}-${idx}`} style={{ padding: "4px 8px", backgroundColor: rowBg }}>
+                        <td key={`${col.key}-${idx}`} style={{ padding: "4px 8px", backgroundColor: rowBg, verticalAlign: "top" }}>
                           {col.type === "select" ? (
                             <select
                               className="form-select"
@@ -121,27 +124,35 @@ export const TablaEditable: React.FC<Props> = ({
                               ))}
                             </select>
                           ) : (
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <input
-                                type={col.type || "text"}
-                                className="form-control"
-                                value={valor}
-                                disabled={isReadOnly}
-                                placeholder={col.placeholder || ""}
-                                onChange={(e) => onChangeFila(idx, col.key, e.target.value)}
-                                style={{
-                                  fontSize: "12px",
-                                  padding: "4px 8px",
-                                  height: "32px",
-                                  width: "100%",
-                                  backgroundColor: isReadOnly ? "#f8fafc" : (rowBg || "#ffffff"),
-                                }}
-                              />
-                              {isPending && isFirstEditableField && (
-                                <TextoPendiente
-                                  title={pendingTitle}
-                                  style={{ fontSize: "11px", whiteSpace: "nowrap" }}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <input
+                                  type={col.type || "text"}
+                                  className="form-control"
+                                  value={valor}
+                                  disabled={isReadOnly}
+                                  placeholder={col.placeholder || ""}
+                                  onChange={(e) => onChangeFila(idx, col.key, e.target.value)}
+                                  style={{
+                                    fontSize: "12px",
+                                    padding: "4px 8px",
+                                    height: "32px",
+                                    width: "100%",
+                                    backgroundColor: isReadOnly ? "#f8fafc" : (rowBg || "#ffffff"),
+                                    borderColor: cellError ? "#DC3545" : undefined,
+                                  }}
                                 />
+                                {isPending && isFirstEditableField && (
+                                  <TextoPendiente
+                                    title={pendingTitle}
+                                    style={{ fontSize: "11px", whiteSpace: "nowrap" }}
+                                  />
+                                )}
+                              </div>
+                              {cellError && (
+                                <span style={{ fontSize: "11px", color: "#DC3545", lineHeight: 1.25 }}>
+                                  {cellError}
+                                </span>
                               )}
                             </div>
                           )}

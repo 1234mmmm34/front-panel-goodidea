@@ -121,3 +121,14 @@ export interface ContactoXEmpresa {
   v_Descripcion: string;
 }
 
+export type OrigenContacto = 'EXTERNO' | 'GI';
+
+export interface ContactoReprograma {
+  i_CveContacto: number;
+  v_NombreContacto: string | null;
+  v_Email: string | null;
+  v_TipoContacto: string | null; // tipo de contacto del cliente, o nombre del perfil si es GI
+  v_Origen: OrigenContacto;
+}
+
+

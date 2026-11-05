@@ -441,6 +441,7 @@ export interface ReprogramacionInsertDto {
   i_CveArea: number | null;
   v_Observaciones: string;
   i_CveContactoReprograma: number;
+  v_TipoContactoReprograma: 'EXTERNO' | 'GI';
   CambiaProveedor: boolean;
   CambiaInstructor: boolean;
   d_NuevoPrecioProveedor: number;

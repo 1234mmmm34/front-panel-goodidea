@@ -25,7 +25,7 @@ import {
   RangoFechaDto,
   ReprogramacionInsertDto,
 } from "@/types/servicios";
-import { ContactoXEmpresa } from "@/types/empresas";
+import { ContactoReprograma, OrigenContacto } from "@/types/empresas";
 import { AgendaService } from "@/services/agenda.service";
 import { EmpresasService } from "@/services/empresas.service";
 import { useToast } from "@/context/ToastContext";
@@ -107,7 +107,7 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
   // Catálogos precargados
   const [instructores, setInstructores] = useState<InstructorGetDto[]>([]);
   const [proveedores, setProveedores] = useState<ProveedorGetDto[]>([]);
-  const [contactos, setContactos] = useState<ContactoXEmpresa[]>([]);
+  const [contactos, setContactos] = useState<ContactoReprograma[]>([]);
   const [areas, setAreas] = useState<AreaGetDto[]>([]);
 
   // Paso 2: Formulario reprogramación
@@ -126,7 +126,10 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
   // Paso 3: Motivo y Contacto
   const [motivoElegido, setMotivoElegido] = useState<string>("");
   const [observacionesText, setObservacionesText] = useState<string>("");
-  const [contactoReprogramaId, setContactoReprogramaId] = useState<string>("");
+  const [contactoReprograma, setContactoReprograma] = useState<{
+    i_CveContacto: number;
+    v_Origen: OrigenContacto;
+  } | null>(null);
 
   // Horas ocupadas del instructor seleccionado
   const [horasOcupadasInstructor, setHorasOcupadasInstructor] = useState<RangoFechaDto[]>([]);
@@ -145,7 +148,7 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
       setAreaId("");
       setMotivoElegido("");
       setObservacionesText("");
-      setContactoReprogramaId("");
+      setContactoReprograma(null);
       setHorasOcupadasInstructor([]);
 
       const agendaIdToUse = iCveAgenda || 0;
@@ -222,8 +225,20 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
           }
 
           if (empId) {
-            const cList = await EmpresasService.getContactos(Number(empId));
-            setContactos(cList || []);
+            try {
+              const cList = await EmpresasService.getContactosReprograma(Number(empId));
+              setContactos(cList || []);
+            } catch (err: any) {
+              const msg =
+                err?.response?.data?.error ||
+                err?.response?.data?.mensaje ||
+                err?.response?.data?.message ||
+                (typeof err?.response?.data === "string" ? err.response.data : null) ||
+                err?.message ||
+                "No se pudieron cargar los contactos para reprogramar.";
+              toast.error(msg);
+              setContactos([]);
+            }
           }
 
           // Extraer ID de la Planta/Centro defensivamente
@@ -421,7 +436,7 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
   };
 
   const handleConfirmarReprogramacion = async () => {
-    if (!contactoReprogramaId || Number(contactoReprogramaId) <= 0) {
+    if (!contactoReprograma || contactoReprograma.i_CveContacto <= 0) {
       toast.error("Selecciona el contacto que solicita la reprogramación");
       return;
     }
@@ -550,7 +565,8 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
       b_TipoProvInsApoyo: bTipoProvInsApoyoFinal,
       i_CveArea: areaId ? Number(areaId) : null,
       v_Observaciones: obsFinal,
-      i_CveContactoReprograma: Number(contactoReprogramaId),
+      i_CveContactoReprograma: contactoReprograma.i_CveContacto,
+      v_TipoContactoReprograma: contactoReprograma.v_Origen,
       CambiaProveedor: cambiaProveedorFinal,
       CambiaInstructor: cambiaInstructorFinal,
       d_NuevoPrecioProveedor:
@@ -1403,21 +1419,82 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
                       </label>
                       <select
                         className="form-select"
-                        value={contactoReprogramaId}
-                        onChange={(e) => setContactoReprogramaId(e.target.value)}
+                        value={
+                          contactoReprograma
+                            ? `${contactoReprograma.v_Origen}-${contactoReprograma.i_CveContacto}`
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) {
+                            setContactoReprograma(null);
+                            return;
+                          }
+                          const dashIdx = val.indexOf("-");
+                          if (dashIdx === -1) {
+                            setContactoReprograma(null);
+                            return;
+                          }
+                          const v_Origen = val.slice(0, dashIdx) as OrigenContacto;
+                          const i_CveContacto = Number(val.slice(dashIdx + 1));
+                          if (
+                            (v_Origen === "EXTERNO" || v_Origen === "GI") &&
+                            i_CveContacto > 0
+                          ) {
+                            setContactoReprograma({ i_CveContacto, v_Origen });
+                          } else {
+                            setContactoReprograma(null);
+                          }
+                        }}
                         style={{ height: "38px", fontSize: "13px", borderRadius: "8px" }}
                       >
                         <option value="">-- Selecciona el contacto de la empresa --</option>
-                        {contactos.map((c: any) => {
-                          const cve = c.i_CveContacto ?? c.iD_Contacto ?? c.id_contacto ?? c.iCveContacto;
-                          const nombre = c.v_NombreContacto || c.v_Nombre || c.v_Contacto || c.s_NombreContacto || `Contacto #${cve}`;
-                          const tipo = c.v_TipoContacto || c.s_TipoContacto || "";
-                          return (
-                            <option key={cve} value={cve}>
-                              {nombre} {tipo ? `(${tipo})` : ""}
-                            </option>
+                        {(() => {
+                          const externos = contactos.filter(
+                            (c) => c.v_Origen === "EXTERNO"
                           );
-                        })}
+                          const gi = contactos.filter((c) => c.v_Origen === "GI");
+                          return (
+                            <>
+                              {externos.length > 0 && (
+                                <optgroup label="EXTERNO">
+                                  {externos.map((c) => {
+                                    const val = `${c.v_Origen}-${c.i_CveContacto}`;
+                                    const nombre =
+                                      c.v_NombreContacto ||
+                                      `Contacto #${c.i_CveContacto}`;
+                                    const texto = c.v_TipoContacto
+                                      ? `${nombre} — ${c.v_TipoContacto}`
+                                      : nombre;
+                                    return (
+                                      <option key={val} value={val}>
+                                        {texto}
+                                      </option>
+                                    );
+                                  })}
+                                </optgroup>
+                              )}
+                              {gi.length > 0 && (
+                                <optgroup label="GI">
+                                  {gi.map((c) => {
+                                    const val = `${c.v_Origen}-${c.i_CveContacto}`;
+                                    const nombre =
+                                      c.v_NombreContacto ||
+                                      `Contacto #${c.i_CveContacto}`;
+                                    const texto = c.v_TipoContacto
+                                      ? `${nombre} — ${c.v_TipoContacto}`
+                                      : nombre;
+                                    return (
+                                      <option key={val} value={val}>
+                                        {texto}
+                                      </option>
+                                    );
+                                  })}
+                                </optgroup>
+                              )}
+                            </>
+                          );
+                        })()}
                       </select>
                     </div>
                   </div>
@@ -1549,7 +1626,7 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmarReprogramacion}
-                disabled={guardando || cargandoInicial || !contactoReprogramaId}
+                disabled={guardando || cargandoInicial || !contactoReprograma}
                 style={{
                   height: "38px",
                   padding: "0 26px",
