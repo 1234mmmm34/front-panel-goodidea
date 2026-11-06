@@ -113,6 +113,8 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
   const [cTelefono, setCTelefono] = useState<string>("");
   const [cEmail, setCEmail] = useState<string>("");
   const [cPuesto, setCPuesto] = useState<string>("");
+  const [b_RecordatorioPagos, setB_RecordatorioPagos] = useState<boolean>(false);
+  const [b_RecordatorioOC, setB_RecordatorioOC] = useState<boolean>(false);
   const [errNombreContacto, setErrNombreContacto] = useState<boolean>(false);
 
   const cargarContactos = async (idEmpresa: number) => {
@@ -368,6 +370,8 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
       setCTelefono(item.v_TelefonoFijo || "");
       setCEmail(item.v_Email || "");
       setCPuesto(item.v_TipoContacto || "");
+      setB_RecordatorioPagos(Boolean(item.b_RecordatorioPagos));
+      setB_RecordatorioOC(Boolean(item.b_RecordatorioOC));
     } else {
       setContactoEditar(null);
       setCIdContacto(0);
@@ -376,6 +380,8 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
       setCTelefono("");
       setCEmail("");
       setCPuesto("");
+      setB_RecordatorioPagos(false);
+      setB_RecordatorioOC(false);
     }
     setModalContactoAbierto(true);
   };
@@ -396,6 +402,8 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
       v_TelefonoFijo: cTelefono.trim(),
       v_SiglasTipoContacto: "",
       v_Descripcion: "",
+      b_RecordatorioPagos: Boolean(b_RecordatorioPagos),
+      b_RecordatorioOC: Boolean(b_RecordatorioOC),
     };
 
     let exito = false;
@@ -1412,6 +1420,81 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
                   value={cPuesto}
                   onChange={(e) => setCPuesto(e.target.value)}
                 />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "11px", fontWeight: 600, color: "#4a6580", display: "block", marginBottom: "8px" }}>
+                  Recordatorios por correo
+                </label>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+                    gap: "10px",
+                  }}
+                >
+                  <label
+                    htmlFor="chk-recordatorio-pagos"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "12.5px",
+                      fontWeight: 500,
+                      color: "#1e3a5f",
+                      cursor: "pointer",
+                      userSelect: "none",
+                      margin: 0,
+                    }}
+                  >
+                    <input
+                      id="chk-recordatorio-pagos"
+                      type="checkbox"
+                      checked={b_RecordatorioPagos}
+                      onChange={(e) => setB_RecordatorioPagos(e.target.checked)}
+                      style={{
+                        width: "15px",
+                        height: "15px",
+                        accentColor: "#2B8FCC",
+                        cursor: "pointer",
+                        margin: 0,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span>Mandar recordatorios de pagos</span>
+                  </label>
+
+                  <label
+                    htmlFor="chk-recordatorio-oc"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "12.5px",
+                      fontWeight: 500,
+                      color: "#1e3a5f",
+                      cursor: "pointer",
+                      userSelect: "none",
+                      margin: 0,
+                    }}
+                  >
+                    <input
+                      id="chk-recordatorio-oc"
+                      type="checkbox"
+                      checked={b_RecordatorioOC}
+                      onChange={(e) => setB_RecordatorioOC(e.target.checked)}
+                      style={{
+                        width: "15px",
+                        height: "15px",
+                        accentColor: "#2B8FCC",
+                        cursor: "pointer",
+                        margin: 0,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span>Mandar recordatorios de órdenes de compra</span>
+                  </label>
+                </div>
               </div>
             </div>
 

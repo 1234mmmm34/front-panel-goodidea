@@ -119,6 +119,8 @@ export interface ContactoXEmpresa {
   v_TelefonoFijo: string;
   v_SiglasTipoContacto: string;
   v_Descripcion: string;
+  b_RecordatorioPagos: boolean;
+  b_RecordatorioOC: boolean;
 }
 
 export type OrigenContacto = 'EXTERNO' | 'GI';
