@@ -105,8 +105,9 @@ export interface ActividadMock {
   v_Titulo: string; // máx. 20 caracteres
   b_General: boolean; // true = no ligada a proyecto
   i_CveServAgendaDet: number | null; // proyecto ligado (null si es general)
-  d_FechaHoraInicio: string; // ISO
-  d_FechaHoraFin: string; // ISO
+  d_FechaInicio: string; // ISO, fecha (y hora si b_TieneHorario)
+  d_FechaFin: string; // ISO, fecha (y hora si b_TieneHorario)
+  b_TieneHorario: boolean;
   v_Notas: string | null;
   v_Estatus: "Activa" | "Reprogramada" | "Cancelada";
   i_CveReprograma: number | null; // apunta a la nueva actividad si fue reprogramada
@@ -114,9 +115,15 @@ export interface ActividadMock {
   v_Registro: string; // consultor que la registró
 }
 
+export type MomentoActividadFila = "unico" | "inicio" | "fin";
+
 export type AgendaConsultorFila =
   | { tipo: "sesion"; sesion: SesionMock }
-  | { tipo: "actividad"; actividad: ActividadMock };
+  | {
+      tipo: "actividad";
+      actividad: ActividadMock;
+      momento: MomentoActividadFila;
+    };
 
 // ============================================================================
 // 2. CONSTANTES Y CÁLCULO DE DÍAS
@@ -246,6 +253,164 @@ function calcularDuracionHorasTexto(inicioIso: string, finIso: string): string {
   if (diffMin <= 0) return "—";
   const horas = Number((diffMin / 60).toFixed(2));
   return `${horas} hrs`;
+}
+
+function expandirActividadEnFilas(
+  actividad: ActividadMock
+): Extract<AgendaConsultorFila, { tipo: "actividad" }>[] {
+  const diaIni = actividad.d_FechaInicio.split("T")[0];
+  const diaFin = actividad.d_FechaFin.split("T")[0];
+  if (diaIni === diaFin) {
+    return [{ tipo: "actividad", actividad, momento: "unico" }];
+  }
+  return [
+    { tipo: "actividad", actividad, momento: "inicio" },
+    { tipo: "actividad", actividad, momento: "fin" },
+  ];
+}
+
+function obtenerRangoEfectivoFilaActividad(
+  act: ActividadMock,
+  momento: MomentoActividadFila
+): { inicio: string; fin: string; dia: string } {
+  if (momento === "unico") {
+    const dia = act.d_FechaInicio.split("T")[0];
+    if (act.b_TieneHorario && act.d_FechaInicio.includes("T")) {
+      return { inicio: act.d_FechaInicio, fin: act.d_FechaFin, dia };
+    }
+    return { inicio: `${dia}T00:00:00`, fin: `${dia}T23:59:59`, dia };
+  }
+
+  if (momento === "inicio") {
+    const dia = act.d_FechaInicio.split("T")[0];
+    if (act.b_TieneHorario && act.d_FechaInicio.includes("T")) {
+      return { inicio: act.d_FechaInicio, fin: act.d_FechaInicio, dia };
+    }
+    return { inicio: `${dia}T00:00:00`, fin: `${dia}T23:59:59`, dia };
+  }
+
+  // momento === "fin"
+  const dia = act.d_FechaFin.split("T")[0];
+  if (act.b_TieneHorario && act.d_FechaFin.includes("T")) {
+    return { inicio: act.d_FechaFin, fin: act.d_FechaFin, dia };
+  }
+  return { inicio: `${dia}T00:00:00`, fin: `${dia}T23:59:59`, dia };
+}
+
+function formatearFechaActividadTabla(
+  act: ActividadMock,
+  momento: MomentoActividadFila
+): {
+  texto: string;
+  esHoy: boolean;
+} {
+  const dia =
+    momento === "fin"
+      ? act.d_FechaFin.split("T")[0]
+      : act.d_FechaInicio.split("T")[0];
+  return formatearFechaSesionMock(dia);
+}
+
+function formatearHorarioActividadTabla(
+  act: ActividadMock,
+  momento: MomentoActividadFila
+): {
+  texto: string;
+  esTodoElDia: boolean;
+} {
+  if (!act.b_TieneHorario) {
+    return { texto: "Todo el día", esTodoElDia: true };
+  }
+  const hIni = act.d_FechaInicio.includes("T")
+    ? act.d_FechaInicio.split("T")[1].slice(0, 5)
+    : "";
+  const hFin = act.d_FechaFin.includes("T")
+    ? act.d_FechaFin.split("T")[1].slice(0, 5)
+    : "";
+  if (momento === "inicio") {
+    return { texto: hIni || "—", esTodoElDia: false };
+  }
+  if (momento === "fin") {
+    return { texto: hFin || "—", esTodoElDia: false };
+  }
+  return {
+    texto: hIni && hFin ? `${hIni} – ${hFin}` : hIni || "—",
+    esTodoElDia: false,
+  };
+}
+
+function calcularDuracionActividadTabla(
+  act: ActividadMock,
+  momento: MomentoActividadFila
+): string {
+  if (momento !== "unico") {
+    return "—";
+  }
+  if (act.b_TieneHorario) {
+    return calcularDuracionHorasTexto(act.d_FechaInicio, act.d_FechaFin);
+  }
+  return "1 día";
+}
+
+function obtenerTituloActividadConMomento(
+  act: ActividadMock,
+  momento: MomentoActividadFila
+): string {
+  if (momento === "inicio") return `Inicio · ${act.v_Titulo}`;
+  if (momento === "fin") return `Fin · ${act.v_Titulo}`;
+  return act.v_Titulo;
+}
+
+function formatearFechaActividadHistorial(act: ActividadMock): string {
+  const diaIni = act.d_FechaInicio.split("T")[0];
+  const diaFin = act.d_FechaFin.split("T")[0];
+  const [y1, m1, d1] = diaIni.split("-");
+  const [y2, m2, d2] = diaFin.split("-");
+  const mes1 = MESES_HISTORIAL[parseInt(m1, 10) - 1] || m1;
+  const mes2 = MESES_HISTORIAL[parseInt(m2, 10) - 1] || m2;
+
+  if (act.b_TieneHorario) {
+    const hIni = act.d_FechaInicio.includes("T")
+      ? act.d_FechaInicio.split("T")[1].slice(0, 5)
+      : "";
+    const hFin = act.d_FechaFin.includes("T")
+      ? act.d_FechaFin.split("T")[1].slice(0, 5)
+      : "";
+    if (diaIni === diaFin) {
+      return `${formatearFechaCortaHistorial(diaIni)}, ${hIni} – ${hFin}`;
+    }
+    return `${formatearFechaCortaHistorial(diaIni)}, ${hIni} – ${formatearFechaCortaHistorial(diaFin)}, ${hFin}`;
+  }
+
+  // Sin horario (Todo el día)
+  if (diaIni === diaFin) {
+    return `${formatearFechaCortaHistorial(diaIni)} · Todo el día`;
+  }
+  if (y1 === y2 && m1 === m2) {
+    return `${d1.padStart(2, "0")} – ${d2.padStart(2, "0")} de ${mes1}, ${y1} · Todo el día`;
+  }
+  if (y1 === y2) {
+    return `${d1.padStart(2, "0")} de ${mes1} – ${d2.padStart(2, "0")} de ${mes2}, ${y1} · Todo el día`;
+  }
+  return `${formatearFechaCortaHistorial(diaIni)} – ${formatearFechaCortaHistorial(diaFin)} · Todo el día`;
+}
+
+function formatearFechaNodoActividadHistorial(
+  act: ActividadMock,
+  momento: MomentoActividadFila
+): string {
+  if (momento === "unico") {
+    return formatearFechaActividadHistorial(act);
+  }
+  const isoRef = momento === "fin" ? act.d_FechaFin : act.d_FechaInicio;
+  const diaRef = isoRef.split("T")[0];
+  if (act.b_TieneHorario) {
+    const hora = isoRef.includes("T") ? isoRef.split("T")[1].slice(0, 5) : "";
+    return hora
+      ? `${formatearFechaCortaHistorial(diaRef)}, ${hora}`
+      : formatearFechaCortaHistorial(diaRef);
+  }
+  return `${formatearFechaCortaHistorial(diaRef)} · Todo el día`;
 }
 
 // ============================================================================
@@ -725,22 +890,24 @@ const ACTIVIDADES_MOCK_INICIAL: ActividadMock[] = [
     v_Titulo: "Revisión carpeta",
     b_General: false,
     i_CveServAgendaDet: 105,
-    d_FechaHoraInicio: "2026-11-06T08:00:00",
-    d_FechaHoraFin: "2026-11-06T09:00:00",
+    d_FechaInicio: "2026-11-06T08:00:00",
+    d_FechaFin: "2026-11-06T09:00:00",
+    b_TieneHorario: true,
     v_Notas: "Revisión de dictamen municipal antes de confirmar cierre.",
     v_Estatus: "Activa",
     i_CveReprograma: null,
     v_Motivo: null,
     v_Registro: "Ing. Roberto Garza",
   },
-  // Hoy: actividad ligada al proyecto 101 al mediodía (es la nueva tras reprogramarse la actividad #6)
+  // 1) Actividad corta de un día con horario de 2 horas: 13:00 – 15:00 (duración 2 hrs) (es la nueva tras reprogramarse la actividad #6)
   {
     i_CveActividad: 2,
     v_Titulo: "Junta de avance",
     b_General: false,
     i_CveServAgendaDet: 101,
-    d_FechaHoraInicio: "2026-11-06T13:00:00",
-    d_FechaHoraFin: "2026-11-06T14:30:00",
+    d_FechaInicio: "2026-11-06T13:00:00",
+    d_FechaFin: "2026-11-06T15:00:00",
+    b_TieneHorario: true,
     v_Notas: "Presentación de avance del 65 % del PIPC con el cliente.",
     v_Estatus: "Activa",
     i_CveReprograma: null,
@@ -753,22 +920,24 @@ const ACTIVIDADES_MOCK_INICIAL: ActividadMock[] = [
     v_Titulo: "Junta interna GI",
     b_General: true,
     i_CveServAgendaDet: null,
-    d_FechaHoraInicio: "2026-11-06T15:00:00",
-    d_FechaHoraFin: "2026-11-06T18:00:00",
-    v_Notas: "Reunión semanal de seguimiento operativo de consultores.",
+    d_FechaInicio: "2026-11-06T15:00:00",
+    d_FechaFin: "2026-11-06T18:00:00",
+    b_TieneHorario: true,
+    v_Notas: "Revisión semanal de pendientes con dirección.",
     v_Estatus: "Activa",
     i_CveReprograma: null,
     v_Motivo: null,
     v_Registro: "Ing. Roberto Garza",
   },
-  // Mañana: actividad "Salida a planta" ligada al proyecto 101 (para ver Inicio pasado, junta hoy, salida mañana y Fin futuro)
+  // 2) Actividad corta de un día con horario de 1 hora: 09:00 – 10:00 (duración 1 hrs)
   {
     i_CveActividad: 4,
     v_Titulo: "Salida a planta",
     b_General: false,
     i_CveServAgendaDet: 101,
-    d_FechaHoraInicio: "2026-11-07T10:00:00",
-    d_FechaHoraFin: "2026-11-07T12:30:00",
+    d_FechaInicio: "2026-11-07T09:00:00",
+    d_FechaFin: "2026-11-07T10:00:00",
+    b_TieneHorario: true,
     v_Notas: "Recorrido en almacén norte para verificar cargas combustibles.",
     v_Estatus: "Activa",
     i_CveReprograma: null,
@@ -781,8 +950,9 @@ const ACTIVIDADES_MOCK_INICIAL: ActividadMock[] = [
     v_Titulo: "Visita previa",
     b_General: false,
     i_CveServAgendaDet: 101,
-    d_FechaHoraInicio: "2026-11-03T11:00:00",
-    d_FechaHoraFin: "2026-11-03T13:00:00",
+    d_FechaInicio: "2026-11-03T11:00:00",
+    d_FechaFin: "2026-11-03T13:00:00",
+    b_TieneHorario: true,
     v_Notas: "Recorrido inicial en planta.",
     v_Estatus: "Activa",
     i_CveReprograma: null,
@@ -795,8 +965,9 @@ const ACTIVIDADES_MOCK_INICIAL: ActividadMock[] = [
     v_Titulo: "Junta de avance",
     b_General: false,
     i_CveServAgendaDet: 101,
-    d_FechaHoraInicio: "2026-11-04T13:00:00",
-    d_FechaHoraFin: "2026-11-04T14:30:00",
+    d_FechaInicio: "2026-11-04T13:00:00",
+    d_FechaFin: "2026-11-04T15:00:00",
+    b_TieneHorario: true,
     v_Notas: "Primera cita agendada para revisión de carpeta.",
     v_Estatus: "Reprogramada",
     i_CveReprograma: 2,
@@ -809,13 +980,60 @@ const ACTIVIDADES_MOCK_INICIAL: ActividadMock[] = [
     v_Titulo: "Revisión brigadas",
     b_General: false,
     i_CveServAgendaDet: 101,
-    d_FechaHoraInicio: "2026-11-05T11:00:00",
-    d_FechaHoraFin: "2026-11-05T12:00:00",
+    d_FechaInicio: "2026-11-05T11:00:00",
+    d_FechaFin: "2026-11-05T12:00:00",
+    b_TieneHorario: true,
     v_Notas: "Validación de organigrama de brigadas.",
     v_Estatus: "Cancelada",
     i_CveReprograma: null,
     v_Motivo: "Se integró el punto en la junta de avance.",
     v_Registro: "Lic. Sofía Méndez",
+  },
+  // 3) Actividad de varios días con horario que empezó ayer (05/nov) y termina mañana (07/nov) -> sale "En curso" arriba
+  {
+    i_CveActividad: 8,
+    v_Titulo: "Auditoría en planta",
+    b_General: false,
+    i_CveServAgendaDet: 101,
+    d_FechaInicio: "2026-11-05T16:00:00",
+    d_FechaFin: "2026-11-07T10:00:00",
+    b_TieneHorario: true,
+    v_Notas:
+      "Revisar extintores, rutas de evacuación y señalética del área de almacén.",
+    v_Estatus: "Activa",
+    i_CveReprograma: null,
+    v_Motivo: null,
+    v_Registro: "Ing. Roberto Garza",
+  },
+  // 4) Actividad de un día sin horario ("Todo el día", duración "1 día")
+  {
+    i_CveActividad: 9,
+    v_Titulo: "Trámite municipal",
+    b_General: false,
+    i_CveServAgendaDet: 105,
+    d_FechaInicio: "2026-11-07",
+    d_FechaFin: "2026-11-07",
+    b_TieneHorario: false,
+    v_Notas: "Recolección de dictamen y sellos en ventanilla.",
+    v_Estatus: "Activa",
+    i_CveReprograma: null,
+    v_Motivo: null,
+    v_Registro: "Lic. Sofía Méndez",
+  },
+  // 5) Actividad de varios días sin horario en el futuro (09/nov al 11/nov -> "Todo el día", duración "3 días")
+  {
+    i_CveActividad: 10,
+    v_Titulo: "Congreso EHS",
+    b_General: true,
+    i_CveServAgendaDet: null,
+    d_FechaInicio: "2026-11-09",
+    d_FechaFin: "2026-11-11",
+    b_TieneHorario: false,
+    v_Notas: "Participación en congreso anual de seguridad industrial.",
+    v_Estatus: "Activa",
+    i_CveReprograma: null,
+    v_Motivo: null,
+    v_Registro: "Ing. Roberto Garza",
   },
 ];
 
@@ -943,7 +1161,9 @@ export default function AvanceProyectosPage() {
     v_Titulo: string;
     b_General: boolean;
     i_CveServAgendaDet: number | null;
-    fecha: string;
+    fechaInicio: string;
+    fechaFin: string;
+    b_TieneHorario: boolean;
     horaInicio: string;
     horaFin: string;
     v_Notas: string;
@@ -951,7 +1171,9 @@ export default function AvanceProyectosPage() {
     v_Titulo: "",
     b_General: false,
     i_CveServAgendaDet: null,
-    fecha: HOY_MOCK,
+    fechaInicio: HOY_MOCK,
+    fechaFin: HOY_MOCK,
+    b_TieneHorario: true,
     horaInicio: "09:00",
     horaFin: "10:00",
     v_Notas: "",
@@ -965,12 +1187,16 @@ export default function AvanceProyectosPage() {
   const [actividadReprogramando, setActividadReprogramando] =
     useState<ActividadMock | null>(null);
   const [formReprogramar, setFormReprogramar] = useState<{
-    fecha: string;
+    fechaInicio: string;
+    fechaFin: string;
+    b_TieneHorario: boolean;
     horaInicio: string;
     horaFin: string;
     v_Motivo: string;
   }>({
-    fecha: HOY_MOCK,
+    fechaInicio: HOY_MOCK,
+    fechaFin: HOY_MOCK,
+    b_TieneHorario: true,
     horaInicio: "09:00",
     horaFin: "10:00",
     v_Motivo: "",
@@ -1083,25 +1309,28 @@ export default function AvanceProyectosPage() {
     });
   }, [proyectosEnCurso, busquedaProyectoSelect]);
 
-  // §2.1: El estatus de cada fila depende SOLO de su fecha y hora (aplica igual a sesiones, Inicio, Fin, Inicio y fin y actividades del consultor)
+  // §3: Estatus de cada renglón depende SOLO de su momento propio (igual que Inicio / Fin de los servicios)
   const obtenerEstatusFilaAgenda = (
     fila: AgendaConsultorFila
   ): EstatusFilaAgenda => {
-    const dIni =
-      fila.tipo === "sesion"
-        ? fila.sesion.d_FechaHoraInicio
-        : fila.actividad.d_FechaHoraInicio;
-    const dFin =
-      fila.tipo === "sesion"
-        ? fila.sesion.d_FechaHoraFin
-        : fila.actividad.d_FechaHoraFin;
+    if (fila.tipo === "sesion") {
+      const dIni = fila.sesion.d_FechaHoraInicio;
+      const dFin = fila.sesion.d_FechaHoraFin;
+      if (dIni > AHORA_MOCK) return "Programado";
+      if (dIni <= AHORA_MOCK && AHORA_MOCK < dFin) return "En curso";
+      return "Terminado";
+    }
 
-    if (dIni > AHORA_MOCK) return "Programado";
-    if (dIni <= AHORA_MOCK && AHORA_MOCK < dFin) return "En curso";
+    const { inicio, fin } = obtenerRangoEfectivoFilaActividad(
+      fila.actividad,
+      fila.momento
+    );
+    if (inicio > AHORA_MOCK) return "Programado";
+    if (inicio <= AHORA_MOCK && AHORA_MOCK < fin) return "En curso";
     return "Terminado";
   };
 
-  // §2.1 y §5: Lista unificada de sesiones + actividades activas del consultor agrupada por estatus y ordenada por fecha/hora de inicio
+  // §1, §2 y §3: Lista unificada de sesiones + renglones de actividades activas del consultor agrupada por estatus y ordenada por fecha/hora de su momento
   const filasAgendaConsultor = useMemo<AgendaConsultorFila[]>(() => {
     const combinadas: AgendaConsultorFila[] = [
       ...SESIONES_MOCK.map(
@@ -1109,22 +1338,22 @@ export default function AvanceProyectosPage() {
       ),
       ...actividades
         .filter((actividad) => actividad.v_Estatus === "Activa")
-        .map(
-          (actividad): AgendaConsultorFila => ({ tipo: "actividad", actividad })
-        ),
+        .flatMap((actividad) => expandirActividadEnFilas(actividad)),
     ];
 
-    // Filas visibles por default (§2.1):
-    // - Solo se muestran filas "En curso" y "Programado" de hoy en adelante.
-    // - Lo "Terminado" no aparece, aunque sea de hoy.
-    // - Las filas con fecha anterior a hoy nunca aparecen por default.
+    // Filas visibles por default (§3):
+    // - Cada renglón es un momento propio; lo Terminado no aparece por default (ej. el renglón Inicio de ayer ya no sale; el renglón Fin sale en su fecha).
     const visibles = combinadas.filter((fila) => {
-      const fechaIso =
-        fila.tipo === "sesion"
-          ? fila.sesion.d_FechaHoraInicio
-          : fila.actividad.d_FechaHoraInicio;
-      const fechaDia = fechaIso.split("T")[0];
-      if (fechaDia < HOY_MOCK) return false;
+      if (fila.tipo === "sesion") {
+        const fechaDia = fila.sesion.d_FechaHoraInicio.split("T")[0];
+        if (fechaDia < HOY_MOCK) return false;
+      } else {
+        const { dia } = obtenerRangoEfectivoFilaActividad(
+          fila.actividad,
+          fila.momento
+        );
+        if (dia < HOY_MOCK) return false;
+      }
       const estatus = obtenerEstatusFilaAgenda(fila);
       return estatus === "En curso" || estatus === "Programado";
     });
@@ -1145,11 +1374,11 @@ export default function AvanceProyectosPage() {
       const fechaA =
         a.tipo === "sesion"
           ? a.sesion.d_FechaHoraInicio
-          : a.actividad.d_FechaHoraInicio;
+          : obtenerRangoEfectivoFilaActividad(a.actividad, a.momento).inicio;
       const fechaB =
         b.tipo === "sesion"
           ? b.sesion.d_FechaHoraInicio
-          : b.actividad.d_FechaHoraInicio;
+          : obtenerRangoEfectivoFilaActividad(b.actividad, b.momento).inicio;
       return fechaA.localeCompare(fechaB);
     });
 
@@ -1168,11 +1397,17 @@ export default function AvanceProyectosPage() {
         );
       }
       const act = fila.actividad;
+      const tituloMomento = obtenerTituloActividadConMomento(
+        act,
+        fila.momento
+      ).toLowerCase();
       const srv = act.i_CveServAgendaDet
         ? servicios.find((s) => s.i_CveServAgendaDet === act.i_CveServAgendaDet)
         : null;
       return (
+        tituloMomento.includes(q) ||
         act.v_Titulo.toLowerCase().includes(q) ||
+        (act.v_Notas && act.v_Notas.toLowerCase().includes(q)) ||
         (act.b_General && "general".includes(q)) ||
         (srv &&
           (srv.v_Empresa.toLowerCase().includes(q) ||
@@ -1183,14 +1418,16 @@ export default function AvanceProyectosPage() {
     });
   }, [actividades, servicios, busquedaTexto]);
 
-  // §3 y §4: Handlers de Crear / Editar / Eliminar actividad del consultor
+  // §1: Handlers de Crear / Editar actividad del consultor
   const handleAbrirCrearActividad = () => {
     setActividadEditandoId(null);
     setFormActividad({
       v_Titulo: "",
       b_General: false,
       i_CveServAgendaDet: null,
-      fecha: HOY_MOCK,
+      fechaInicio: HOY_MOCK,
+      fechaFin: HOY_MOCK,
+      b_TieneHorario: true,
       horaInicio: "09:00",
       horaFin: "10:00",
       v_Notas: "",
@@ -1201,20 +1438,25 @@ export default function AvanceProyectosPage() {
   };
 
   const handleAbrirEditarActividad = (act: ActividadMock) => {
-    const fechaStr = act.d_FechaHoraInicio.split("T")[0] || HOY_MOCK;
-    const hIni = act.d_FechaHoraInicio.includes("T")
-      ? act.d_FechaHoraInicio.split("T")[1].slice(0, 5)
-      : "09:00";
-    const hFin = act.d_FechaHoraFin.includes("T")
-      ? act.d_FechaHoraFin.split("T")[1].slice(0, 5)
-      : "10:00";
+    const fechaIniStr = act.d_FechaInicio.split("T")[0] || HOY_MOCK;
+    const fechaFinStr = act.d_FechaFin.split("T")[0] || fechaIniStr;
+    const hIni =
+      act.b_TieneHorario && act.d_FechaInicio.includes("T")
+        ? act.d_FechaInicio.split("T")[1].slice(0, 5)
+        : "";
+    const hFin =
+      act.b_TieneHorario && act.d_FechaFin.includes("T")
+        ? act.d_FechaFin.split("T")[1].slice(0, 5)
+        : "";
 
     setActividadEditandoId(act.i_CveActividad);
     setFormActividad({
       v_Titulo: act.v_Titulo,
       b_General: act.b_General,
       i_CveServAgendaDet: act.b_General ? null : act.i_CveServAgendaDet,
-      fecha: fechaStr,
+      fechaInicio: fechaIniStr,
+      fechaFin: fechaFinStr,
+      b_TieneHorario: act.b_TieneHorario,
       horaInicio: hIni,
       horaFin: hFin,
       v_Notas: act.v_Notas || "",
@@ -1252,7 +1494,7 @@ export default function AvanceProyectosPage() {
       : null;
 
     if (actividadEditandoId !== null) {
-      // §4: En Editar solo cambia título, proyecto/general y notas; la fecha y las horas no se editan aquí
+      // En Editar solo cambia título, proyecto/general y notas; la fecha y las horas no se editan aquí
       setActividades((prev) =>
         prev.map((item) =>
           item.i_CveActividad === actividadEditandoId
@@ -1270,21 +1512,39 @@ export default function AvanceProyectosPage() {
       );
       toast.success("Actividad actualizada exitosamente");
     } else {
-      if (
-        !formActividad.fecha ||
-        !formActividad.horaInicio ||
-        !formActividad.horaFin
-      ) {
-        toast.error("La fecha, hora de inicio y hora de fin son obligatorias.");
+      if (!formActividad.fechaInicio || !formActividad.fechaFin) {
+        toast.error("La fecha de inicio y la fecha de fin son obligatorias.");
         return;
       }
-      if (formActividad.horaFin <= formActividad.horaInicio) {
-        toast.error("La hora de fin debe ser mayor que la hora de inicio.");
+      if (formActividad.fechaFin < formActividad.fechaInicio) {
+        toast.error(
+          "La fecha de fin no puede ser menor que la fecha de inicio."
+        );
         return;
       }
 
-      const dInicio = `${formActividad.fecha}T${formActividad.horaInicio}:00`;
-      const dFin = `${formActividad.fecha}T${formActividad.horaFin}:00`;
+      if (formActividad.b_TieneHorario) {
+        if (!formActividad.horaInicio || !formActividad.horaFin) {
+          toast.error("La hora de inicio y la hora de fin son obligatorias.");
+          return;
+        }
+        // Con horario y mismo día: hora fin menor o igual a hora inicio
+        if (
+          formActividad.fechaInicio === formActividad.fechaFin &&
+          formActividad.horaFin <= formActividad.horaInicio
+        ) {
+          toast.error("La hora de fin debe ser mayor que la hora de inicio.");
+          return;
+        }
+      }
+
+      const dInicio = formActividad.b_TieneHorario
+        ? `${formActividad.fechaInicio}T${formActividad.horaInicio}:00`
+        : formActividad.fechaInicio;
+      const dFin = formActividad.b_TieneHorario
+        ? `${formActividad.fechaFin}T${formActividad.horaFin}:00`
+        : formActividad.fechaFin;
+
       const sesionUsuario = obtenerSesionActual();
       const nombreConsultor =
         sesionUsuario?.username ||
@@ -1300,8 +1560,9 @@ export default function AvanceProyectosPage() {
         i_CveServAgendaDet: formActividad.b_General
           ? null
           : formActividad.i_CveServAgendaDet,
-        d_FechaHoraInicio: dInicio,
-        d_FechaHoraFin: dFin,
+        d_FechaInicio: dInicio,
+        d_FechaFin: dFin,
+        b_TieneHorario: formActividad.b_TieneHorario,
         v_Notas: notasLimpias,
         v_Estatus: "Activa",
         i_CveReprograma: null,
@@ -1315,18 +1576,23 @@ export default function AvanceProyectosPage() {
     handleCerrarModalActividad();
   };
 
-  // §4: Reprogramar actividad del consultor
+  // §1: Reprogramar actividad del consultor (usa los mismos campos y validaciones)
   const handleAbrirReprogramarActividad = (act: ActividadMock) => {
-    const fechaStr = act.d_FechaHoraInicio.split("T")[0] || HOY_MOCK;
-    const hIni = act.d_FechaHoraInicio.includes("T")
-      ? act.d_FechaHoraInicio.split("T")[1].slice(0, 5)
-      : "09:00";
-    const hFin = act.d_FechaHoraFin.includes("T")
-      ? act.d_FechaHoraFin.split("T")[1].slice(0, 5)
-      : "10:00";
+    const fechaIniStr = act.d_FechaInicio.split("T")[0] || HOY_MOCK;
+    const fechaFinStr = act.d_FechaFin.split("T")[0] || fechaIniStr;
+    const hIni =
+      act.b_TieneHorario && act.d_FechaInicio.includes("T")
+        ? act.d_FechaInicio.split("T")[1].slice(0, 5)
+        : "";
+    const hFin =
+      act.b_TieneHorario && act.d_FechaFin.includes("T")
+        ? act.d_FechaFin.split("T")[1].slice(0, 5)
+        : "";
     setActividadReprogramando(act);
     setFormReprogramar({
-      fecha: fechaStr,
+      fechaInicio: fechaIniStr,
+      fechaFin: fechaFinStr,
+      b_TieneHorario: act.b_TieneHorario,
       horaInicio: hIni,
       horaFin: hFin,
       v_Motivo: "",
@@ -1336,7 +1602,9 @@ export default function AvanceProyectosPage() {
   const handleCerrarReprogramarActividad = () => {
     setActividadReprogramando(null);
     setFormReprogramar({
-      fecha: HOY_MOCK,
+      fechaInicio: HOY_MOCK,
+      fechaFin: HOY_MOCK,
+      b_TieneHorario: true,
       horaInicio: "09:00",
       horaFin: "10:00",
       v_Motivo: "",
@@ -1345,23 +1613,34 @@ export default function AvanceProyectosPage() {
 
   const handleGuardarReprogramarActividad = () => {
     if (!actividadReprogramando) return;
-    if (
-      !formReprogramar.fecha ||
-      !formReprogramar.horaInicio ||
-      !formReprogramar.horaFin
-    ) {
-      toast.error(
-        "La nueva fecha, hora de inicio y hora de fin son obligatorias."
-      );
+    if (!formReprogramar.fechaInicio || !formReprogramar.fechaFin) {
+      toast.error("La fecha de inicio y la fecha de fin son obligatorias.");
       return;
     }
-    if (formReprogramar.horaFin <= formReprogramar.horaInicio) {
-      toast.error("La hora de fin debe ser mayor que la hora de inicio.");
+    if (formReprogramar.fechaFin < formReprogramar.fechaInicio) {
+      toast.error("La fecha de fin no puede ser menor que la fecha de inicio.");
       return;
+    }
+    if (formReprogramar.b_TieneHorario) {
+      if (!formReprogramar.horaInicio || !formReprogramar.horaFin) {
+        toast.error("La hora de inicio y la hora de fin son obligatorias.");
+        return;
+      }
+      if (
+        formReprogramar.fechaInicio === formReprogramar.fechaFin &&
+        formReprogramar.horaFin <= formReprogramar.horaInicio
+      ) {
+        toast.error("La hora de fin debe ser mayor que la hora de inicio.");
+        return;
+      }
     }
 
-    const dInicio = `${formReprogramar.fecha}T${formReprogramar.horaInicio}:00`;
-    const dFin = `${formReprogramar.fecha}T${formReprogramar.horaFin}:00`;
+    const dInicio = formReprogramar.b_TieneHorario
+      ? `${formReprogramar.fechaInicio}T${formReprogramar.horaInicio}:00`
+      : formReprogramar.fechaInicio;
+    const dFin = formReprogramar.b_TieneHorario
+      ? `${formReprogramar.fechaFin}T${formReprogramar.horaFin}:00`
+      : formReprogramar.fechaFin;
     const motivoLimpio = formReprogramar.v_Motivo.trim()
       ? formReprogramar.v_Motivo.trim()
       : null;
@@ -1374,8 +1653,9 @@ export default function AvanceProyectosPage() {
       v_Titulo: actividadReprogramando.v_Titulo,
       b_General: actividadReprogramando.b_General,
       i_CveServAgendaDet: actividadReprogramando.i_CveServAgendaDet,
-      d_FechaHoraInicio: dInicio,
-      d_FechaHoraFin: dFin,
+      d_FechaInicio: dInicio,
+      d_FechaFin: dFin,
+      b_TieneHorario: formReprogramar.b_TieneHorario,
       v_Notas: actividadReprogramando.v_Notas,
       v_Estatus: "Activa",
       i_CveReprograma: null,
@@ -2369,8 +2649,7 @@ export default function AvanceProyectosPage() {
                 <th>Fecha</th>
                 <th>Horario</th>
                 <th>Cliente</th>
-                <th>Actividad</th>
-                <th>Proyecto</th>
+                <th style={{ minWidth: "320px", width: "38%" }}>Actividad</th>
                 <th>Duración</th>
                 <th>Estatus</th>
                 <th className="text-center" style={{ width: "90px" }}>
@@ -2381,7 +2660,7 @@ export default function AvanceProyectosPage() {
             <tbody>
               {filasAgendaConsultor.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-secondary">
+                  <td colSpan={7} className="text-center py-8 text-secondary">
                     No se encontraron sesiones ni actividades.
                   </td>
                 </tr>
@@ -2436,45 +2715,44 @@ export default function AvanceProyectosPage() {
                           )}
                         </td>
 
-                        {/* 4. Actividad */}
-                        <td style={{ whiteSpace: "nowrap" }}>
-                          <span
-                            style={{
-                              fontWeight: 700,
-                              color: "#1e3a5f",
-                            }}
-                          >
-                            {ses.v_Actividad}
-                          </span>
-                        </td>
-
-                        {/* 5. Proyecto */}
-                        <td>
+                        {/* 4. Actividad (Título: descripción + chip de tipo debajo) */}
+                        <td
+                          style={{
+                            whiteSpace: "normal",
+                            wordBreak: "break-word",
+                            minWidth: "280px",
+                          }}
+                        >
                           <div
                             style={{
-                              fontWeight: 700,
                               color: "#1e3a5f",
+                              lineHeight: 1.4,
                               marginBottom: "4px",
                             }}
                           >
-                            {ses.v_Servicio}
+                            <span style={{ fontWeight: 700 }}>
+                              {ses.v_Actividad}:
+                            </span>{" "}
+                            <span style={{ fontWeight: 400 }}>
+                              {ses.v_Servicio}
+                            </span>
                           </div>
                           <BadgeTipoServicio
                             tipoServicio={ses.v_TipoServicio}
                           />
                         </td>
 
-                        {/* 6. Duración */}
+                        {/* 5. Duración */}
                         <td style={{ whiteSpace: "nowrap" }}>
                           <span>{ses.v_Duracion}</span>
                         </td>
 
-                        {/* 7. Estatus */}
+                        {/* 6. Estatus */}
                         <td>
                           {renderEstatusSesionBadge(estatusFila)}
                         </td>
 
-                        {/* 8. Acciones: Ojo abre Historial de actividades (§3) */}
+                        {/* 7. Acciones: Ojo abre Historial de actividades (§3) */}
                         <td className="text-center whitespace-nowrap">
                           <button
                             type="button"
@@ -2490,20 +2768,22 @@ export default function AvanceProyectosPage() {
                     );
                   }
 
-                  // Fila de Actividad del consultor (§2)
+                  // Fila de Actividad del consultor (§1 y §2)
                   const act = fila.actividad;
-                  const { texto: fechaTexto, esHoy } = formatearFechaSesionMock(
-                    act.d_FechaHoraInicio
+                  const momento = fila.momento;
+                  const { texto: fechaTexto, esHoy } =
+                    formatearFechaActividadTabla(act, momento);
+                  const { texto: horarioTexto, esTodoElDia } =
+                    formatearHorarioActividadTabla(act, momento);
+                  const duracionTexto = calcularDuracionActividadTabla(
+                    act,
+                    momento
                   );
-                  const horarioTexto = formatearHorarioSesionMock(
-                    act.d_FechaHoraInicio,
-                    act.d_FechaHoraFin,
-                    "rango"
+                  const tituloConMomento = obtenerTituloActividadConMomento(
+                    act,
+                    momento
                   );
-                  const duracionTexto = calcularDuracionHorasTexto(
-                    act.d_FechaHoraInicio,
-                    act.d_FechaHoraFin
-                  );
+                  const notasLimpia = act.v_Notas ? act.v_Notas.trim() : "";
                   const srvLigado =
                     !act.b_General && act.i_CveServAgendaDet
                       ? servicios.find(
@@ -2513,7 +2793,7 @@ export default function AvanceProyectosPage() {
 
                   return (
                     <tr
-                      key={`act-${act.i_CveActividad}`}
+                      key={`act-${act.i_CveActividad}-${momento}`}
                       style={esHoy ? { backgroundColor: "#eef6fd" } : undefined}
                     >
                       {/* 1. Fecha */}
@@ -2530,7 +2810,13 @@ export default function AvanceProyectosPage() {
 
                       {/* 2. Horario */}
                       <td style={{ whiteSpace: "nowrap" }}>
-                        <span>{horarioTexto}</span>
+                        <span
+                          style={
+                            esTodoElDia ? { color: "#64748b" } : undefined
+                          }
+                        >
+                          {horarioTexto}
+                        </span>
                       </td>
 
                       {/* 3. Cliente */}
@@ -2552,57 +2838,46 @@ export default function AvanceProyectosPage() {
                         )}
                       </td>
 
-                      {/* 4. Actividad (título tal cual en negritas) */}
-                      <td style={{ whiteSpace: "nowrap" }}>
-                        <span
+                      {/* 4. Actividad (Título / Inicio · Título / Fin · Título: notas, o sin dos puntos si no tiene notas) */}
+                      <td
+                        style={{
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
+                          minWidth: "280px",
+                        }}
+                      >
+                        <div
                           style={{
-                            fontWeight: 700,
                             color: "#1e3a5f",
+                            lineHeight: 1.4,
                           }}
                         >
-                          {act.v_Titulo}
-                        </span>
+                          {notasLimpia ? (
+                            <>
+                              <span style={{ fontWeight: 700 }}>
+                                {tituloConMomento}:
+                              </span>{" "}
+                              <span style={{ fontWeight: 400 }}>
+                                {notasLimpia}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ fontWeight: 700 }}>
+                              {tituloConMomento}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
-                      {/* 5. Proyecto */}
-                      <td>
-                        {act.b_General || !srvLigado ? (
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              color: "#64748b",
-                              fontSize: "12.5px",
-                            }}
-                          >
-                            GENERAL
-                          </span>
-                        ) : (
-                          <>
-                            <div
-                              style={{
-                                fontWeight: 700,
-                                color: "#1e3a5f",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              {srvLigado.v_Servicio}
-                            </div>
-                            <BadgeTipoServicio
-                              tipoServicio={srvLigado.v_TipoServicio}
-                            />
-                          </>
-                        )}
-                      </td>
-
-                      {/* 6. Duración */}
+                      {/* 5. Duración */}
                       <td style={{ whiteSpace: "nowrap" }}>
                         <span>{duracionTexto}</span>
                       </td>
 
-                      {/* 7. Estatus */}
+                      {/* 6. Estatus */}
                       <td>{renderEstatusSesionBadge(estatusFila)}</td>
 
-                      {/* 8. Acciones: Ojo (Historial), Lápiz (editar), Reprogramar y Cancelar (§2) */}
+                      {/* 7. Acciones: Ojo (Historial), Lápiz (editar), Reprogramar y Cancelar (§2) */}
                       <td
                         className="text-center whitespace-nowrap"
                         style={{ width: "130px", minWidth: "130px" }}
@@ -4488,99 +4763,189 @@ export default function AvanceProyectosPage() {
                 </div>
               )}
 
-              {/* 4, 5 y 6. Fecha *, Hora inicio *, Hora fin * (solo al agregar; al editar se cambian reprogramando — §4) */}
+              {/* 4, 5 y 6. Fecha inicio *, Fecha fin *, ¿Tiene horario? y Hora inicio * / Hora fin * (solo al agregar; al editar se cambian reprogramando — §1 y §4) */}
               {actividadEditandoId === null && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                    gap: "12px",
-                  }}
-                >
-                  <div>
-                    <label
-                      className="form-label"
-                      style={{ marginBottom: "6px" }}
-                    >
-                      Fecha <span style={{ color: "#2B8FCC" }}>*</span>
-                    </label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={formActividad.fecha}
-                      onChange={(e) =>
-                        setFormActividad((prev) => ({
-                          ...prev,
-                          fecha: e.target.value,
-                        }))
-                      }
-                      style={{
-                        width: "100%",
-                        height: "36px",
-                        fontSize: "13px",
-                        borderRadius: "8px",
-                        border: "1px solid #d0dce8",
-                        padding: "0 10px",
-                      }}
-                    />
+                <>
+                  {/* Renglón 1: Fecha inicio y Fecha fin */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(140px, 1fr))",
+                      gap: "12px",
+                    }}
+                  >
+                    <div>
+                      <label
+                        className="form-label"
+                        style={{ marginBottom: "6px" }}
+                      >
+                        Fecha inicio <span style={{ color: "#2B8FCC" }}>*</span>
+                      </label>
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={formActividad.fechaInicio}
+                        onChange={(e) => {
+                          const nuevaIni = e.target.value;
+                          setFormActividad((prev) => ({
+                            ...prev,
+                            fechaInicio: nuevaIni,
+                            fechaFin:
+                              !prev.fechaFin || prev.fechaFin < nuevaIni
+                                ? nuevaIni
+                                : prev.fechaFin,
+                          }));
+                        }}
+                        style={{
+                          width: "100%",
+                          height: "36px",
+                          fontSize: "13px",
+                          borderRadius: "8px",
+                          border: "1px solid #d0dce8",
+                          padding: "0 10px",
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        className="form-label"
+                        style={{ marginBottom: "6px" }}
+                      >
+                        Fecha fin <span style={{ color: "#2B8FCC" }}>*</span>
+                      </label>
+                      <input
+                        type="date"
+                        className="form-control"
+                        min={formActividad.fechaInicio || undefined}
+                        value={formActividad.fechaFin}
+                        onChange={(e) =>
+                          setFormActividad((prev) => ({
+                            ...prev,
+                            fechaFin: e.target.value,
+                          }))
+                        }
+                        style={{
+                          width: "100%",
+                          height: "36px",
+                          fontSize: "13px",
+                          borderRadius: "8px",
+                          border: "1px solid #d0dce8",
+                          padding: "0 10px",
+                        }}
+                      />
+                    </div>
                   </div>
 
+                  {/* Renglón 2: Checkbox ¿Tiene horario? */}
                   <div>
                     <label
-                      className="form-label"
-                      style={{ marginBottom: "6px" }}
-                    >
-                      Hora inicio <span style={{ color: "#2B8FCC" }}>*</span>
-                    </label>
-                    <input
-                      type="time"
-                      className="form-control"
-                      value={formActividad.horaInicio}
-                      onChange={(e) =>
-                        setFormActividad((prev) => ({
-                          ...prev,
-                          horaInicio: e.target.value,
-                        }))
-                      }
                       style={{
-                        width: "100%",
-                        height: "36px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        cursor: "pointer",
                         fontSize: "13px",
-                        borderRadius: "8px",
-                        border: "1px solid #d0dce8",
-                        padding: "0 10px",
+                        fontWeight: 500,
+                        color: "#334155",
+                        userSelect: "none",
                       }}
-                    />
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formActividad.b_TieneHorario}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormActividad((prev) => ({
+                            ...prev,
+                            b_TieneHorario: checked,
+                            horaInicio: checked
+                              ? prev.horaInicio || "09:00"
+                              : "",
+                            horaFin: checked ? prev.horaFin || "10:00" : "",
+                          }));
+                        }}
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          accentColor: "#2B8FCC",
+                          cursor: "pointer",
+                        }}
+                      />
+                      <span>¿Tiene horario?</span>
+                    </label>
                   </div>
 
-                  <div>
-                    <label
-                      className="form-label"
-                      style={{ marginBottom: "6px" }}
-                    >
-                      Hora fin <span style={{ color: "#2B8FCC" }}>*</span>
-                    </label>
-                    <input
-                      type="time"
-                      className="form-control"
-                      value={formActividad.horaFin}
-                      onChange={(e) =>
-                        setFormActividad((prev) => ({
-                          ...prev,
-                          horaFin: e.target.value,
-                        }))
-                      }
+                  {/* Renglón 3: Hora inicio y Hora fin (solo visible si tiene horario) */}
+                  {formActividad.b_TieneHorario && (
+                    <div
                       style={{
-                        width: "100%",
-                        height: "36px",
-                        fontSize: "13px",
-                        borderRadius: "8px",
-                        border: "1px solid #d0dce8",
-                        padding: "0 10px",
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(140px, 1fr))",
+                        gap: "12px",
                       }}
-                    />
-                  </div>
-                </div>
+                    >
+                      <div>
+                        <label
+                          className="form-label"
+                          style={{ marginBottom: "6px" }}
+                        >
+                          Hora inicio{" "}
+                          <span style={{ color: "#2B8FCC" }}>*</span>
+                        </label>
+                        <input
+                          type="time"
+                          className="form-control"
+                          value={formActividad.horaInicio}
+                          onChange={(e) =>
+                            setFormActividad((prev) => ({
+                              ...prev,
+                              horaInicio: e.target.value,
+                            }))
+                          }
+                          style={{
+                            width: "100%",
+                            height: "36px",
+                            fontSize: "13px",
+                            borderRadius: "8px",
+                            border: "1px solid #d0dce8",
+                            padding: "0 10px",
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          className="form-label"
+                          style={{ marginBottom: "6px" }}
+                        >
+                          Hora fin <span style={{ color: "#2B8FCC" }}>*</span>
+                        </label>
+                        <input
+                          type="time"
+                          className="form-control"
+                          value={formActividad.horaFin}
+                          onChange={(e) =>
+                            setFormActividad((prev) => ({
+                              ...prev,
+                              horaFin: e.target.value,
+                            }))
+                          }
+                          style={{
+                            width: "100%",
+                            height: "36px",
+                            fontSize: "13px",
+                            borderRadius: "8px",
+                            border: "1px solid #d0dce8",
+                            padding: "0 10px",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* 7. Notas (opcional) */}
@@ -4750,37 +5115,37 @@ export default function AvanceProyectosPage() {
               >
                 <strong>{actividadReprogramando.v_Titulo}</strong>
                 <span style={{ color: "#64748b", marginLeft: "8px" }}>
-                  (
-                  {formatearFechaHoraHistorial(
-                    actividadReprogramando.d_FechaHoraInicio,
-                    actividadReprogramando.d_FechaHoraFin,
-                    "rango"
-                  )}
-                  )
+                  ({formatearFechaActividadHistorial(actividadReprogramando)})
                 </span>
               </div>
 
+              {/* Renglón 1: Fecha inicio y Fecha fin */}
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
                   gap: "12px",
                 }}
               >
                 <div>
                   <label className="form-label" style={{ marginBottom: "6px" }}>
-                    Nueva fecha <span style={{ color: "#2B8FCC" }}>*</span>
+                    Fecha inicio <span style={{ color: "#2B8FCC" }}>*</span>
                   </label>
                   <input
                     type="date"
                     className="form-control"
-                    value={formReprogramar.fecha}
-                    onChange={(e) =>
+                    value={formReprogramar.fechaInicio}
+                    onChange={(e) => {
+                      const nuevaIni = e.target.value;
                       setFormReprogramar((prev) => ({
                         ...prev,
-                        fecha: e.target.value,
-                      }))
-                    }
+                        fechaInicio: nuevaIni,
+                        fechaFin:
+                          !prev.fechaFin || prev.fechaFin < nuevaIni
+                            ? nuevaIni
+                            : prev.fechaFin,
+                      }));
+                    }}
                     style={{
                       width: "100%",
                       height: "36px",
@@ -4794,41 +5159,17 @@ export default function AvanceProyectosPage() {
 
                 <div>
                   <label className="form-label" style={{ marginBottom: "6px" }}>
-                    Hora inicio <span style={{ color: "#2B8FCC" }}>*</span>
+                    Fecha fin <span style={{ color: "#2B8FCC" }}>*</span>
                   </label>
                   <input
-                    type="time"
+                    type="date"
                     className="form-control"
-                    value={formReprogramar.horaInicio}
+                    min={formReprogramar.fechaInicio || undefined}
+                    value={formReprogramar.fechaFin}
                     onChange={(e) =>
                       setFormReprogramar((prev) => ({
                         ...prev,
-                        horaInicio: e.target.value,
-                      }))
-                    }
-                    style={{
-                      width: "100%",
-                      height: "36px",
-                      fontSize: "13px",
-                      borderRadius: "8px",
-                      border: "1px solid #d0dce8",
-                      padding: "0 10px",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ marginBottom: "6px" }}>
-                    Hora fin <span style={{ color: "#2B8FCC" }}>*</span>
-                  </label>
-                  <input
-                    type="time"
-                    className="form-control"
-                    value={formReprogramar.horaFin}
-                    onChange={(e) =>
-                      setFormReprogramar((prev) => ({
-                        ...prev,
-                        horaFin: e.target.value,
+                        fechaFin: e.target.value,
                       }))
                     }
                     style={{
@@ -4842,6 +5183,112 @@ export default function AvanceProyectosPage() {
                   />
                 </div>
               </div>
+
+              {/* Renglón 2: Checkbox ¿Tiene horario? */}
+              <div>
+                <label
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "#334155",
+                    userSelect: "none",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formReprogramar.b_TieneHorario}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormReprogramar((prev) => ({
+                        ...prev,
+                        b_TieneHorario: checked,
+                        horaInicio: checked
+                          ? prev.horaInicio || "09:00"
+                          : "",
+                        horaFin: checked ? prev.horaFin || "10:00" : "",
+                      }));
+                    }}
+                    style={{
+                      width: "16px",
+                      height: "16px",
+                      accentColor: "#2B8FCC",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <span>¿Tiene horario?</span>
+                </label>
+              </div>
+
+              {/* Renglón 3: Hora inicio y Hora fin (solo visible si tiene horario) */}
+              {formReprogramar.b_TieneHorario && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <label
+                      className="form-label"
+                      style={{ marginBottom: "6px" }}
+                    >
+                      Hora inicio <span style={{ color: "#2B8FCC" }}>*</span>
+                    </label>
+                    <input
+                      type="time"
+                      className="form-control"
+                      value={formReprogramar.horaInicio}
+                      onChange={(e) =>
+                        setFormReprogramar((prev) => ({
+                          ...prev,
+                          horaInicio: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        height: "36px",
+                        fontSize: "13px",
+                        borderRadius: "8px",
+                        border: "1px solid #d0dce8",
+                        padding: "0 10px",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className="form-label"
+                      style={{ marginBottom: "6px" }}
+                    >
+                      Hora fin <span style={{ color: "#2B8FCC" }}>*</span>
+                    </label>
+                    <input
+                      type="time"
+                      className="form-control"
+                      value={formReprogramar.horaFin}
+                      onChange={(e) =>
+                        setFormReprogramar((prev) => ({
+                          ...prev,
+                          horaFin: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        height: "36px",
+                        fontSize: "13px",
+                        borderRadius: "8px",
+                        border: "1px solid #d0dce8",
+                        padding: "0 10px",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="form-label" style={{ marginBottom: "6px" }}>
@@ -5088,12 +5535,7 @@ export default function AvanceProyectosPage() {
               .filter(
                 (a) => !a.b_General && a.i_CveServAgendaDet === cveProyecto
               )
-              .map(
-                (actividad): AgendaConsultorFila => ({
-                  tipo: "actividad",
-                  actividad,
-                })
-              );
+              .flatMap((actividad) => expandirActividadEnFilas(actividad));
 
             elementos = [...sesionesProy, ...actividadesProy];
           } else if (filaEnHistorial.tipo === "sesion") {
@@ -5132,12 +5574,7 @@ export default function AvanceProyectosPage() {
             }
             elementos = actividades
               .filter((a) => idsCadena.has(a.i_CveActividad))
-              .map(
-                (actividad): AgendaConsultorFila => ({
-                  tipo: "actividad",
-                  actividad,
-                })
-              );
+              .flatMap((actividad) => expandirActividadEnFilas(actividad));
           }
 
           // Ordenar por fecha y hora de arriba hacia abajo
@@ -5145,15 +5582,17 @@ export default function AvanceProyectosPage() {
             const fA =
               a.tipo === "sesion"
                 ? a.sesion.d_FechaHoraInicio
-                : a.actividad.d_FechaHoraInicio;
+                : obtenerRangoEfectivoFilaActividad(a.actividad, a.momento)
+                    .inicio;
             const fB =
               b.tipo === "sesion"
                 ? b.sesion.d_FechaHoraInicio
-                : b.actividad.d_FechaHoraInicio;
+                : obtenerRangoEfectivoFilaActividad(b.actividad, b.momento)
+                    .inicio;
             return fA.localeCompare(fB);
           });
 
-          // Índice de la actividad actual (en la que se pulsó el ojo)
+          // Índice del elemento actual (en el que se pulsó el ojo)
           const idxActual = elementos.findIndex((el) => {
             if (
               el.tipo === "sesion" &&
@@ -5170,7 +5609,8 @@ export default function AvanceProyectosPage() {
             ) {
               return (
                 el.actividad.i_CveActividad ===
-                filaEnHistorial.actividad.i_CveActividad
+                  filaEnHistorial.actividad.i_CveActividad &&
+                el.momento === filaEnHistorial.momento
               );
             }
             return false;
@@ -5305,26 +5745,25 @@ export default function AvanceProyectosPage() {
                     const esActual = idx === idxActual;
                     const esUltimo = idx === elementos.length - 1;
 
-                    const dIni =
+                    const fechaHoraStr =
                       el.tipo === "sesion"
-                        ? el.sesion.d_FechaHoraInicio
-                        : el.actividad.d_FechaHoraInicio;
-                    const dFin =
-                      el.tipo === "sesion"
-                        ? el.sesion.d_FechaHoraFin
-                        : el.actividad.d_FechaHoraFin;
-                    const modoHorario =
-                      el.tipo === "sesion" ? el.sesion.v_ModoHorario : "rango";
-                    const fechaHoraStr = formatearFechaHoraHistorial(
-                      dIni,
-                      dFin,
-                      modoHorario
-                    );
+                        ? formatearFechaHoraHistorial(
+                            el.sesion.d_FechaHoraInicio,
+                            el.sesion.d_FechaHoraFin,
+                            el.sesion.v_ModoHorario
+                          )
+                        : formatearFechaNodoActividadHistorial(
+                            el.actividad,
+                            el.momento
+                          );
 
                     const nombreActividad =
                       el.tipo === "sesion"
                         ? el.sesion.v_Actividad
-                        : el.actividad.v_Titulo;
+                        : obtenerTituloActividadConMomento(
+                            el.actividad,
+                            el.momento
+                          );
 
                     // Estatus del nodo: Terminado, En curso, Programado, Reprogramada o Cancelada
                     let estatusLabel:
@@ -5410,7 +5849,7 @@ export default function AvanceProyectosPage() {
                         key={
                           el.tipo === "sesion"
                             ? `hist-ses-${el.sesion.i_CveAgendaDetalle}`
-                            : `hist-act-${el.actividad.i_CveActividad}`
+                            : `hist-act-${el.actividad.i_CveActividad}-${el.momento}`
                         }
                         ref={esActual ? nodoActualHistorialRef : undefined}
                         style={{
@@ -5561,7 +6000,7 @@ export default function AvanceProyectosPage() {
                               <span>
                                 {actividadNuevaReprogramada
                                   ? `Reprogramada al ${formatearFechaCortaHistorial(
-                                      actividadNuevaReprogramada.d_FechaHoraInicio
+                                      actividadNuevaReprogramada.d_FechaInicio
                                     )}`
                                   : "Reprogramada"}
                               </span>

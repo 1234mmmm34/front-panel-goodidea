@@ -24,7 +24,12 @@ export interface ServicioConEntregablesDto {
 }
 
 export interface SubirArchivoRequestDto {
-  v_Tipo: "cotizacion_cliente" | "oc_cliente" | "entregable" | "vobo_autoridad";
+  v_Tipo:
+    | "cotizacion_cliente"
+    | "oc_cliente"
+    | "entregable"
+    | "carta_entrega"
+    | "vobo_autoridad";
   ServiciosSeleccionados?: number[];
   v_Referencia?: string;
   EntregablesSeleccionados?: number[];

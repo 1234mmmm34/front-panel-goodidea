@@ -25,6 +25,8 @@ import InputFechaTexto from "@/components/ui/InputFechaTexto";
 import { useToast } from "@/context/ToastContext";
 import { formatearFechaTexto, addDays, addMonths } from "@/lib/date-utils";
 import { leerCfdiXml } from "@/lib/cfdi-utils";
+import { redondear2 } from "@/lib/montos";
+import { AvisoInfo } from "@/components/ui/AvisoInfo";
 
 interface ModalNuevaFacturaProps {
   abierto: boolean;
@@ -108,6 +110,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
   // --- PARTE 2: CONFIGURACIÓN DE VENTA Y FACTURAS ---
   const [cantidadFacturas, setCantidadFacturas] = useState<number | "">(1);
   const [descripcionVenta, setDescripcionVenta] = useState<string>("");
+  const [montoFacturarAhora, setMontoFacturarAhora] = useState<number>(0);
   const [facturas, setFacturas] = useState<FacturaVentaState[]>([]);
 
   // Sub-modal Configurar Pagos
@@ -147,6 +150,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
       setServiciosParaAgruparIds(new Set());
       setCantidadFacturas(1);
       setDescripcionVenta("");
+      setMontoFacturarAhora(0);
       setFacturas([]);
       setErrorPaso1(null);
       setErrorPaso2(null);
@@ -299,8 +303,16 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
     });
   };
 
+  const TEXTO_NO_AGRUPAR_PARCIAL =
+    "Este servicio ya tiene facturas. Su restante se factura sin agrupar (solo o junto con otros servicios en la misma factura).";
+
   // Choicechips selection handlers
   const toggleSeleccionParaAgrupar = (idTemp: string) => {
+    const srv = serviciosIndividuales.find((s) => s.idTemp === idTemp);
+    if ((srv?.d_Facturado ?? 0) > 0) {
+      toast.warning(TEXTO_NO_AGRUPAR_PARCIAL);
+      return;
+    }
     setServiciosParaAgruparIds((prev) => {
       const next = new Set(prev);
       if (next.has(idTemp)) next.delete(idTemp);
@@ -310,10 +322,15 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
   };
 
   const toggleSeleccionarTodosParaAgrupar = () => {
-    if (serviciosParaAgruparIds.size === serviciosIndividuales.length) {
+    const agrupables = serviciosIndividuales.filter((s) => !((s.d_Facturado ?? 0) > 0));
+    if (agrupables.length === 0) {
+      toast.warning(TEXTO_NO_AGRUPAR_PARCIAL);
+      return;
+    }
+    if (serviciosParaAgruparIds.size === agrupables.length) {
       setServiciosParaAgruparIds(new Set());
     } else {
-      setServiciosParaAgruparIds(new Set(serviciosIndividuales.map((s) => s.idTemp)));
+      setServiciosParaAgruparIds(new Set(agrupables.map((s) => s.idTemp)));
     }
   };
 
@@ -328,9 +345,16 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
       return;
     }
 
-    const itemsAAgrupar = serviciosParaAgruparIds.size > 0
+    const candidatos = serviciosParaAgruparIds.size > 0
       ? serviciosIndividuales.filter((s) => serviciosParaAgruparIds.has(s.idTemp))
       : serviciosIndividuales;
+
+    if (candidatos.some((s) => (s.d_Facturado ?? 0) > 0)) {
+      toast.warning(TEXTO_NO_AGRUPAR_PARCIAL);
+      return;
+    }
+
+    const itemsAAgrupar = candidatos.filter((s) => !((s.d_Facturado ?? 0) > 0));
 
     if (itemsAAgrupar.length === 0) {
       toast.warning("Selecciona al menos un servicio con la casilla para agrupar.");
@@ -362,9 +386,16 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
   const handleAgregarAGrupoExistente = (idGrupo: string) => {
     if (serviciosIndividuales.length === 0) return;
 
-    const itemsAAgrupar = serviciosParaAgruparIds.size > 0
+    const candidatos = serviciosParaAgruparIds.size > 0
       ? serviciosIndividuales.filter((s) => serviciosParaAgruparIds.has(s.idTemp))
       : serviciosIndividuales;
+
+    if (candidatos.some((s) => (s.d_Facturado ?? 0) > 0)) {
+      toast.warning(TEXTO_NO_AGRUPAR_PARCIAL);
+      return;
+    }
+
+    const itemsAAgrupar = candidatos.filter((s) => !((s.d_Facturado ?? 0) > 0));
 
     if (itemsAAgrupar.length === 0) {
       toast.warning("Selecciona al menos un servicio con la casilla para agrupar.");
@@ -469,6 +500,11 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
     const sumGrpTotal = grupos.reduce((acc, g) => acc + g.total, 0);
     return Math.round((sumIndivTotal + sumGrpTotal) * 100) / 100;
   }, [serviciosIndividuales, grupos]);
+
+  // Si cambian los conceptos en el Paso 1, resetear montoFacturarAhora al nuevo totalServiciosCve
+  useEffect(() => {
+    setMontoFacturarAhora(totalServiciosCve);
+  }, [totalServiciosCve]);
 
   // Sincronizar / Repartir montos automáticamente entre las facturas de la Parte 2
   const sincronizarFacturasConCantidad = (cant: number, totalCve: number) => {
@@ -624,7 +660,9 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
     }
 
     setErrorPaso1(null);
-    sincronizarFacturasConCantidad(typeof cantidadFacturas === "number" ? cantidadFacturas : 1, totalServiciosCve);
+    const montoInicial = montoFacturarAhora > 0 && montoFacturarAhora <= totalServiciosCve ? montoFacturarAhora : totalServiciosCve;
+    setMontoFacturarAhora(montoInicial);
+    sincronizarFacturasConCantidad(typeof cantidadFacturas === "number" ? cantidadFacturas : 1, montoInicial);
     setPasoActual(2);
     setPasoMaximoAlcanzado((prev) => Math.max(prev, 2));
   };
@@ -638,12 +676,20 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
   }, [facturas]);
 
   const descuadreFacturas = useMemo(() => {
-    return Math.abs(totalFacturadoCve - totalServiciosCve) > 0.01;
-  }, [totalFacturadoCve, totalServiciosCve]);
+    return Math.abs(totalFacturadoCve - montoFacturarAhora) > 0.01;
+  }, [totalFacturadoCve, montoFacturarAhora]);
 
   const handleAvanzarPaso2 = () => {
     const invalidos: Record<string, boolean> = {};
     let errorMsg: string | null = null;
+
+    if (montoFacturarAhora <= 0 || montoFacturarAhora > totalServiciosCve + 0.01) {
+      invalidos["montoFacturarAhora"] = true;
+      errorMsg = `El monto a facturar ahora debe ser mayor a $0 y menor o igual a $${totalServiciosCve.toLocaleString("es-MX", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}.`;
+    }
 
     facturas.forEach((f, idx) => {
       if (!f.v_NoFactura.trim()) {
@@ -673,9 +719,13 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
     });
 
     if (descuadreFacturas) {
-      errorMsg = `El total facturado ($${totalFacturadoCve.toLocaleString(
-        "es-MX"
-      )}) no coincide con el total de servicios ($${totalServiciosCve.toLocaleString("es-MX")}).`;
+      errorMsg = `El total facturado ($${totalFacturadoCve.toLocaleString("es-MX", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}) no coincide con el monto a facturar ahora ($${montoFacturarAhora.toLocaleString("es-MX", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}).`;
     }
 
     if (Object.keys(invalidos).length > 0 || errorMsg) {
@@ -1593,6 +1643,11 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                   <div style={{ fontWeight: 600, color: "#1e3a5f", fontSize: "13px" }}>
                                     {srv.v_Servicio}
                                   </div>
+                                  {(srv.d_Facturado ?? 0) > 0 && (
+                                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
+                                      Facturado antes: ${(srv.d_Facturado ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · Pendiente: ${(srv.d_Total ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                  )}
                                   <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
                                     {srv.i_Cantidad != null ? `${Number(srv.i_Cantidad).toFixed(2)} ${srv.v_Unidad || ""} — ` : ""}
                                     Subtotal: ${(srv.d_Subtotal ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
@@ -1712,10 +1767,13 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "110px", overflowY: "auto", padding: "2px" }}>
                                 {serviciosIndividuales.map((item) => {
                                   const checked = serviciosParaAgruparIds.has(item.idTemp);
+                                  const yaFacturado = (item.d_Facturado ?? 0) > 0;
                                   return (
                                     <button
                                       key={item.idTemp}
                                       type="button"
+                                      disabled={yaFacturado}
+                                      title={yaFacturado ? TEXTO_NO_AGRUPAR_PARCIAL : undefined}
                                       onClick={() => toggleSeleccionParaAgrupar(item.idTemp)}
                                       style={{
                                         display: "inline-flex",
@@ -1728,7 +1786,8 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                         color: checked ? "#1e3a5f" : "#64748b",
                                         fontSize: "11px",
                                         fontWeight: 600,
-                                        cursor: "pointer",
+                                        cursor: yaFacturado ? "not-allowed" : "pointer",
+                                        opacity: yaFacturado ? 0.5 : 1,
                                         transition: "all 0.15s ease",
                                       }}
                                     >
@@ -1830,6 +1889,16 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                       )}
                     </div>
                   </div>
+
+                  {/* Avisos informativos de Paso 1 */}
+                  {(serviciosIndividuales.some((s) => (s.d_Facturado ?? 0) > 0) ||
+                    grupos.some((g) => g.servicios.some((s) => (s.d_Facturado ?? 0) > 0))) && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <AvisoInfo tipo="info">
+                        Algunos servicios ya fueron facturados en parte; se muestra solo lo que les falta por facturar.
+                      </AvisoInfo>
+                    </div>
+                  )}
 
                   {/* 1.2.2 Tabla de Seleccionados */}
                   {serviciosIndividuales.length === 0 && grupos.length === 0 ? (
@@ -2024,6 +2093,13 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                     </tr>
                                   );
                                 })}
+                              <tr style={{ backgroundColor: "#f8fafc", borderLeft: "4px solid #7a96b0" }}>
+                                <td colSpan={7} style={{ padding: "6px 12px 10px 16px" }}>
+                                  <AvisoInfo tipo="info">
+                                    El monto global sustituye la suma de los precios de estos servicios. Si después facturas solo una parte, el restante aparecerá por servicio y ya no se podrá volver a agrupar.
+                                  </AvisoInfo>
+                                </td>
+                              </tr>
                             </React.Fragment>
                           ))}
 
@@ -2031,6 +2107,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                           {serviciosIndividuales.map((item) => {
                             const noCot = item.v_NoCotizacionGI;
                             const estaSeleccionado = serviciosParaAgruparIds.has(item.idTemp);
+                            const yaFacturado = (item.d_Facturado ?? 0) > 0;
                             return (
                               <tr key={item.idTemp} style={{ backgroundColor: "#ffffff", borderLeft: estaSeleccionado ? "4px solid #2B8FCC" : "4px solid #e2e8f0" }}>
                                 <td style={{ textAlign: "center", width: "60px" }}>
@@ -2045,22 +2122,30 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                     </button>
                                     <button
                                       type="button"
+                                      disabled={yaFacturado}
                                       onClick={() => toggleSeleccionParaAgrupar(item.idTemp)}
                                       style={{
                                         width: "18px",
                                         height: "18px",
                                         borderRadius: "4px",
                                         border: estaSeleccionado ? "2px solid #2B8FCC" : "2px solid #94a3b8",
-                                        backgroundColor: estaSeleccionado ? "#2B8FCC" : "#ffffff",
+                                        backgroundColor: estaSeleccionado ? "#2B8FCC" : yaFacturado ? "#f1f5f9" : "#ffffff",
                                         color: "#ffffff",
                                         display: "inline-flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        cursor: "pointer",
+                                        cursor: yaFacturado ? "not-allowed" : "pointer",
+                                        opacity: yaFacturado ? 0.45 : 1,
                                         padding: 0,
                                         transition: "all 0.15s ease",
                                       }}
-                                      title={estaSeleccionado ? "Desmarcar para agrupar" : "Marcar para agrupar"}
+                                      title={
+                                        yaFacturado
+                                          ? TEXTO_NO_AGRUPAR_PARCIAL
+                                          : estaSeleccionado
+                                          ? "Desmarcar para agrupar"
+                                          : "Marcar para agrupar"
+                                      }
                                     >
                                       {estaSeleccionado && <Check size={12} strokeWidth={3} />}
                                     </button>
@@ -2081,6 +2166,11 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                   <div style={{ fontWeight: 600, color: "#0f172a" }}>
                                     {item.v_Servicio}
                                   </div>
+                                  {yaFacturado && (
+                                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
+                                      Facturado antes: ${(item.d_Facturado ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · Pendiente: ${(item.d_Total ?? item.total ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                  )}
                                   {(item.i_Cantidad != null || item.v_Unidad) && (
                                     <div style={{ fontSize: "11px", color: "#64748b", marginTop: "1px" }}>
                                       {Number(item.i_Cantidad ?? 0).toFixed(2)} {item.v_Unidad || ""}
@@ -2219,13 +2309,13 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                         if (!isNaN(val)) {
                           setCantidadFacturas(val);
                           if (val >= 1) {
-                            sincronizarFacturasConCantidad(val, totalServiciosCve);
+                            sincronizarFacturasConCantidad(val, montoFacturarAhora);
                           }
                         }
                       }}
                       onBlur={() => {
                         if (!cantidadFacturas || cantidadFacturas < 1) {
-                          sincronizarFacturasConCantidad(1, totalServiciosCve);
+                          sincronizarFacturasConCantidad(1, montoFacturarAhora);
                         }
                       }}
                     />
@@ -2256,6 +2346,196 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Card "Facturar ahora" */}
+              {(() => {
+                const pctMostrado = totalServiciosCve > 0 ? redondear2((montoFacturarAhora / totalServiciosCve) * 100) : 0;
+                const restanteZ = redondear2(totalServiciosCve - montoFacturarAhora);
+                const cantFacturasNum = typeof cantidadFacturas === "number" && cantidadFacturas >= 1 ? cantidadFacturas : 1;
+
+                return (
+                  <div
+                    style={{
+                      border: "1px solid #d8e6f0",
+                      borderRadius: "12px",
+                      padding: "18px 20px",
+                      backgroundColor: "#ffffff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: "14px",
+                        borderBottom: "1px solid #f1f5f9",
+                        paddingBottom: "10px",
+                      }}
+                    >
+                      <h4
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          color: "#1e3a5f",
+                          margin: 0,
+                        }}
+                      >
+                        Facturar ahora
+                      </h4>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                        Total conceptos c/IVA: ${totalServiciosCve.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN
+                      </span>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
+                      {/* Monto c/IVA ($) */}
+                      <div>
+                        <label
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#4a6580",
+                            display: "block",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          Monto c/IVA ($)<span style={{ color: "#dc2626" }}>*</span>
+                        </label>
+                        <div style={{ position: "relative" }}>
+                          <span
+                            style={{
+                              position: "absolute",
+                              left: "10px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              color: "#64748b",
+                            }}
+                          >
+                            $
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0.01}
+                            max={totalServiciosCve}
+                            className="form-control"
+                            style={{
+                              height: "36px",
+                              borderRadius: "8px",
+                              fontSize: "13px",
+                              paddingLeft: "24px",
+                              fontWeight: 700,
+                              border: camposInvalidadosPaso2["montoFacturarAhora"]
+                                ? "1px solid #dc3545"
+                                : undefined,
+                            }}
+                            value={montoFacturarAhora || ""}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const val = raw === "" ? 0 : redondear2(Number(raw));
+                              setMontoFacturarAhora(val);
+                              sincronizarFacturasConCantidad(cantFacturasNum, val);
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Porcentaje (%) */}
+                      <div>
+                        <label
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#4a6580",
+                            display: "block",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          Porcentaje (%)<span style={{ color: "#dc2626" }}>*</span>
+                        </label>
+                        <div style={{ position: "relative" }}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0.01}
+                            max={100}
+                            className="form-control"
+                            style={{
+                              height: "36px",
+                              borderRadius: "8px",
+                              fontSize: "13px",
+                              paddingRight: "28px",
+                              fontWeight: 700,
+                            }}
+                            value={pctMostrado || ""}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const pct = raw === "" ? 0 : Number(raw);
+                              const nuevoMonto = redondear2((totalServiciosCve * pct) / 100);
+                              setMontoFacturarAhora(nuevoMonto);
+                              sincronizarFacturasConCantidad(cantFacturasNum, nuevoMonto);
+                            }}
+                          />
+                          <span
+                            style={{
+                              position: "absolute",
+                              right: "10px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              color: "#64748b",
+                            }}
+                          >
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: "12px", fontSize: "13px", fontWeight: 700, color: restanteZ > 0 ? "#b45309" : "#16a34a" }}>
+                      {restanteZ > 0
+                        ? `Queda por facturar después: $${restanteZ.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : "Se factura el 100 %"}
+                    </div>
+
+                    {montoFacturarAhora < totalServiciosCve - 0.01 && (() => {
+                      const totalConceptos =
+                        serviciosIndividuales.length +
+                        grupos.reduce((acc, g) => acc + g.servicios.length, 0);
+                      const masDeUnConcepto = totalConceptos > 1 || serviciosIndividuales.length + grupos.length > 1;
+                      return (
+                        <div style={{ marginTop: "12px" }}>
+                          <AvisoInfo tipo="info">
+                            <div>
+                              Facturación parcial: quedarán $
+                              {restanteZ.toLocaleString("es-MX", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              pendientes. Esos servicios seguirán apareciendo en &apos;Nueva factura&apos; con su saldo y en Programación como &apos;Parcial&apos;.
+                            </div>
+                            {masDeUnConcepto && (
+                              <div style={{ marginTop: "4px" }}>
+                                El monto se reparte entre los servicios en proporción a lo que le falta a cada uno.
+                              </div>
+                            )}
+                            {grupos.length > 0 && (
+                              <div style={{ marginTop: "4px" }}>
+                                El restante del proyecto aparecerá después por servicio, con su parte proporcional del monto global.
+                              </div>
+                            )}
+                          </AvisoInfo>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              })()}
 
               {/* 2.2 Bloque Facturas */}
               <div
@@ -2648,7 +2928,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                     <span>Total facturado:</span>
                     <span style={{ color: descuadreFacturas ? "#dc3545" : "#16a34a" }}>
                       Facturado: ${totalFacturadoCve.toLocaleString("es-MX", { minimumFractionDigits: 2 })} / $
-                      {totalServiciosCve.toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN
+                      {montoFacturarAhora.toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN
                     </span>
                   </div>
                 </div>
@@ -2828,6 +3108,20 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {montoFacturarAhora < totalServiciosCve - 0.01 && (() => {
+                  const pct = totalServiciosCve > 0 ? redondear2((montoFacturarAhora / totalServiciosCve) * 100) : 0;
+                  const quedanPendientes = redondear2(totalServiciosCve - montoFacturarAhora);
+                  return (
+                    <div style={{ marginTop: "12px" }}>
+                      <AvisoInfo tipo="advertencia">
+                        <strong>
+                          Facturación parcial — se factura ${montoFacturarAhora.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de ${totalServiciosCve.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({pct} %). Quedan ${quedanPendientes.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pendientes.
+                        </strong>
+                      </AvisoInfo>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* 3.4 Facturas */}

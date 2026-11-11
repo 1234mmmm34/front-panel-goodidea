@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { X, FileText, Ban, Stamp, CheckCircle2, XCircle, Loader2, Eye, Plus, RefreshCw } from "lucide-react";
-import { FacturaGetDto } from "@/types/facturas";
+import { FacturaGetDto, LineaServicioFacturaDto, AbonoFacturaDto } from "@/types/facturas";
 import InputFechaTexto from "@/components/ui/InputFechaTexto";
+import { AvisoInfo } from "@/components/ui/AvisoInfo";
 import { FacturasService } from "@/services/facturas.service";
 import { VerDocumento } from "@/services/archivos.service";
 import { leerCfdiXml } from "@/lib/cfdi-utils";
@@ -608,15 +609,55 @@ export const ModalCancelarFacturas: React.FC<ModalCancelarFacturasProps> = ({
   const { toast } = useToast();
   const [motivo, setMotivo] = useState<string>("");
   const [guardando, setGuardando] = useState<boolean>(false);
+  const [lineasDetalle, setLineasDetalle] = useState<LineaServicioFacturaDto[]>([]);
+  const [abonosDetalle, setAbonosDetalle] = useState<AbonoFacturaDto[]>([]);
 
   useEffect(() => {
-    if (abierto) {
+    if (abierto && factura) {
       setMotivo("");
       setGuardando(false);
+      const cveFacturaVal =
+        factura.i_CveFacturas ??
+        (factura as any).i_CveFactura ??
+        (factura as any).id ??
+        0;
+
+      if (cveFacturaVal) {
+        Promise.all([
+          FacturasService.getFacturaDetalle(cveFacturaVal).catch(() => []),
+          FacturasService.getAbonosPorFactura(cveFacturaVal).catch(() => []),
+        ]).then(([resLineas, resAbonos]) => {
+          setLineasDetalle(Array.isArray(resLineas) ? resLineas : []);
+          setAbonosDetalle(Array.isArray(resAbonos) ? resAbonos : []);
+        });
+      } else {
+        setLineasDetalle([]);
+        setAbonosDetalle([]);
+      }
+    } else if (!abierto) {
+      setLineasDetalle([]);
+      setAbonosDetalle([]);
     }
-  }, [abierto]);
+  }, [abierto, factura]);
 
   if (!abierto || !factura) return null;
+
+  const nombresServicios = Array.from(
+    new Set(
+      lineasDetalle
+        .map((l) => (l.v_Servicio || (l as any).v_NombreServicio || "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  const sumaAbonosPagados = abonosDetalle
+    .filter((a) => a.i_Estado === 1)
+    .reduce((acc, a) => acc + (a.d_Monto || 0), 0);
+  const montoPagado = sumaAbonosPagados > 0 ? sumaAbonosPagados : Number(factura.d_Abonado || 0);
+
+  const esProyecto = lineasDetalle.some(
+    (l) => l.v_TipoVenta && l.v_TipoVenta.trim().toLowerCase() === "proyecto"
+  );
 
   const handleConfirmarCancelacion = async () => {
     if (!motivo.trim()) {
@@ -688,16 +729,40 @@ export const ModalCancelarFacturas: React.FC<ModalCancelarFacturasProps> = ({
             <X size={18} />
           </button>
         </div>
-        <div className="modal-body" style={{ padding: "20px" }}>
-          <p style={{ fontSize: "14px", color: "#334155", margin: "0 0 12px 0" }}>
+        <div className="modal-body" style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
+          <p style={{ fontSize: "14px", color: "#334155", margin: 0 }}>
             ¿Estás seguro de que deseas cancelar la factura de <strong>{factura.v_Empresa}</strong>?
           </p>
-          <div style={{ padding: "12px", backgroundColor: "#fef2f2", borderRadius: "8px", border: "1px solid #fecaca", marginBottom: "16px" }}>
-            <span style={{ fontSize: "13px", color: "#991b1b" }}>
-              Esta acción revocará la factura fiscal y no se podrá deshacer.
-            </span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+
+          <AvisoInfo tipo="advertencia">
+            <div>
+              Al cancelar esta factura, el monto que cubría vuelve a quedar pendiente de facturar en sus servicios.
+            </div>
+            {nombresServicios.length > 1 && (
+              <div style={{ marginTop: "4px" }}>
+                Servicios afectados: {nombresServicios.join(", ")}.
+              </div>
+            )}
+          </AvisoInfo>
+
+          {montoPagado > 0.01 && (
+            <AvisoInfo tipo="peligro">
+              Tiene pagos registrados por $
+              {montoPagado.toLocaleString("es-MX", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              que también se cancelarán.
+            </AvisoInfo>
+          )}
+
+          {esProyecto && (
+            <AvisoInfo tipo="info">
+              El proyecto quedará sin facturas y podrá volver a separarse en servicios.
+            </AvisoInfo>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
             <label className="form-label" style={{ fontSize: "12px", fontWeight: 600 }}>
               Motivo de cancelación<span style={{ color: "#dc2626" }}>*</span>:
             </label>

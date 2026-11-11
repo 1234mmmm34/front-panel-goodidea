@@ -5,6 +5,7 @@ import { X, Search, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { GastosService } from "@/services/gastos.service";
 import { ProveedorGetDto } from "@/types/servicios";
 import { ServicioSinFacturaProv, AbonoCrearDto } from "@/types/gastos";
+import { formatearPrecioUnitario } from "@/lib/montos";
 import { useToast } from "@/context/ToastContext";
 
 interface Props {
@@ -396,7 +397,7 @@ export const ModalNuevoGasto: React.FC<Props> = ({
                             <td>{s.v_Servicio || "—"}</td>
                             <td>{s.d_FechaInicio ? s.d_FechaInicio.split("T")[0] : "—"}</td>
                             <td>{s.i_Cantidad}</td>
-                            <td>{formatMoneda(s.d_PrecioUnitario)}</td>
+                            <td>${formatearPrecioUnitario(s.d_PrecioUnitario)}</td>
                             <td style={{ fontWeight: 600, color: "#1e3a5f" }}>{formatMoneda(s.d_Total)}</td>
                             <td>{s.v_NoCotizacionProv || "—"}</td>
                             <td>{s.v_NoOrdenCompraProv || "—"}</td>

@@ -13,7 +13,9 @@ import {
 import { FacturaProv, FacturaProvLinea, AbonoProv } from "@/types/gastos";
 import { GastosService } from "@/services/gastos.service";
 import { formatearFechaTexto, calcularDiasRetraso } from "@/lib/date-utils";
+import { redondear2, formatearPrecioUnitario } from "@/lib/montos";
 import { useToast } from "@/context/ToastContext";
+import { AvisoInfo } from "@/components/ui/AvisoInfo";
 
 interface Props {
   abierto: boolean;
@@ -164,15 +166,11 @@ export const ModalDetalleGasto: React.FC<Props> = ({
 
   // Cálculos de resumen de servicios y descuento
   const { subtotalTabla, porcentajeDesc, montoDescuento, subtotalConDescuento, ivaCalculado } = useMemo(() => {
-    let sub = 0;
-    lineas.forEach((l) => {
-      sub += l.d_Subtotal || 0;
-    });
-
+    const sub = redondear2(lineas.reduce((acc, l) => acc + (l.d_Subtotal || 0), 0));
     const pct = gastoLocal?.d_PorcentajeDescuento || 0;
-    const desc = sub * (pct / 100);
-    const subConDesc = sub - desc;
-    const iva = pct > 0 ? subConDesc * 0.16 : lineas.reduce((acc, l) => acc + (l.d_IVA || 0), 0);
+    const subConDesc = redondear2(sub * (1 - pct / 100));
+    const desc = redondear2(sub - subConDesc);
+    const iva = redondear2(subConDesc * 0.16);
 
     return {
       subtotalTabla: sub,
@@ -801,7 +799,7 @@ export const ModalDetalleGasto: React.FC<Props> = ({
                                     borderRight: "1px solid #e2e8f0",
                                   }}
                                 >
-                                  {formatearMonto(linea.d_PrecioUnitario)}
+                                  {"$" + formatearPrecioUnitario(linea.d_PrecioUnitario)}
                                 </td>
                                 <td
                                   style={{
@@ -985,6 +983,21 @@ export const ModalDetalleGasto: React.FC<Props> = ({
                         </tr>
                       </tbody>
                     </table>
+                  </div>
+                  <div style={{ marginTop: "8px" }}>
+                    {sumaPagados > 0.01 ||
+                    (gastoLocal.d_Abonado ?? 0) > 0.01 ||
+                    gastoLocal.v_EstadoPago === "Abonada" ||
+                    gastoLocal.v_EstadoPago === "Pagada" ||
+                    gastoLocal.v_EstadoPago === "Liquidada" ? (
+                      <AvisoInfo tipo="info">
+                        Ya tiene pagos: aunque cambie el precio o la cantidad del servicio, este monto ya no se actualiza.
+                      </AvisoInfo>
+                    ) : (
+                      <AvisoInfo tipo="info">
+                        Este monto se actualiza solo si cambian el precio o la cantidad del servicio, mientras no tenga pagos.
+                      </AvisoInfo>
+                    )}
                   </div>
                 </div>
 

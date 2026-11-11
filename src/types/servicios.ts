@@ -50,6 +50,7 @@ export interface AgendaServicioGetDto {
   v_ConfirmadoPor?: string | null;
   b_TienePlanContingencia?: boolean;
   i_AvancePipc?: number | null;
+  d_SaldoPorFacturar?: number; // c/IVA
 }
 
 export interface TerminoServicioDto {
@@ -174,6 +175,7 @@ export interface AgendaDetalleGetDto {
   v_Notas?: string | null;
   d_FechaConfirmacionTermino?: string | null;
   v_ConfirmadoPor?: string | null;
+  d_SaldoPorFacturar?: number; // c/IVA
 }
 
 export interface CambiarTitularesSesionDto {

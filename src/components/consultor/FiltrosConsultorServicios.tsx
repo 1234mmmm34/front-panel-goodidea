@@ -3,12 +3,12 @@
 import React, { useState } from "react";
 import { Search } from "lucide-react";
 import DateRangePickerPopover from "@/components/ui/DateRangePickerPopover";
-import { FiltrosConsultorServiciosState } from "@/types/consultor";
+import { FiltrosConsultorServiciosState, VistaConsultor } from "@/types/consultor";
 
 interface Props {
   filtros: FiltrosConsultorServiciosState;
   onCambiarFiltros: (nuevosFiltros: FiltrosConsultorServiciosState) => void;
-  onCambiarVisualizar: (nuevaVista: "sesiones" | "servicios") => void;
+  onCambiarVisualizar: (nuevaVista: VistaConsultor) => void;
   onBuscar: () => void;
 }
 
@@ -32,7 +32,10 @@ export const FiltrosConsultorServicios: React.FC<Props> = ({
   };
 
   return (
-    <div className="card mb-4 p-4 filter-card" style={{ position: "relative", zIndex: 40, overflow: "visible" }}>
+    <div
+      className="card mb-4 p-4 filter-card"
+      style={{ position: "relative", zIndex: 40, overflow: "visible" }}
+    >
       <div
         style={{
           display: "flex",
@@ -45,37 +48,118 @@ export const FiltrosConsultorServicios: React.FC<Props> = ({
         }}
       >
         {/* Selector Visualizar */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "140px" }}>
-          <label className="form-label" style={{ marginBottom: 0 }}>Visualizar</label>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+            minWidth: "140px",
+          }}
+        >
+          <label className="form-label" style={{ marginBottom: 0 }}>
+            Visualizar
+          </label>
           <select
             className="form-select text-xs py-1.5"
             style={{ borderRadius: "20px", height: "32px", fontWeight: 600 }}
             value="servicios"
-            onChange={(e) => onCambiarVisualizar(e.target.value as "sesiones" | "servicios")}
+            onChange={(e) =>
+              onCambiarVisualizar(e.target.value as VistaConsultor)
+            }
           >
-            <option value="sesiones">Sesiones</option>
+            <option value="actividades">Actividades</option>
             <option value="servicios">Servicios</option>
           </select>
         </div>
 
         {/* Selector de Rango de Fechas */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "220px", position: "relative", zIndex: 50 }}>
-          <label className="form-label" style={{ marginBottom: 0 }}>Rango de fechas</label>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+            minWidth: "220px",
+            position: "relative",
+            zIndex: 50,
+          }}
+        >
+          <label className="form-label" style={{ marginBottom: 0 }}>
+            Rango de fechas
+          </label>
           <DateRangePickerPopover
             fechaInicio={filtros.fechaInicio}
             fechaFin={filtros.fechaFin}
             onChangeRange={(inicio, fin) => {
-              const nuevosFiltros = { ...filtros, fechaInicio: inicio, fechaFin: fin, usarRango: true };
+              const nuevosFiltros = {
+                ...filtros,
+                fechaInicio: inicio,
+                fechaFin: fin,
+                usarRango: true,
+              };
               onCambiarFiltros(nuevosFiltros);
               onBuscar();
             }}
           />
         </div>
 
+        {/* §1.3 Checkbox "Solo con días excedidos" junto al rango de fechas */}
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            cursor: "pointer",
+            fontSize: "12.5px",
+            fontWeight: 500,
+            color: "#334155",
+            height: "32px",
+            userSelect: "none",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={Boolean(filtros.soloExcedidos)}
+            onChange={(e) => {
+              const nuevosFiltros = {
+                ...filtros,
+                soloExcedidos: e.target.checked,
+              };
+              onCambiarFiltros(nuevosFiltros);
+              onBuscar();
+            }}
+            style={{
+              width: "15px",
+              height: "15px",
+              accentColor: "#2B8FCC",
+              cursor: "pointer",
+            }}
+          />
+          <span>Solo con días excedidos</span>
+        </label>
+
         {/* Buscador */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: "8px", width: "auto", marginLeft: "auto" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "240px", minWidth: "160px" }}>
-            <label className="form-label" style={{ marginBottom: 0 }}>Buscar</label>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "flex-end",
+            gap: "8px",
+            width: "auto",
+            marginLeft: "auto",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              width: "240px",
+              minWidth: "160px",
+            }}
+          >
+            <label className="form-label" style={{ marginBottom: 0 }}>
+              Buscar
+            </label>
             <div style={{ position: "relative", width: "100%" }}>
               <Search
                 size={14}
@@ -91,7 +175,12 @@ export const FiltrosConsultorServicios: React.FC<Props> = ({
               <input
                 type="text"
                 className="form-control text-xs py-1.5"
-                style={{ width: "100%", paddingLeft: "28px", borderRadius: "20px", height: "32px" }}
+                style={{
+                  width: "100%",
+                  paddingLeft: "28px",
+                  borderRadius: "20px",
+                  height: "32px",
+                }}
                 placeholder="Buscar servicio (Enter)..."
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}

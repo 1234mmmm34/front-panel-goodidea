@@ -30,6 +30,7 @@ import { AgendaService } from "@/services/agenda.service";
 import { EmpresasService } from "@/services/empresas.service";
 import { useToast } from "@/context/ToastContext";
 import { esFechaPasada } from "@/lib/date-utils";
+import { esPrecioValido } from "@/lib/montos";
 
 interface ModalReprogramarSesionProps {
   abierto: boolean;
@@ -1265,10 +1266,15 @@ export const ModalReprogramarSesion: React.FC<ModalReprogramarSesionProps> = ({
                               <div style={{ position: "relative" }}>
                                 <input
                                   type="number"
+                                  step="0.0001"
                                   className="form-control"
                                   placeholder="0.00"
                                   value={nuevoPrecioProveedor}
-                                  onChange={(e) => setNuevoPrecioProveedor(e.target.value)}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (!esPrecioValido(raw)) return;
+                                    setNuevoPrecioProveedor(raw);
+                                  }}
                                   style={{
                                     height: "38px",
                                     fontSize: "13px",

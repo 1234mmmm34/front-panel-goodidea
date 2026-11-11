@@ -57,6 +57,8 @@ import { CatalogosService } from "@/services/catalogos.service";
 import { entregables as entregablesCat } from "@/types/catalogos";
 import { VerDocumento } from "@/services/archivos.service";
 import { formatearFechaCorta, formatearFechaTexto, esFechaPasada } from "@/lib/date-utils";
+import { esPrecioValido, calcularImportes, formatearPrecioUnitario, redondear2 } from "@/lib/montos";
+import { AvisoInfo } from "@/components/ui/AvisoInfo";
 import { useToast } from "@/context/ToastContext";
 import { obtenerSesionActual } from "@/lib/api-client";
 import { BloquePipcEntregable } from "@/components/pipc/CardPipcDetalleServicio";
@@ -319,7 +321,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const subtotalGastoCalculado = useMemo(() => {
     const cant = Number(formGastoCantidad) || 0;
     const precio = Number(formGastoCostoUnitario) || 0;
-    return cant * precio;
+    return calcularImportes(cant, precio).subtotal;
   }, [formGastoCantidad, formGastoCostoUnitario]);
 
   // --- useMemo para Sesiones y Editar montos ---
@@ -370,15 +372,14 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       .sort((a, b) => (a.i_Orden ?? 0) - (b.i_Orden ?? 0));
   }, [detalle, listaSesiones]);
 
-  const montoSubtotalCalculado = useMemo(() => {
+  const importesMontoCalculados = useMemo(() => {
     const cant = parseFloat(formMontoCantidad) || 0;
     const pu = parseFloat(formMontoPrecioUnitario) || 0;
-    return cant * pu;
+    return calcularImportes(cant, pu);
   }, [formMontoCantidad, formMontoPrecioUnitario]);
 
-  const montoFinalConIvaCalculado = useMemo(() => {
-    return montoSubtotalCalculado * (1 + IVA);
-  }, [montoSubtotalCalculado]);
+  const montoSubtotalCalculado = importesMontoCalculados.subtotal;
+  const montoFinalConIvaCalculado = importesMontoCalculados.total;
 
   const ocultarEditarMontos = useMemo(() => {
     return detalle?.v_TipoVenta === "proyecto";
@@ -1325,7 +1326,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
     if (!cotizacionGI.trim()) p.push("No. cotización GI");
     if (!ordenCompra.trim()) p.push("No. OC cliente");
     if (entregables.some((e) => !e.b_Entregado)) p.push("Entregables");
-    if (facturas.length === 0) p.push("Factura");
+    if (facturas.length === 0 || (facturas.length > 0 && (detalle.d_SaldoPorFacturar ?? 0) > 0.01)) p.push("Factura");
     if (detalle.b_AplicaVoBo && !detalle.v_KeyVoBo) p.push("Visto bueno");
     return p;
   };
@@ -2582,19 +2583,19 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                     <div>
                       <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>precio unitario s/IVA</span>
                       <p style={{ fontSize: "13px", fontFamily: "var(--font-mono)", fontWeight: 400, color: "#1e293b", margin: 0 }}>
-                        ${(detalle.d_PrecioUnitario ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                        ${formatearPrecioUnitario(detalle.d_PrecioUnitario)}
                       </p>
                     </div>
                     <div>
                       <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>precio total s/IVA</span>
                       <p style={{ fontSize: "13px", fontFamily: "var(--font-mono)", fontWeight: 400, color: "#1e293b", margin: 0 }}>
-                        ${((detalle.d_PrecioUnitario ?? 0) * detalle.i_Cantidad).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                        ${calcularImportes(detalle.i_Cantidad, detalle.d_PrecioUnitario ?? 0).subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div>
                       <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>precio final c/IVA</span>
                       <p style={{ fontSize: "14px", fontFamily: "var(--font-mono)", fontWeight: 500, color: "#2B8FCC", margin: 0 }}>
-                        ${((detalle.d_PrecioUnitario ?? 0) * detalle.i_Cantidad * (1 + IVA)).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                        ${calcularImportes(detalle.i_Cantidad, detalle.d_PrecioUnitario ?? 0).total.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
@@ -2685,19 +2686,19 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                     <div>
                       <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>costo unitario s/IVA</span>
                       <p style={{ fontSize: "13px", fontFamily: "var(--font-mono)", fontWeight: 400, color: "#1e293b", margin: 0 }}>
-                        ${(detalle.d_PrecioProveedor ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                        ${formatearPrecioUnitario(detalle.d_PrecioProveedor)}
                       </p>
                     </div>
                     <div>
                       <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>costo total s/IVA</span>
                       <p style={{ fontSize: "13px", fontFamily: "var(--font-mono)", fontWeight: 400, color: "#1e293b", margin: 0 }}>
-                        ${((detalle.d_PrecioProveedor ?? 0) * (detalle.i_Cantidad ?? 1)).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                        ${calcularImportes(detalle.i_Cantidad ?? 1, detalle.d_PrecioProveedor ?? 0).subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div>
                       <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b", display: "block", marginBottom: "2px" }}>costo final c/IVA</span>
                       <p style={{ fontSize: "14px", fontFamily: "var(--font-mono)", fontWeight: 500, color: "#2B8FCC", margin: 0 }}>
-                        ${(((detalle.d_PrecioProveedor ?? 0) * (detalle.i_Cantidad ?? 1)) * (1 + IVA)).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                        ${calcularImportes(detalle.i_Cantidad ?? 1, detalle.d_PrecioProveedor ?? 0).total.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div>
@@ -2776,7 +2777,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                               {`${Number(gasto.i_Cantidad).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${gasto.v_Unidad || "Pieza"}`}
                             </td>
                             <td style={{ padding: "8px 12px", fontFamily: "var(--font-mono)", textAlign: "right", color: "#334155" }}>
-                              ${(gasto.d_CostoUnitario ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ${formatearPrecioUnitario(gasto.d_CostoUnitario)}
                             </td>
                             <td style={{ padding: "8px 12px", fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 600, color: "#0f172a" }}>
                               ${(gasto.d_Subtotal ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2956,6 +2957,13 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                 {/* Tabla de Facturas Reales */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b" }}>facturas asociadas</span>
+                  {facturas.length > 0 && (detalle.d_SaldoPorFacturar ?? 0) > 0.01 && (
+                    <AvisoInfo tipo="advertencia">
+                      <strong>
+                        Facturado parcialmente — falta ${Number(detalle.d_SaldoPorFacturar ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por facturar.
+                      </strong>
+                    </AvisoInfo>
+                  )}
                   {facturas.length === 0 ? (
                     <div style={{ padding: "12px", backgroundColor: "#fffbeb", border: "1px solid #fde68a", borderRadius: "6px", fontSize: "12px", color: "#92400e" }}>
                       Este servicio no tiene facturas asociadas.
@@ -3547,12 +3555,16 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                       <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#64748b", fontSize: "13px" }}>$</span>
                       <input
                         type="number"
-                        step="0.01"
+                        step="0.0001"
                         min="0.01"
                         className="form-control"
                         placeholder="0.00"
                         value={formPrecioProveedor}
-                        onChange={(e) => setFormPrecioProveedor(e.target.value)}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (!esPrecioValido(raw)) return;
+                          setFormPrecioProveedor(raw);
+                        }}
                         disabled={guardandoProveedor}
                         style={{ fontSize: "13px", height: "38px", borderRadius: "8px", paddingLeft: "24px" }}
                       />
@@ -3897,12 +3909,16 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                     <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#64748b", fontSize: "13px" }}>$</span>
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.0001"
                       min="0.01"
                       className="form-control"
                       placeholder="0.00"
                       value={formGastoCostoUnitario}
-                      onChange={(e) => setFormGastoCostoUnitario(e.target.value)}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (!esPrecioValido(raw)) return;
+                        setFormGastoCostoUnitario(raw);
+                      }}
                       disabled={guardandoGasto || Boolean(gastoEditando?.b_TienePagos)}
                       style={{ fontSize: "13px", height: "38px", borderRadius: "8px", paddingLeft: "24px" }}
                     />
@@ -4124,12 +4140,16 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   </span>
                   <input
                     type="number"
-                    step="any"
+                    step="0.0001"
                     min="0"
                     className="form-control"
                     placeholder="0.00"
                     value={formMontoPrecioUnitario}
-                    onChange={(e) => setFormMontoPrecioUnitario(e.target.value)}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (!esPrecioValido(raw)) return;
+                      setFormMontoPrecioUnitario(raw);
+                    }}
                     disabled={guardandoMontos}
                     required
                     style={{
@@ -4184,6 +4204,40 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   }}
                 />
               </div>
+
+              {/* Aviso antes de guardar si hay facturas vigentes */}
+              {(() => {
+                const facturasVigentes = facturas.filter((f) => !f.b_Cancelada);
+                if (facturasVigentes.length === 0) return null;
+                const totalActualCve = detalle
+                  ? calcularImportes(detalle.i_Cantidad, detalle.d_PrecioUnitario ?? 0).total
+                  : 0;
+                const saldoPorFacturar = Number(detalle?.d_SaldoPorFacturar ?? 0);
+                const facturadoActual = Math.max(0, redondear2(totalActualCve - saldoPorFacturar));
+
+                return (
+                  <AvisoInfo tipo="advertencia">
+                    <div>
+                      Este servicio tiene {facturasVigentes.length} factura(s). Al guardar, se cancelarán junto con sus pagos y el servicio quedará pendiente de facturar por el monto nuevo.
+                    </div>
+                    {saldoPorFacturar > 0.01 && (
+                      <div style={{ marginTop: "4px" }}>
+                        Actualmente está facturado parcialmente: $
+                        {facturadoActual.toLocaleString("es-MX", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        de $
+                        {totalActualCve.toLocaleString("es-MX", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                        .
+                      </div>
+                    )}
+                  </AvisoInfo>
+                );
+              })()}
 
               {/* Footer acciones */}
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
@@ -4370,6 +4424,10 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
 
             {/* Content / Scrollable */}
             <div style={{ padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+              <AvisoInfo tipo="peligro">
+                Se cancelarán estas facturas completas, con todos sus pagos programados y registrados.
+              </AvisoInfo>
+
               <p style={{ fontSize: "13px", color: "#334155", margin: 0, lineHeight: 1.5 }}>
                 Para cambiar los montos se cancelarán <strong>estas facturas y todos sus abonos (pagados y programados)</strong>, con el motivo &quot;Cambio de montos del servicio&quot;. Después habrá que facturar de nuevo con el monto actualizado.
               </p>
@@ -4382,6 +4440,14 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                   );
                   const abonosFactura = (datosFacturasAsociadas.Abonos || []).filter(
                     (a) => a.i_CveFactura === fac.i_CveFacturas
+                  );
+                  const otrosServicios = serviciosFactura.filter(
+                    (s) => s.b_OtroServicio || (detalle && s.i_CveServAgendaDet !== detalle.i_CveServAgendaDet)
+                  );
+                  const nombresOtros = otrosServicios.map((s) => s.v_Servicio || "Servicio").join(", ");
+                  const abonosPagadosFac = abonosFactura.filter((a) => a.i_Estado === 1);
+                  const sumaPagadosFac = redondear2(
+                    abonosPagadosFac.reduce((acc, a) => acc + (a.d_Monto ?? 0), 0)
                   );
 
                   return (
@@ -4516,23 +4582,11 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                                 </tbody>
                               </table>
                             </div>
-                            {serviciosFactura.some((s) => s.b_OtroServicio) && (
-                              <div
-                                style={{
-                                  marginTop: "6px",
-                                  padding: "6px 10px",
-                                  backgroundColor: "#fffbeb",
-                                  border: "1px solid #fde68a",
-                                  borderRadius: "6px",
-                                  fontSize: "11px",
-                                  color: "#92400e",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "6px",
-                                }}
-                              >
-                                <AlertTriangle size={13} style={{ color: "#d97706", flexShrink: 0 }} />
-                                <span>Esta factura también cubre otros servicios; se cancelará también para ellos.</span>
+                            {otrosServicios.length > 0 && (
+                              <div style={{ marginTop: "8px" }}>
+                                <AvisoInfo tipo="advertencia">
+                                  Esta factura también cubre otros servicios: {nombresOtros}. Al cancelarla, esos servicios también volverán a quedar pendientes de facturar.
+                                </AvisoInfo>
                               </div>
                             )}
                           </>
@@ -4549,80 +4603,89 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                             Sin abonos
                           </p>
                         ) : (
-                          <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
-                              <thead>
-                                <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#64748b" }}>
-                                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>Monto</th>
-                                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>Fecha programada</th>
-                                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>Estado</th>
-                                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>Fecha de pago</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {abonosFactura.map((abono, aIdx) => (
-                                  <tr
-                                    key={`abono-${abono.i_CveAbono || aIdx}`}
-                                    style={{
-                                      borderBottom: aIdx < abonosFactura.length - 1 ? "1px solid #f1f5f9" : "none",
-                                    }}
-                                  >
-                                    <td style={{ padding: "6px 10px", fontFamily: "var(--font-mono)", fontWeight: 500, color: "#0f172a", whiteSpace: "nowrap" }}>
-                                      ${(abono.d_Monto ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td style={{ padding: "6px 10px", color: "#475569", whiteSpace: "nowrap" }}>
-                                      {abono.d_FechaProgramada ? formatearFechaTexto(abono.d_FechaProgramada) : "—"}
-                                    </td>
-                                    <td style={{ padding: "6px 10px", whiteSpace: "nowrap" }}>
-                                      {abono.i_Estado === 1 ? (
-                                        <span
-                                          style={{
-                                            fontSize: "10px",
-                                            fontWeight: 600,
-                                            padding: "2px 6px",
-                                            borderRadius: "10px",
-                                            backgroundColor: "#dcfce7",
-                                            color: "#15803d",
-                                            border: "1px solid #bbf7d0",
-                                          }}
-                                        >
-                                          Pagado
-                                        </span>
-                                      ) : (
-                                        <span
-                                          style={{
-                                            fontSize: "10px",
-                                            fontWeight: 600,
-                                            padding: "2px 6px",
-                                            borderRadius: "10px",
-                                            backgroundColor: "#f1f5f9",
-                                            color: "#475569",
-                                            border: "1px solid #e2e8f0",
-                                          }}
-                                        >
-                                          Programado
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td style={{ padding: "6px 10px", whiteSpace: "nowrap" }}>
-                                      {abono.i_Estado === 1 ? (
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                                          <span style={{ color: "#1e293b" }}>
-                                            {abono.d_FechaAbono ? formatearFechaTexto(abono.d_FechaAbono) : "—"}
-                                          </span>
-                                          <span style={{ fontSize: "10px", color: "#15803d", fontWeight: 500 }}>
-                                            Pago ya recibido
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        <span style={{ color: "#94a3b8" }}>—</span>
-                                      )}
-                                    </td>
+                          <>
+                            <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "6px", backgroundColor: "#ffffff" }}>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
+                                <thead>
+                                  <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#64748b" }}>
+                                    <th style={{ padding: "6px 10px", fontWeight: 600 }}>Monto</th>
+                                    <th style={{ padding: "6px 10px", fontWeight: 600 }}>Fecha programada</th>
+                                    <th style={{ padding: "6px 10px", fontWeight: 600 }}>Estado</th>
+                                    <th style={{ padding: "6px 10px", fontWeight: 600 }}>Fecha de pago</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                                </thead>
+                                <tbody>
+                                  {abonosFactura.map((abono, aIdx) => (
+                                    <tr
+                                      key={`abono-${abono.i_CveAbono || aIdx}`}
+                                      style={{
+                                        borderBottom: aIdx < abonosFactura.length - 1 ? "1px solid #f1f5f9" : "none",
+                                      }}
+                                    >
+                                      <td style={{ padding: "6px 10px", fontFamily: "var(--font-mono)", fontWeight: 500, color: "#0f172a", whiteSpace: "nowrap" }}>
+                                        ${(abono.d_Monto ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                      <td style={{ padding: "6px 10px", color: "#475569", whiteSpace: "nowrap" }}>
+                                        {abono.d_FechaProgramada ? formatearFechaTexto(abono.d_FechaProgramada) : "—"}
+                                      </td>
+                                      <td style={{ padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                        {abono.i_Estado === 1 ? (
+                                          <span
+                                            style={{
+                                              fontSize: "10px",
+                                              fontWeight: 600,
+                                              padding: "2px 6px",
+                                              borderRadius: "10px",
+                                              backgroundColor: "#dcfce7",
+                                              color: "#15803d",
+                                              border: "1px solid #bbf7d0",
+                                            }}
+                                          >
+                                            Pagado
+                                          </span>
+                                        ) : (
+                                          <span
+                                            style={{
+                                              fontSize: "10px",
+                                              fontWeight: 600,
+                                              padding: "2px 6px",
+                                              borderRadius: "10px",
+                                              backgroundColor: "#f1f5f9",
+                                              color: "#475569",
+                                              border: "1px solid #e2e8f0",
+                                            }}
+                                          >
+                                            Programado
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td style={{ padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                        {abono.i_Estado === 1 ? (
+                                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                                            <span style={{ color: "#1e293b" }}>
+                                              {abono.d_FechaAbono ? formatearFechaTexto(abono.d_FechaAbono) : "—"}
+                                            </span>
+                                            <span style={{ fontSize: "10px", color: "#15803d", fontWeight: 500 }}>
+                                              Pago ya recibido
+                                            </span>
+                                          </div>
+                                        ) : (
+                                          <span style={{ color: "#94a3b8" }}>—</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            {abonosPagadosFac.length > 0 && (
+                              <div style={{ marginTop: "8px" }}>
+                                <AvisoInfo tipo="advertencia">
+                                  La factura {fac.v_NoFactura || "Sin folio"} ya tiene pagos registrados por ${sumaPagadosFac.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Al cancelarla, esos pagos también se cancelan; revisa si hay que aplicarlos a la nueva factura.
+                                </AvisoInfo>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -4731,9 +4794,15 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
               Utilidad del servicio
             </h3>
 
-            <p style={{ fontSize: "13px", color: "#475569", margin: "0 0 16px 0", lineHeight: 1.5 }}>
+            <p style={{ fontSize: "13px", color: "#475569", margin: "0 0 12px 0", lineHeight: 1.5 }}>
               {conflictoUtilidad.error}
             </p>
+
+            <div style={{ width: "100%", marginBottom: "16px" }}>
+              <AvisoInfo tipo="info">
+                El monto que ya está en Finanzas → Gastos para el servicio externo no se modificará porque tiene pagos registrados.
+              </AvisoInfo>
+            </div>
 
             {conflictoUtilidad.d_Utilidad !== null && conflictoUtilidad.d_Utilidad !== undefined && (
               <div

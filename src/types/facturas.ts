@@ -109,6 +109,7 @@ export interface ServicioSinFacturaDto {
   d_FechaInicio?: string | null;
   d_Subtotal: number;
   d_Total: number;
+  d_Facturado?: number; // c/IVA, lo que ya se facturó de este servicio (0 si nunca se ha facturado)
   i_Cantidad?: number | null;
   v_Unidad?: string | null;
   v_TipoServicio?: string | null;

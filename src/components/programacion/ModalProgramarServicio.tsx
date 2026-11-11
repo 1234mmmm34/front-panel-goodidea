@@ -17,6 +17,7 @@ import {
 } from "@/types/servicios";
 import { AgendaService } from "@/services/agenda.service";
 import InputFechaTexto from "@/components/ui/InputFechaTexto";
+import { esPrecioValido, calcularImportes, redondear2 } from "@/lib/montos";
 import { useToast } from "@/context/ToastContext";
 
 interface Props {
@@ -383,15 +384,19 @@ export const ModalProgramarServicio: React.FC<Props> = ({
 
   // Cálculos financieros para Paso 2
   const cantidadTotal = detalle?.i_Cantidad || 1;
-  const precioSinIVA = cantidadTotal * precioUnitario;
-  const costoItemSinIVA = esProveedorApoyo ? cantidadTotal * precioProveedor : 0;
+  const impCliente = calcularImportes(cantidadTotal, precioUnitario);
+  const impCosto = esProveedorApoyo
+    ? calcularImportes(cantidadTotal, precioProveedor)
+    : { subtotal: 0, iva: 0, total: 0 };
+  const precioSinIVA = impCliente.subtotal;
+  const costoItemSinIVA = impCosto.subtotal;
   const totalSinIVA = precioSinIVA;
   const totalCostos = costoItemSinIVA;
-  const totalUtilidad = totalSinIVA - totalCostos;
+  const totalUtilidad = redondear2(totalSinIVA - totalCostos);
 
-  const totalConIVA = totalSinIVA * (1 + IVA);
-  const totalCostosConIVA = totalCostos * (1 + IVA);
-  const utilidadConIVA = totalConIVA - totalCostosConIVA;
+  const totalConIVA = impCliente.total;
+  const totalCostosConIVA = impCosto.total;
+  const utilidadConIVA = redondear2(totalConIVA - totalCostosConIVA);
   const margenPorcentaje = totalSinIVA > 0 ? (totalUtilidad / totalSinIVA) * 100 : 0;
 
   if (!abierto || !detalle) return null;
@@ -1065,7 +1070,7 @@ export const ModalProgramarServicio: React.FC<Props> = ({
                             <input
                               type="number"
                               min="0"
-                              step="0.01"
+                              step="0.0001"
                               className="form-control form-control-sm"
                               style={{
                                 height: "30px",
@@ -1075,9 +1080,11 @@ export const ModalProgramarServicio: React.FC<Props> = ({
                                 width: "100%",
                               }}
                               value={precioProveedor ?? ""}
-                              onChange={(e) =>
-                                setPrecioProveedor(Math.max(0, Number(e.target.value)))
-                              }
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (!esPrecioValido(raw)) return;
+                                setPrecioProveedor(Math.max(0, Number(raw)));
+                              }}
                             />
                           </div>
                         )}
@@ -1457,7 +1464,7 @@ export const ModalProgramarServicio: React.FC<Props> = ({
                             <input
                               type="number"
                               min="0"
-                              step="0.01"
+                              step="0.0001"
                               className="form-control"
                               style={{
                                 height: "30px",
@@ -1469,9 +1476,11 @@ export const ModalProgramarServicio: React.FC<Props> = ({
                               }}
                               value={precioUnitario || ""}
                               placeholder="0.00"
-                              onChange={(e) =>
-                                setPrecioUnitario(Math.max(0, Number(e.target.value)))
-                              }
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (!esPrecioValido(raw)) return;
+                                setPrecioUnitario(Math.max(0, Number(raw)));
+                              }}
                             />
                           </td>
 

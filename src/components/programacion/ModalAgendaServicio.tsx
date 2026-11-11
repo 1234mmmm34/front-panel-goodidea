@@ -35,6 +35,7 @@ import { ServiciosService } from "@/services/servicios.service";
 import { AgendaService } from "@/services/agenda.service";
 import InputFechaTexto from "@/components/ui/InputFechaTexto";
 import { formatearFechaTexto } from "@/lib/date-utils";
+import { esPrecioValido, calcularImportes, redondear2 } from "@/lib/montos";
 import { useToast } from "@/context/ToastContext";
 import { ModalConfirmarAgenda } from "./ModalConfirmarAgenda";
 
@@ -692,23 +693,41 @@ export const ModalAgendaServicio: React.FC<Props> = ({
   };
 
   // Cálculos financieros
-  const totalSinIVA = serviciosAgregados.reduce(
-    (acc, s) => acc + s.cantidad * s.precioUnitario,
-    0
+  const totalSinIVA = redondear2(
+    serviciosAgregados.reduce(
+      (acc, s) => acc + calcularImportes(s.cantidad, s.precioUnitario).subtotal,
+      0
+    )
   );
-  const totalCostos = serviciosAgregados.reduce((acc, s) => {
-    const pState = getProgState(s);
-    const costSinIVA =
-      pState.v_TipoApoyo === "Proveedor" && pState.d_PrecioProveedor
-        ? pState.d_PrecioProveedor * s.cantidad
-        : s.costo;
-    return acc + costSinIVA;
-  }, 0);
-  const totalUtilidad = totalSinIVA - totalCostos;
+  const totalCostos = redondear2(
+    serviciosAgregados.reduce((acc, s) => {
+      const pState = getProgState(s);
+      const costSinIVA =
+        pState.v_TipoApoyo === "Proveedor" && pState.d_PrecioProveedor
+          ? calcularImportes(s.cantidad, pState.d_PrecioProveedor).subtotal
+          : redondear2(s.costo || 0);
+      return acc + costSinIVA;
+    }, 0)
+  );
+  const totalUtilidad = redondear2(totalSinIVA - totalCostos);
 
-  const totalConIVA = totalSinIVA * 1.16;
-  const totalCostosConIVA = totalCostos * 1.16;
-  const totalUtilidadConIVA = totalConIVA - totalCostosConIVA;
+  const totalConIVA = redondear2(
+    serviciosAgregados.reduce(
+      (acc, s) => acc + calcularImportes(s.cantidad, s.precioUnitario).total,
+      0
+    )
+  );
+  const totalCostosConIVA = redondear2(
+    serviciosAgregados.reduce((acc, s) => {
+      const pState = getProgState(s);
+      const costConIVA =
+        pState.v_TipoApoyo === "Proveedor" && pState.d_PrecioProveedor
+          ? calcularImportes(s.cantidad, pState.d_PrecioProveedor).total
+          : calcularImportes(1, s.costo || 0).total;
+      return acc + costConIVA;
+    }, 0)
+  );
+  const totalUtilidadConIVA = redondear2(totalConIVA - totalCostosConIVA);
 
   // Filtros autocomplete empresa
   const empresasFiltradas = empresasCatalogo.filter((e) => {
@@ -807,31 +826,34 @@ export const ModalAgendaServicio: React.FC<Props> = ({
 
   const totalesCalculados = useMemo(() => {
     let sinIVA = 0;
+    let conIVA = 0;
     let costosSinIVA = 0;
+    let costosConIVA = 0;
 
     serviciosAgregados.forEach((item) => {
       const progState = programacionMap[item.idTemp];
       const esProveedor = progState?.v_TipoApoyo === "Proveedor";
-      const costoItemSinIVA =
+      const impCliente = calcularImportes(item.cantidad, item.precioUnitario);
+      const impCosto =
         esProveedor && progState?.d_PrecioProveedor
-          ? progState.d_PrecioProveedor * item.cantidad
-          : item.costo || 0;
+          ? calcularImportes(item.cantidad, progState.d_PrecioProveedor)
+          : calcularImportes(1, item.costo || 0);
 
-      sinIVA += (item.cantidad || 0) * (item.precioUnitario || 0);
-      costosSinIVA += costoItemSinIVA;
+      sinIVA = redondear2(sinIVA + impCliente.subtotal);
+      conIVA = redondear2(conIVA + impCliente.total);
+      costosSinIVA = redondear2(costosSinIVA + impCosto.subtotal);
+      costosConIVA = redondear2(costosConIVA + impCosto.total);
     });
 
-    const utilidadSinIVA = sinIVA - costosSinIVA;
-    const totalConIVA = sinIVA * 1.16;
-    const totalCostosConIVA = costosSinIVA * 1.16;
-    const totalUtilidadConIVA = totalConIVA - totalCostosConIVA;
+    const utilidadSinIVA = redondear2(sinIVA - costosSinIVA);
+    const totalUtilidadConIVA = redondear2(conIVA - costosConIVA);
 
     return {
       totalSinIVA: sinIVA,
       totalCostosSinIVA: costosSinIVA,
       totalUtilidadSinIVA: utilidadSinIVA,
-      totalConIVA,
-      totalCostosConIVA,
+      totalConIVA: conIVA,
+      totalCostosConIVA: costosConIVA,
       totalUtilidadConIVA,
     };
   }, [serviciosAgregados, programacionMap]);
@@ -1798,7 +1820,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                             const esCapacitacion = item.i_CveTipoServicio === 2;
                             const cantNum = Number(item.cantidad) || 0;
                             const precioNum = Number(item.precioUnitario) || 0;
-                            const subtotal = cantNum * precioNum;
+                            const subtotal = calcularImportes(cantNum, precioNum).subtotal;
 
                             return (
                               <React.Fragment key={item.idTemp}>
@@ -1855,6 +1877,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                     <input
                                       type="number"
                                       min={0}
+                                      step="0.0001"
                                       className="form-control"
                                       style={{
                                         height: "30px",
@@ -1867,6 +1890,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                       value={item.precioUnitario}
                                       onChange={(e) => {
                                         const raw = e.target.value;
+                                        if (!esPrecioValido(raw)) return;
                                         handleActualizarServicio(
                                           item.idTemp,
                                           "precioUnitario",
@@ -2428,7 +2452,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                                   <input
                                                     type="number"
                                                     min="0"
-                                                    step="0.01"
+                                                    step="0.0001"
                                                     className="form-control form-control-sm"
                                                     style={{
                                                       height: "30px",
@@ -2439,7 +2463,9 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                                     }}
                                                     value={progState.d_PrecioProveedor ?? ""}
                                                     onChange={(e) => {
-                                                      const val = Math.max(0, Number(e.target.value));
+                                                      const raw = e.target.value;
+                                                      if (!esPrecioValido(raw)) return;
+                                                      const val = Math.max(0, Number(raw));
                                                       updateProgState(item.idTemp, {
                                                         d_PrecioProveedor: val,
                                                       });
@@ -2909,6 +2935,7 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                                   <input
                                                     type="number"
                                                     min={0}
+                                                    step="0.0001"
                                                     className="form-control"
                                                     style={{
                                                       height: "32px",
@@ -2920,7 +2947,9 @@ export const ModalAgendaServicio: React.FC<Props> = ({
                                                     placeholder="$0.00"
                                                     value={progState.d_PrecioProveedor || ""}
                                                     onChange={(e) => {
-                                                      const val = Math.max(0, Number(e.target.value));
+                                                      const raw = e.target.value;
+                                                      if (!esPrecioValido(raw)) return;
+                                                      const val = Math.max(0, Number(raw));
                                                       updateProgState(item.idTemp, {
                                                         d_PrecioProveedor: val,
                                                       });
@@ -3144,13 +3173,16 @@ export const ModalAgendaServicio: React.FC<Props> = ({
 
                             const costoItemSinIVA =
                               esProveedor && progState.d_PrecioProveedor
-                                ? progState.d_PrecioProveedor * item.cantidad
-                                : item.costo;
+                                ? calcularImportes(item.cantidad, progState.d_PrecioProveedor).subtotal
+                                : redondear2(item.costo || 0);
 
-                            const costoItemConIVA = costoItemSinIVA * 1.16;
+                            const costoItemConIVA =
+                              esProveedor && progState.d_PrecioProveedor
+                                ? calcularImportes(item.cantidad, progState.d_PrecioProveedor).total
+                                : calcularImportes(1, item.costo || 0).total;
 
-                            const precioSinIVA = item.cantidad * item.precioUnitario;
-                            const utilidad = precioSinIVA - costoItemSinIVA;
+                            const precioSinIVA = calcularImportes(item.cantidad, item.precioUnitario).subtotal;
+                            const utilidad = redondear2(precioSinIVA - costoItemSinIVA);
                             const esPrimerRenglon = index === 0;
 
                             const deshabilitarCotizacion = compartirCotizacion && !esPrimerRenglon;

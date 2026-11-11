@@ -6,6 +6,7 @@ import { Eye, Trash2 } from "lucide-react";
 import { AgendaServicioGetDto, EntregableResumenDto } from "@/types/servicios";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
 import { formatearFechaCorta, formatearFechaTexto, limpiarDecimales } from "@/lib/date-utils";
+import { redondear2 } from "@/lib/montos";
 import { VerDocumento } from "@/services/archivos.service";
 import { CeldaEstatusPipc, CeldaEstatusPipcBadge } from "@/components/pipc/CeldaEstatusPipc";
 
@@ -486,7 +487,35 @@ export const TablaAgendaServicios: React.FC<Props> = ({
                   {/* 10. Facturas: solo texto plano, nunca es link */}
                   <td>
                     {row.v_Facturas && row.v_Facturas.trim() !== "" && row.v_Facturas.toLowerCase() !== "pendiente" ? (
-                      <span style={{ color: "#1e293b", fontSize: "12px", fontWeight: 400 }}>{row.v_Facturas}</span>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
+                        <span style={{ color: "#1e293b", fontSize: "12px", fontWeight: 400 }}>{row.v_Facturas}</span>
+                        {(row.d_SaldoPorFacturar ?? 0) > 0.01 && (() => {
+                          const totalT = Number(row.d_MontoTotal ?? 0);
+                          const faltaX = Number(row.d_SaldoPorFacturar ?? 0);
+                          const facturadoF = Math.max(0, redondear2(totalT - faltaX));
+                          const fStr = facturadoF.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                          const tStr = totalT.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                          const xStr = faltaX.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                          return (
+                            <span
+                              title={`Facturado $${fStr} de $${tStr}. Falta $${xStr} por facturar.`}
+                              style={{
+                                display: "inline-block",
+                                backgroundColor: "#fef3c7",
+                                color: "#92400e",
+                                border: "1px solid #fde68a",
+                                borderRadius: "8px",
+                                padding: "1px 8px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Parcial — falta ${xStr}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     ) : (
                       <span style={{ color: "#dc3545", fontWeight: 500, fontSize: "12px" }}>Pendiente</span>
                     )}

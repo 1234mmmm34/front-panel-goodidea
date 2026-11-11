@@ -2,6 +2,7 @@ export interface EntregableResumen {
   v_Nombre: string;
   b_Entregado: boolean;
   v_Key: string | null;
+  v_KeyCarta?: string | null;
 }
 
 export interface AgendaServicioConsultorGetDto {
@@ -13,7 +14,7 @@ export interface AgendaServicioConsultorGetDto {
   v_TipoServicio: string;
   v_Unidad: string;
   i_Cantidad: number | null;
-  i_CveEstatus: number; // 0 Cancelado, 1 Programado, 2 En curso, 3 Terminado, 4 Reprogramado
+  i_CveEstatus: number; // 0 Cancelado, 1 Programado, 2 En curso, 3 Terminado, 4 Reprogramado, 5 Por confirmar, 6 En proceso (PIPC)
   d_FechaInicio: string | null;
   d_FechaFin: string | null;
   v_Titular: string | null; // puede traer varios nombres separados por ", "
@@ -32,6 +33,12 @@ export interface AgendaServicioConsultorGetDto {
   v_ConfirmadoPor?: string | null;
   b_TienePlanContingencia?: boolean;
   i_AvancePipc?: number | null;
+  // §1.2 Campos nuevos de avance y días
+  b_AplicaAvance: boolean;
+  i_PorcentajeAvance: number | null;
+  i_DiasTotales: number | null;
+  i_DiasExcedidos: number;
+  i_DiasRestantes: number;
 }
 
 export interface AgendaDetalleConsultorCabeceraDto {
@@ -56,6 +63,15 @@ export interface AgendaDetalleConsultorCabeceraDto {
   v_Notas: string | null;
   d_FechaConfirmacionTermino: string | null;
   v_ConfirmadoPor: string | null;
+  // §2.1 Campos nuevos en cabecera
+  b_AplicaAvance: boolean;
+  b_TienePlanContingencia: boolean;
+  i_PorcentajeAvance: number | null;
+  d_FechaInicio: string | null;
+  d_FechaFin: string | null;
+  i_DiasTotales: number | null;
+  i_DiasExcedidos: number;
+  i_DiasRestantes: number;
 }
 
 export interface SesionConsultorDto {
@@ -86,6 +102,8 @@ export interface EntregableConsultorDto {
   f_FechaEntregable: string | null;
   i_CveArchivo: number | null;
   v_Key: string | null;
+  i_CveArchivoCarta: number | null;
+  v_KeyCarta: string | null;
 }
 
 export interface AlumnoConsultorDto {
@@ -97,25 +115,108 @@ export interface AlumnoConsultorDto {
   v_Puesto: string | null;
 }
 
+export interface AvanceConsultorDto {
+  i_CveAvance: number;
+  i_Porcentaje: number;
+  v_Nota: string | null;
+  v_Usuario: string | null;
+  d_FechaRegistro: string;
+}
+
 export interface AgendaDetalleConsultorDto {
   cabecera: AgendaDetalleConsultorCabeceraDto;
   sesiones: SesionConsultorDto[];
   entregables: EntregableConsultorDto[];
   alumnos: AlumnoConsultorDto[];
+  avances: AvanceConsultorDto[];
 }
+
+export type OrigenActividadConsultor = "SESION" | "SERVICIO" | "ACTIVIDAD";
+export type MomentoActividadConsultor = "UNICO" | "INICIO" | "FIN";
+
+export interface ActividadConsultor {
+  v_Origen: OrigenActividadConsultor;
+  v_Momento: MomentoActividadConsultor;
+  i_CveActividad: number | null; // solo ACTIVIDAD
+  i_CveAgenda: number | null;
+  i_CveServAgendaDet: number | null; // null = actividad General
+  i_CveAgendaDetalle: number | null; // solo SESION
+  d_FechaInicio: string;
+  d_FechaFin: string;
+  b_TieneHorario: boolean;
+  v_Empresa: string | null;
+  v_Planta: string | null;
+  v_Actividad: string; // "Sesión 1" | "Inicio" | "Fin" | "Inicio y fin" | "Junta" | "Inicio · Junta" | "Fin · Junta"
+  v_Descripcion: string | null; // nombre del servicio o notas de la actividad
+  v_Titulo: string | null; // solo ACTIVIDAD, para editar
+  v_Notas: string | null; // solo ACTIVIDAD, para editar
+  v_TipoServicio: string | null; // null en ACTIVIDAD
+  i_CveTipoServicio: number | null; // null en actividades del consultor
+  b_RequiereConfirmacion: boolean; // true en Estudios (3), Servicios (6) y actividades del consultor
+  d_FinCompromiso: string | null; // fin compromiso del proyecto; en actividades del consultor, su fecha fin
+  d_FinReal: string | null; // fecha real de término (al confirmar); null si aún no se confirma
+  v_Duracion: string | null; // "4 hrs" | "1 día" | null
+  i_CveEstatus: number;
+  i_TotalRegistros: number;
+}
+
+export interface HistorialActividad
+  extends Omit<ActividadConsultor, "i_TotalRegistros"> {
+  v_Motivo: string | null; // motivo de cancelación o reprogramación
+  d_FechaReprogramada: string | null; // fecha de la nueva, si fue reprogramada
+}
+
+export interface ProyectoEnCursoConsultorDto {
+  i_CveServAgendaDet: number;
+  v_Servicio: string;
+  v_TipoServicio: string;
+  v_Empresa: string;
+  v_Planta: string | null;
+}
+
+export interface CrearEditarActividadPayload {
+  v_Titulo: string;
+  i_CveServAgendaDet: number | null;
+  v_Notas: string | null;
+  d_FechaInicio: string;
+  d_FechaFin: string;
+  b_TieneHorario: boolean;
+}
+
+export interface ReprogramarActividadPayload {
+  d_FechaInicio: string;
+  d_FechaFin: string;
+  b_TieneHorario: boolean;
+  v_Motivo: string | null;
+}
+
+export interface CancelarActividadPayload {
+  v_Motivo: string | null;
+}
+
+export interface GuardarAvancePayload {
+  i_CveServAgendaDet: number;
+  i_Porcentaje: number;
+  v_Nota: string | null;
+}
+
+export type VistaConsultor = "actividades" | "servicios";
 
 export interface FiltrosConsultorSesionesState {
-  visualizar: "sesiones" | "servicios";
+  visualizar: VistaConsultor;
   fechaInicio: string;
   fechaFin: string;
   usarRango: boolean;
   searchTerm: string;
 }
 
+export type FiltrosConsultorActividadesState = FiltrosConsultorSesionesState;
+
 export interface FiltrosConsultorServiciosState {
-  visualizar: "sesiones" | "servicios";
+  visualizar: VistaConsultor;
   fechaInicio: string;
   fechaFin: string;
   usarRango: boolean;
   searchTerm: string;
+  soloExcedidos: boolean;
 }
