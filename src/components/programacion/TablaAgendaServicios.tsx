@@ -3,8 +3,12 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Trash2 } from "lucide-react";
-import { AgendaServicioGetDto, EntregableResumenDto } from "@/types/servicios";
+import { AgendaServicioGetDto, EntregableResumenDto, OrdenCliente } from "@/types/servicios";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
+import {
+  FiltroColumnaChecklist,
+  OpcionFiltro,
+} from "@/components/ui/FiltroColumnaChecklist";
 import { formatearFechaCorta, formatearFechaTexto, limpiarDecimales } from "@/lib/date-utils";
 import { redondear2 } from "@/lib/montos";
 import { VerDocumento } from "@/services/archivos.service";
@@ -15,6 +19,12 @@ interface Props {
   cargando: boolean;
   onVerDetalle: (item: AgendaServicioGetDto) => void;
   onEliminar: (item: AgendaServicioGetDto) => void;
+  filtroCliente: {
+    cargarOpciones: () => Promise<OpcionFiltro[]>;
+    seleccionados: number[] | null;
+    orden: OrdenCliente;
+    onAplicar: (seleccionados: number[] | null, orden: OrdenCliente) => void;
+  };
 }
 
 export const TablaAgendaServicios: React.FC<Props> = ({
@@ -22,6 +32,7 @@ export const TablaAgendaServicios: React.FC<Props> = ({
   cargando,
   onVerDetalle,
   onEliminar,
+  filtroCliente,
 }) => {
   const renderEstatusBadge = (estatus: number | null, sinProgramar: boolean) => {
     if (sinProgramar) {
@@ -60,7 +71,15 @@ export const TablaAgendaServicios: React.FC<Props> = ({
       <table className="alegra-table">
         <thead>
           <tr>
-            <th>Cliente</th>
+            <th>
+              <FiltroColumnaChecklist
+                titulo="Cliente"
+                cargarOpciones={filtroCliente.cargarOpciones}
+                seleccionados={filtroCliente.seleccionados}
+                orden={filtroCliente.orden}
+                onAplicar={filtroCliente.onAplicar}
+              />
+            </th>
             <th>Servicio</th>
             <th>Tipo</th>
             <th>Fechas</th>

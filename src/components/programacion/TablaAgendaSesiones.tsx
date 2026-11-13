@@ -3,7 +3,12 @@
 import React from "react";
 import { RefreshCw, Ban, Eye } from "lucide-react";
 import { AgendaGetDto } from "@/types/calendario";
+import { OrdenCliente } from "@/types/servicios";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
+import {
+  FiltroColumnaChecklist,
+  OpcionFiltro,
+} from "@/components/ui/FiltroColumnaChecklist";
 import { isToday, isSameDay, addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { limpiarDecimales } from "@/lib/date-utils";
@@ -14,6 +19,12 @@ interface Props {
   onReprogramar: (item: AgendaGetDto) => void;
   onCancelar?: (item: AgendaGetDto) => void;
   onVerHistorial?: (item: AgendaGetDto) => void;
+  filtroCliente: {
+    cargarOpciones: () => Promise<OpcionFiltro[]>;
+    seleccionados: number[] | null;
+    orden: OrdenCliente;
+    onAplicar: (seleccionados: number[] | null, orden: OrdenCliente) => void;
+  };
 }
 
 function formatearFechaSesion(fechaStr: string | null): { texto: string; esHoy: boolean } {
@@ -90,6 +101,7 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
   onReprogramar,
   onCancelar,
   onVerHistorial,
+  filtroCliente,
 }) => {
   return (
     <div className="alegra-table-container">
@@ -99,7 +111,15 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
             <th>Fecha inicio</th>
             <th>Hora inicio</th>
             <th>Hora fin</th>
-            <th>Cliente</th>
+            <th>
+              <FiltroColumnaChecklist
+                titulo="Cliente"
+                cargarOpciones={filtroCliente.cargarOpciones}
+                seleccionados={filtroCliente.seleccionados}
+                orden={filtroCliente.orden}
+                onAplicar={filtroCliente.onAplicar}
+              />
+            </th>
             <th>Estatus</th>
             <th>Tema</th>
             <th>Tipo</th>

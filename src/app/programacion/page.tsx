@@ -3,7 +3,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import { AgendaServicioGetDto } from "@/types/servicios";
+import { AgendaServicioGetDto, OrdenCliente } from "@/types/servicios";
 import { AgendaGetDto } from "@/types/calendario";
 import { AgendaService } from "@/services/agenda.service";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -36,6 +36,22 @@ function ProgramacionContent() {
   const paramQ = searchParams.get("q");
   const paramPagina = searchParams.get("pagina");
   const paramDetalle = searchParams.get("detalle");
+  const paramEmp = searchParams.get("emp");
+  const paramOrd = searchParams.get("ord");
+
+  const parseEmpresasParam = (val: string | null): number[] | null => {
+    if (val === null || val.trim() === "") return null;
+    if (val.trim() === "0") return [];
+    const ids = val
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n) && n > 0);
+    return ids;
+  };
+
+  const parseOrdenParam = (val: string | null): OrdenCliente => {
+    return val === "ASC" || val === "DESC" ? val : null;
+  };
 
   const hoy = useMemo(() => new Date().toISOString().split("T")[0], []);
 
@@ -66,6 +82,12 @@ function ProgramacionContent() {
   const [itemReprogramar, setItemReprogramar] = useState<AgendaGetDto | null>(null);
   const [itemCancelar, setItemCancelar] = useState<AgendaGetDto | null>(null);
   const [itemHistorial, setItemHistorial] = useState<AgendaGetDto | null>(null);
+  const [empresasSesiones, setEmpresasSesiones] = useState<number[] | null>(() =>
+    paramVista !== "servicios" ? parseEmpresasParam(paramEmp) : null
+  );
+  const [ordenClienteSesiones, setOrdenClienteSesiones] = useState<OrdenCliente>(() =>
+    paramVista !== "servicios" ? parseOrdenParam(paramOrd) : null
+  );
 
   // --- ESTADO VISTA SERVICIOS ---
   const [datosServicios, setDatosServicios] = useState<AgendaServicioGetDto[]>([]);
@@ -77,6 +99,12 @@ function ProgramacionContent() {
     usarRango: Boolean(paramHasta),
     searchTerm: paramQ || "",
   }));
+  const [empresasServicios, setEmpresasServicios] = useState<number[] | null>(() =>
+    paramVista === "servicios" ? parseEmpresasParam(paramEmp) : null
+  );
+  const [ordenClienteServicios, setOrdenClienteServicios] = useState<OrdenCliente>(() =>
+    paramVista === "servicios" ? parseOrdenParam(paramOrd) : null
+  );
   const [modalFormAbierto, setModalFormAbierto] = useState<boolean>(false);
   const [modalAgendaAbierto, setModalAgendaAbierto] = useState<boolean>(false);
   const [itemEliminar, setItemEliminar] = useState<AgendaServicioGetDto | null>(null);
@@ -91,6 +119,8 @@ function ProgramacionContent() {
       nuevosFiltrosServicios?: FiltrosServiciosState;
       nuevaPagina?: number;
       detalleId?: number | null;
+      nuevasEmpresas?: number[] | null;
+      nuevoOrdenCliente?: OrdenCliente;
     }) => {
       const targetVista = cambios.nuevaVista ?? vista;
       const targetPagina = cambios.nuevaPagina ?? paginaActual;
@@ -98,6 +128,18 @@ function ProgramacionContent() {
         cambios.detalleId !== undefined
           ? cambios.detalleId
           : itemDetalle?.i_CveServAgendaDet ?? null;
+      const targetEmp =
+        cambios.nuevasEmpresas !== undefined
+          ? cambios.nuevasEmpresas
+          : targetVista === "servicios"
+          ? empresasServicios
+          : empresasSesiones;
+      const targetOrd =
+        cambios.nuevoOrdenCliente !== undefined
+          ? cambios.nuevoOrdenCliente
+          : targetVista === "servicios"
+          ? ordenClienteServicios
+          : ordenClienteSesiones;
 
       const params = new URLSearchParams();
       params.set("vista", targetVista);
@@ -116,6 +158,13 @@ function ProgramacionContent() {
         if (fses.searchTerm && fses.searchTerm.trim() !== "") params.set("q", fses.searchTerm.trim());
       }
 
+      if (Array.isArray(targetEmp)) {
+        params.set("emp", targetEmp.length > 0 ? targetEmp.join(",") : "0");
+      }
+      if (targetOrd) {
+        params.set("ord", targetOrd);
+      }
+
       if (targetPagina > 1) {
         params.set("pagina", String(targetPagina));
       }
@@ -128,7 +177,18 @@ function ProgramacionContent() {
       const url = qs ? `/programacion?${qs}` : `/programacion`;
       router.replace(url, { scroll: false });
     },
-    [vista, paginaActual, itemDetalle, filtrosServicios, filtrosSesiones, router]
+    [
+      vista,
+      paginaActual,
+      itemDetalle,
+      filtrosServicios,
+      filtrosSesiones,
+      empresasServicios,
+      ordenClienteServicios,
+      empresasSesiones,
+      ordenClienteSesiones,
+      router,
+    ]
   );
 
   // Abrir y cerrar modal de detalle actualizando query param "detalle"
@@ -151,13 +211,15 @@ function ProgramacionContent() {
       pagina: paginaActual,
       tamano: tamanoPagina,
       searchTerm: filtrosSesiones.searchTerm || undefined,
+      empresas: empresasSesiones,
+      ordenCliente: ordenClienteSesiones,
     });
 
     setDatosSesiones(res.datos);
     setTotalRegistros(res.total);
     setTotalPaginas(res.totalPaginas);
     setCargando(false);
-  }, [filtrosSesiones, paginaActual, tamanoPagina]);
+  }, [filtrosSesiones, paginaActual, tamanoPagina, empresasSesiones, ordenClienteSesiones]);
 
   // --- Cargar datos de Servicios ---
   const cargarServicios = useCallback(async () => {
@@ -178,13 +240,59 @@ function ProgramacionContent() {
           : undefined,
       searchTerm: filtrosServicios.searchTerm || undefined,
       facturado: facturadoVal,
+      empresas: empresasServicios,
+      ordenCliente: ordenClienteServicios,
     });
 
     setDatosServicios(res.datos);
     setTotalRegistros(res.total);
     setTotalPaginas(res.totalPaginas);
     setCargando(false);
-  }, [filtrosServicios, paginaActual, tamanoPagina]);
+  }, [filtrosServicios, paginaActual, tamanoPagina, empresasServicios, ordenClienteServicios]);
+
+  // --- Cargar opciones de empresas para filtro de columna Cliente ---
+  const cargarOpcionesEmpresasSesiones = useCallback(async () => {
+    const lista = await AgendaService.getEmpresasFiltro({
+      vista: "sesiones",
+      fechaInicio: filtrosSesiones.fechaInicio,
+      fechaFin:
+        filtrosSesiones.usarRango && filtrosSesiones.fechaFin
+          ? filtrosSesiones.fechaFin
+          : undefined,
+      searchTerm: filtrosSesiones.searchTerm || undefined,
+    });
+    return lista.map((e) => ({
+      valor: e.i_CveEmpresa,
+      etiqueta: e.v_Empresa,
+    }));
+  }, [filtrosSesiones]);
+
+  const cargarOpcionesEmpresasServicios = useCallback(async () => {
+    let facturadoVal: number | undefined;
+    if (filtrosServicios.facturacion === "facturado") facturadoVal = 1;
+    if (filtrosServicios.facturacion === "pendiente") facturadoVal = 0;
+
+    const lista = await AgendaService.getEmpresasFiltro({
+      vista: "servicios",
+      soloSinProgramar: filtrosServicios.programacion === "pendientes",
+      fechaInicio:
+        filtrosServicios.programacion === "programados"
+          ? filtrosServicios.fechaInicio
+          : undefined,
+      fechaFin:
+        filtrosServicios.programacion === "programados" &&
+        filtrosServicios.usarRango &&
+        filtrosServicios.fechaFin
+          ? filtrosServicios.fechaFin
+          : undefined,
+      searchTerm: filtrosServicios.searchTerm || undefined,
+      facturado: facturadoVal,
+    });
+    return lista.map((e) => ({
+      valor: e.i_CveEmpresa,
+      etiqueta: e.v_Empresa,
+    }));
+  }, [filtrosServicios]);
 
   // Trigger de carga al cambiar vista o parámetros
   useEffect(() => {
@@ -245,7 +353,15 @@ function ProgramacionContent() {
         searchTerm: "",
       };
       setFiltrosSesiones(nf);
-      actualizarUrl({ nuevaVista, nuevosFiltrosSesiones: nf, nuevaPagina: 1 });
+      setEmpresasSesiones(null);
+      setOrdenClienteSesiones(null);
+      actualizarUrl({
+        nuevaVista,
+        nuevosFiltrosSesiones: nf,
+        nuevaPagina: 1,
+        nuevasEmpresas: null,
+        nuevoOrdenCliente: null,
+      });
     } else {
       const nf: FiltrosServiciosState = {
         programacion: "programados",
@@ -256,7 +372,15 @@ function ProgramacionContent() {
         searchTerm: "",
       };
       setFiltrosServicios(nf);
-      actualizarUrl({ nuevaVista, nuevosFiltrosServicios: nf, nuevaPagina: 1 });
+      setEmpresasServicios(null);
+      setOrdenClienteServicios(null);
+      actualizarUrl({
+        nuevaVista,
+        nuevosFiltrosServicios: nf,
+        nuevaPagina: 1,
+        nuevasEmpresas: null,
+        nuevoOrdenCliente: null,
+      });
     }
   };
 
@@ -330,6 +454,21 @@ function ProgramacionContent() {
             onReprogramar={(item) => setItemReprogramar(item)}
             onCancelar={(item) => setItemCancelar(item)}
             onVerHistorial={(item) => setItemHistorial(item)}
+            filtroCliente={{
+              cargarOpciones: cargarOpcionesEmpresasSesiones,
+              seleccionados: empresasSesiones,
+              orden: ordenClienteSesiones,
+              onAplicar: (seleccionados, orden) => {
+                setEmpresasSesiones(seleccionados);
+                setOrdenClienteSesiones(orden);
+                setPaginaActual(1);
+                actualizarUrl({
+                  nuevaPagina: 1,
+                  nuevasEmpresas: seleccionados,
+                  nuevoOrdenCliente: orden,
+                });
+              },
+            }}
           />
         </>
       ) : (
@@ -354,6 +493,21 @@ function ProgramacionContent() {
             cargando={cargando}
             onVerDetalle={(item) => handleAbrirModalDetalle(item)}
             onEliminar={(item) => setItemEliminar(item)}
+            filtroCliente={{
+              cargarOpciones: cargarOpcionesEmpresasServicios,
+              seleccionados: empresasServicios,
+              orden: ordenClienteServicios,
+              onAplicar: (seleccionados, orden) => {
+                setEmpresasServicios(seleccionados);
+                setOrdenClienteServicios(orden);
+                setPaginaActual(1);
+                actualizarUrl({
+                  nuevaPagina: 1,
+                  nuevasEmpresas: seleccionados,
+                  nuevoOrdenCliente: orden,
+                });
+              },
+            }}
           />
         </>
       )}

@@ -5,6 +5,13 @@ export interface EntregableResumenDto {
   i_CveArchivo?: number | string | null;
 }
 
+export interface AgendaEmpresaFiltroDto {
+  i_CveEmpresa: number;
+  v_Empresa: string;
+}
+
+export type OrdenCliente = "ASC" | "DESC" | null;
+
 export interface AgendaServicioGetDto {
   i_CveAgenda: number;
   i_CveServAgendaDet: number;

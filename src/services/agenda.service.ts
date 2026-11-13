@@ -24,6 +24,8 @@ import {
   FacturaAsociada,
   AbonoAsociado,
   ServicioFactura,
+  AgendaEmpresaFiltroDto,
+  OrdenCliente,
 } from "@/types/servicios";
 
 export const AgendaService = {
@@ -78,6 +80,8 @@ export const AgendaService = {
     pagina: number;
     tamano: number;
     searchTerm?: string;
+    empresas?: number[] | null;
+    ordenCliente?: OrdenCliente;
   }): Promise<PaginadoResponse<AgendaGetDto>> {
     return httpDefensivo(async () => {
       const queryParams: Record<string, unknown> = {
@@ -93,6 +97,13 @@ export const AgendaService = {
       }
       if (params.searchTerm && params.searchTerm.trim().length > 0) {
         queryParams.searchTerm = params.searchTerm.trim();
+      }
+      if (Array.isArray(params.empresas)) {
+        queryParams.empresas =
+          params.empresas.length > 0 ? params.empresas.join(",") : "0";
+      }
+      if (params.ordenCliente) {
+        queryParams.ordenCliente = params.ordenCliente;
       }
 
       const resp = await apiClient.get<any>("agenda/GetAgenda", {
@@ -167,6 +178,8 @@ export const AgendaService = {
     fechaFin?: string;
     searchTerm?: string;
     facturado?: number;
+    empresas?: number[] | null;
+    ordenCliente?: OrdenCliente;
   }): Promise<PaginadoResponse<AgendaServicioGetDto>> {
     return httpDefensivo(async () => {
       const queryParams: Record<string, unknown> = {
@@ -188,6 +201,13 @@ export const AgendaService = {
       }
       if (params.facturado !== undefined && params.facturado !== null) {
         queryParams.facturado = params.facturado;
+      }
+      if (Array.isArray(params.empresas)) {
+        queryParams.empresas =
+          params.empresas.length > 0 ? params.empresas.join(",") : "0";
+      }
+      if (params.ordenCliente) {
+        queryParams.ordenCliente = params.ordenCliente;
       }
 
       const resp = await apiClient.get<AgendaServicioGetDto[] | PaginadoResponse<AgendaServicioGetDto>>(
@@ -248,6 +268,46 @@ export const AgendaService = {
       tamano: params.tamano,
       totalPaginas: 1,
     });
+  },
+
+  /**
+   * GET agenda/GetEmpresasFiltro
+   * Empresas para el filtro de la columna Cliente (según los filtros actuales de la vista)
+   */
+  async getEmpresasFiltro(params: {
+    vista: "sesiones" | "servicios";
+    fechaInicio?: string;
+    fechaFin?: string;
+    searchTerm?: string;
+    soloSinProgramar?: boolean;
+    facturado?: number;
+  }): Promise<AgendaEmpresaFiltroDto[]> {
+    return httpDefensivo(async () => {
+      const queryParams: Record<string, unknown> = {
+        vista: params.vista,
+      };
+      if (params.fechaInicio) {
+        queryParams.fechaInicio = params.fechaInicio;
+      }
+      if (params.fechaFin) {
+        queryParams.fechaFin = params.fechaFin;
+      }
+      if (params.searchTerm && params.searchTerm.trim().length > 0) {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+      if (params.soloSinProgramar !== undefined) {
+        queryParams.soloSinProgramar = params.soloSinProgramar;
+      }
+      if (params.facturado !== undefined && params.facturado !== null) {
+        queryParams.facturado = params.facturado;
+      }
+
+      const resp = await apiClient.get<AgendaEmpresaFiltroDto[]>(
+        "agenda/GetEmpresasFiltro",
+        { params: queryParams }
+      );
+      return Array.isArray(resp.data) ? resp.data : [];
+    }, []);
   },
 
   /**
