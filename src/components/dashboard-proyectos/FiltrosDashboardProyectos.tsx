@@ -3,17 +3,22 @@
 import React from "react";
 import { RefreshCw, ChevronRight } from "lucide-react";
 import DateRangePickerPopover from "@/components/ui/DateRangePickerPopover";
-import { RUBROS_MOCK, ASESORES_MOCK } from "@/types/dashboardProyectos";
+import {
+  DashboardRubroOpcion,
+  DashboardAsesorOpcion,
+} from "@/types/dashboardProyectos";
 
 interface FiltrosDashboardProyectosProps {
   fechaInicio: string;
   fechaFin: string;
-  rubroSeleccionado: string;
-  asesorSeleccionado: string;
+  iCveRubro: number;
+  iCveInstructor: number;
+  rubros: DashboardRubroOpcion[];
+  asesores: DashboardAsesorOpcion[];
   cargando: boolean;
   onCambiarFecha: (inicio: string, fin: string) => void;
-  onCambiarRubro: (rubro: string) => void;
-  onCambiarAsesor: (asesor: string) => void;
+  onCambiarRubro: (id: number) => void;
+  onCambiarAsesor: (id: number) => void;
   onRecargar: () => void;
 }
 
@@ -37,14 +42,21 @@ export const FiltrosDashboardProyectos: React.FC<
 > = ({
   fechaInicio,
   fechaFin,
-  rubroSeleccionado,
-  asesorSeleccionado,
+  iCveRubro,
+  iCveInstructor,
+  rubros,
+  asesores,
   cargando,
   onCambiarFecha,
   onCambiarRubro,
   onCambiarAsesor,
   onRecargar,
 }) => {
+  const asesorValido =
+    iCveInstructor !== 0 &&
+    asesores.some((a) => a.i_CveInstructor === iCveInstructor)
+      ? iCveInstructor
+      : 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
       {/* Breadcrumb & Header */}
@@ -73,7 +85,7 @@ export const FiltrosDashboardProyectos: React.FC<
             padding: 0,
           }}
         >
-          Dashboard de proyectos
+          Resumen de proyectos
         </h1>
         <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>
           Cantidad de proyectos por rubro y asesor, su estatus y los que llevan
@@ -134,14 +146,14 @@ export const FiltrosDashboardProyectos: React.FC<
             </label>
             <select
               id="sel-rubro-proyectos"
-              value={rubroSeleccionado}
-              onChange={(e) => onCambiarRubro(e.target.value)}
+              value={iCveRubro}
+              onChange={(e) => onCambiarRubro(Number(e.target.value))}
               style={pillSelectStyle}
             >
-              <option value="">Todos</option>
-              {RUBROS_MOCK.map((rubro) => (
-                <option key={rubro} value={rubro}>
-                  {rubro}
+              <option value={0}>Todos</option>
+              {rubros.map((rubro) => (
+                <option key={rubro.i_CveRubro} value={rubro.i_CveRubro}>
+                  {rubro.v_Nombre}
                 </option>
               ))}
             </select>
@@ -156,14 +168,17 @@ export const FiltrosDashboardProyectos: React.FC<
             </label>
             <select
               id="sel-asesor-proyectos"
-              value={asesorSeleccionado}
-              onChange={(e) => onCambiarAsesor(e.target.value)}
+              value={asesorValido}
+              onChange={(e) => onCambiarAsesor(Number(e.target.value))}
               style={pillSelectStyle}
             >
-              <option value="">Todos</option>
-              {ASESORES_MOCK.map((asesor) => (
-                <option key={asesor} value={asesor}>
-                  {asesor}
+              <option value={0}>Todos</option>
+              {asesores.map((asesor) => (
+                <option
+                  key={asesor.i_CveInstructor}
+                  value={asesor.i_CveInstructor}
+                >
+                  {asesor.v_Asesor}
                 </option>
               ))}
             </select>

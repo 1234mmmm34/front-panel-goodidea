@@ -49,7 +49,7 @@ export const FiltrosFinanzas: React.FC<FiltrosFinanzasProps> = ({
             padding: 0,
           }}
         >
-          Dashboard de finanzas
+          Resumen de mis finanzas
         </h1>
         <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>
           Facturación, cobranza, cartera y utilidad del periodo seleccionado.

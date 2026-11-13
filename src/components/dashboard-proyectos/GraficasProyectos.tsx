@@ -12,11 +12,9 @@ import {
   LabelList,
 } from "recharts";
 import {
-  ProyectoDashboardMock,
-  RUBROS_MOCK,
-  ASESORES_MOCK,
-  esProyectoMasDe30Dias,
-  v_Rubro,
+  DashboardProyecto,
+  DashboardProyectoAsesor,
+  obtenerIniciales,
 } from "@/types/dashboardProyectos";
 import {
   ModalDetalleProyectos,
@@ -24,9 +22,11 @@ import {
 } from "./ModalDetalleProyectos";
 
 interface GraficasProyectosProps {
-  proyectos: ProyectoDashboardMock[];
-  rubroSeleccionado: string;
-  asesorSeleccionado: string;
+  proyectos: DashboardProyecto[];
+  asignaciones: DashboardProyectoAsesor[];
+  iCveRubro: number;
+  iCveInstructor: number;
+  inicialesMap: Map<string, string>;
   cargando: boolean;
 }
 
@@ -184,12 +184,18 @@ const labelListStyle: React.CSSProperties = {
 
 export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
   proyectos,
-  rubroSeleccionado,
-  asesorSeleccionado,
+  asignaciones,
+  iCveRubro,
+  iCveInstructor,
+  inicialesMap,
   cargando,
 }) => {
+  void iCveRubro;
   const [detalleModal, setDetalleModal] =
     useState<DetalleBarraSeleccionada | null>(null);
+
+  const getEtiquetaAsesor = (nombre: string) =>
+    inicialesMap.get(nombre) ?? obtenerIniciales(nombre);
 
   if (cargando) {
     return (
@@ -240,6 +246,7 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
               key={`sk-g2-${i}`}
               style={{
                 ...cardStyle,
+                gridColumn: "1 / -1",
                 height: "330px",
                 gap: "14px",
               }}
@@ -265,13 +272,38 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
 
   const sinDatos = proyectos.length === 0;
 
-  const rubrosActivos: v_Rubro[] = rubroSeleccionado
-    ? [rubroSeleccionado as v_Rubro]
-    : RUBROS_MOCK;
+  const proyectoPorId = new Map<number, DashboardProyecto>(
+    proyectos.map((p) => [p.i_CveServAgendaDet, p])
+  );
 
-  const asesoresActivos: string[] = asesorSeleccionado
-    ? [asesorSeleccionado]
-    : ASESORES_MOCK;
+  const asignacionesActivas =
+    iCveInstructor !== 0
+      ? asignaciones.filter((a) => a.i_CveInstructor === iCveInstructor)
+      : asignaciones;
+
+  const rubrosActivos: string[] = Array.from(
+    new Set(proyectos.map((p) => p.v_Rubro).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, "es"));
+
+  const asesoresActivos: string[] = Array.from(
+    new Set(asignacionesActivas.map((a) => a.v_Asesor).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, "es"));
+
+  const obtenerProyectosUnicos = (
+    asigs: DashboardProyectoAsesor[]
+  ): DashboardProyecto[] => {
+    const ids = new Set<number>();
+    const lista: DashboardProyecto[] = [];
+    for (const a of asigs) {
+      if (ids.has(a.i_CveServAgendaDet)) continue;
+      const p = proyectoPorId.get(a.i_CveServAgendaDet);
+      if (p) {
+        ids.add(a.i_CveServAgendaDet);
+        lista.push(p);
+      }
+    }
+    return lista;
+  };
 
   // 1. Proyectos por rubro
   const dataPorRubro = rubrosActivos.map((rubro) => ({
@@ -284,28 +316,37 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
   );
   const ticksRubro = generarTicksEnteros(topRubro);
 
-  // 2. Proyectos por asesor
+  // 2. Proyectos por asesor (sobre asignaciones)
   const dataPorAsesor = asesoresActivos.map((asesor) => ({
     label: asesor,
     tooltipTitle: asesor,
-    i_Cantidad: proyectos.filter((p) => p.v_Asesor === asesor).length,
+    i_Cantidad: asignacionesActivas.filter((a) => a.v_Asesor === asesor).length,
   }));
   const topAsesor = calcularTopYAxis(
     Math.max(...dataPorAsesor.map((d) => d.i_Cantidad), 0)
   );
   const ticksAsesor = generarTicksEnteros(topAsesor);
 
-  // 3. Estatus por asesor
-  const dataEstatusPorAsesor = asesoresActivos.map((asesor) => ({
-    label: asesor,
-    tooltipTitle: asesor,
-    i_EnProceso: proyectos.filter(
-      (p) => p.v_Asesor === asesor && p.v_Estatus === "En proceso"
-    ).length,
-    i_Terminado: proyectos.filter(
-      (p) => p.v_Asesor === asesor && p.v_Estatus === "Terminado"
-    ).length,
-  }));
+  // 3. Estatus por asesor (sobre asignaciones + proyectoPorId)
+  const dataEstatusPorAsesor = asesoresActivos.map((asesor) => {
+    const asigsAsesor = asignacionesActivas.filter(
+      (a) => a.v_Asesor === asesor
+    );
+    let i_EnProceso = 0;
+    let i_Terminado = 0;
+    for (const a of asigsAsesor) {
+      const p = proyectoPorId.get(a.i_CveServAgendaDet);
+      if (!p) continue;
+      if (p.b_Terminado) i_Terminado++;
+      else i_EnProceso++;
+    }
+    return {
+      label: asesor,
+      tooltipTitle: asesor,
+      i_EnProceso,
+      i_Terminado,
+    };
+  });
   const topEstatus = calcularTopYAxis(
     Math.max(
       ...dataEstatusPorAsesor.flatMap((d) => [d.i_EnProceso, d.i_Terminado]),
@@ -314,11 +355,11 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
   );
   const ticksEstatus = generarTicksEnteros(topEstatus);
 
-  // 4. Proyectos por rubro y asesor (solo combinaciones que tienen proyectos)
+  // 4. Proyectos por rubro y asesor (solo combinaciones que tienen asignaciones)
   const dataRubroAsesor: {
     key: string;
     label: string;
-    v_Rubro: v_Rubro;
+    v_Rubro: string;
     tooltipTitle: string;
     i_Cantidad: number;
   }[] = [];
@@ -326,14 +367,20 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
 
   rubrosActivos.forEach((rubro) => {
     const asesoresConProy = asesoresActivos.filter((asesor) =>
-      proyectos.some((p) => p.v_Rubro === rubro && p.v_Asesor === asesor)
+      asignacionesActivas.some((a) => {
+        if (a.v_Asesor !== asesor) return false;
+        const p = proyectoPorId.get(a.i_CveServAgendaDet);
+        return p?.v_Rubro === rubro;
+      })
     );
     if (asesoresConProy.length === 0) return;
 
     asesoresConProy.forEach((asesor) => {
-      const cant = proyectos.filter(
-        (p) => p.v_Rubro === rubro && p.v_Asesor === asesor
-      ).length;
+      const cant = asignacionesActivas.filter((a) => {
+        if (a.v_Asesor !== asesor) return false;
+        const p = proyectoPorId.get(a.i_CveServAgendaDet);
+        return p?.v_Rubro === rubro;
+      }).length;
       dataRubroAsesor.push({
         key: `${rubro}__${asesor}`,
         label: asesor,
@@ -355,11 +402,15 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
   const ticksRubroAsesor = generarTicksEnteros(topRubroAsesor);
 
   // 5. Proyectos con más de 30 días por asesor
-  const proyectosMas30 = proyectos.filter((p) => esProyectoMasDe30Dias(p));
+  const proyectosMas30 = proyectos.filter((p) => p.b_MasDe30Dias);
   const dataMas30PorAsesor = asesoresActivos.map((asesor) => ({
     label: asesor,
     tooltipTitle: asesor,
-    i_Cantidad: proyectosMas30.filter((p) => p.v_Asesor === asesor).length,
+    i_Cantidad: asignacionesActivas.filter((a) => {
+      if (a.v_Asesor !== asesor) return false;
+      const p = proyectoPorId.get(a.i_CveServAgendaDet);
+      return Boolean(p?.b_MasDe30Dias);
+    }).length,
   }));
   const topMas30 = calcularTopYAxis(
     Math.max(...dataMas30PorAsesor.map((d) => d.i_Cantidad), 0)
@@ -367,15 +418,11 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
   const ticksMas30 = generarTicksEnteros(topMas30);
 
   const inclinarRubro = dataPorRubro.length >= 3;
-  const inclinarAsesor = dataPorAsesor.length >= 3;
-  const inclinarEstatus = dataEstatusPorAsesor.length >= 3;
-  const inclinarRubroAsesor = dataRubroAsesor.length >= 3;
-  const inclinarMas30 = dataMas30PorAsesor.length >= 3;
 
   // Handlers de clic en barras
   const handleClicRubro = (data: any) => {
     const payload = data?.payload ?? data;
-    const rubro = payload?.label as v_Rubro | undefined;
+    const rubro = payload?.label as string | undefined;
     if (!rubro) return;
     const lista = proyectos.filter((p) => p.v_Rubro === rubro);
     if (lista.length === 0) return;
@@ -391,10 +438,14 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
     const payload = data?.payload ?? data;
     const asesor = payload?.label as string | undefined;
     if (!asesor) return;
-    const lista = proyectos.filter((p) => p.v_Asesor === asesor);
+    const lista = obtenerProyectosUnicos(
+      asignacionesActivas.filter((a) => a.v_Asesor === asesor)
+    );
     if (lista.length === 0) return;
     setDetalleModal({
-      subtitulo: `${capitalizarFrase(asesor)} · ${textoProyectos(lista.length)}`,
+      subtitulo: `${getEtiquetaAsesor(asesor)} · ${textoProyectos(
+        lista.length
+      )}`,
       proyectos: lista,
       ocultarAsesor: true,
       ocultarRubro: false,
@@ -408,12 +459,17 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
     const payload = data?.payload ?? data;
     const asesor = payload?.label as string | undefined;
     if (!asesor) return;
-    const lista = proyectos.filter(
-      (p) => p.v_Asesor === asesor && p.v_Estatus === estatus
+    const quiereTerminado = estatus === "Terminado";
+    const lista = obtenerProyectosUnicos(
+      asignacionesActivas.filter((a) => {
+        if (a.v_Asesor !== asesor) return false;
+        const p = proyectoPorId.get(a.i_CveServAgendaDet);
+        return Boolean(p) && p!.b_Terminado === quiereTerminado;
+      })
     );
     if (lista.length === 0) return;
     setDetalleModal({
-      subtitulo: `${capitalizarFrase(asesor)} · ${estatus} · ${textoProyectos(
+      subtitulo: `${getEtiquetaAsesor(asesor)} · ${estatus} · ${textoProyectos(
         lista.length
       )}`,
       proyectos: lista,
@@ -425,14 +481,18 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
   const handleClicRubroAsesor = (data: any) => {
     const payload = data?.payload ?? data;
     const asesor = payload?.label as string | undefined;
-    const rubro = payload?.v_Rubro as v_Rubro | undefined;
+    const rubro = payload?.v_Rubro as string | undefined;
     if (!asesor || !rubro) return;
-    const lista = proyectos.filter(
-      (p) => p.v_Asesor === asesor && p.v_Rubro === rubro
+    const lista = obtenerProyectosUnicos(
+      asignacionesActivas.filter((a) => {
+        if (a.v_Asesor !== asesor) return false;
+        const p = proyectoPorId.get(a.i_CveServAgendaDet);
+        return p?.v_Rubro === rubro;
+      })
     );
     if (lista.length === 0) return;
     setDetalleModal({
-      subtitulo: `${capitalizarFrase(asesor)} · ${capitalizarFrase(
+      subtitulo: `${getEtiquetaAsesor(asesor)} · ${capitalizarFrase(
         rubro
       )} · ${textoProyectos(lista.length)}`,
       proyectos: lista,
@@ -445,10 +505,16 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
     const payload = data?.payload ?? data;
     const asesor = payload?.label as string | undefined;
     if (!asesor) return;
-    const lista = proyectosMas30.filter((p) => p.v_Asesor === asesor);
+    const lista = obtenerProyectosUnicos(
+      asignacionesActivas.filter((a) => {
+        if (a.v_Asesor !== asesor) return false;
+        const p = proyectoPorId.get(a.i_CveServAgendaDet);
+        return Boolean(p?.b_MasDe30Dias);
+      })
+    );
     if (lista.length === 0) return;
     setDetalleModal({
-      subtitulo: `${capitalizarFrase(
+      subtitulo: `${getEtiquetaAsesor(
         asesor
       )} · En proceso con más de 30 días · ${textoProyectos(lista.length)}`,
       proyectos: lista,
@@ -622,13 +688,13 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
                     <XAxis
                       dataKey="label"
                       interval={0}
-                      tickFormatter={(v) => String(v).toUpperCase()}
+                      tickFormatter={(v) => getEtiquetaAsesor(String(v))}
                       tick={{ fontSize: 11, fill: "#64748b" }}
                       axisLine={{ stroke: "#cbd5e1" }}
                       tickLine={false}
-                      angle={inclinarAsesor ? -35 : 0}
-                      textAnchor={inclinarAsesor ? "end" : "middle"}
-                      height={inclinarAsesor ? 70 : 30}
+                      angle={0}
+                      textAnchor="middle"
+                      height={30}
                     />
                     <YAxis
                       domain={[0, topAsesor]}
@@ -663,7 +729,7 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
             )}
           </div>
 
-          {/* Card 3: Estatus por asesor */}
+          {/* Card 3: Proyectos con más de 30 días por asesor */}
           <div style={cardStyle}>
             <div
               style={{
@@ -674,141 +740,81 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
                 marginBottom: "4px",
               }}
             >
-              <h3 style={h3Style}>Estatus por asesor</h3>
+              <h3 style={h3Style}>Proyectos con más de 30 días por asesor</h3>
+              <span
+                style={{
+                  fontSize: "22px",
+                  fontWeight: 700,
+                  letterSpacing: "-0.5px",
+                  color: "#dc2626",
+                  lineHeight: 1,
+                }}
+              >
+                {proyectosMas30.length}
+              </span>
             </div>
             <p style={descStyle}>
-              Proyectos en proceso y terminados de cada asesor.
+              Proyectos en proceso que llevan más de 30 días desde su inicio.
             </p>
 
             {sinDatos ? (
               <EmptyChartState />
             ) : (
-              <>
-                <div
-                  className="proy-chart-wrap"
-                  style={{ width: "100%", height: 240 }}
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={dataEstatusPorAsesor}
-                      margin={{ top: 20, right: 8, left: -16, bottom: 10 }}
-                      barGap={6}
+              <div
+                className="proy-chart-wrap"
+                style={{ width: "100%", height: 240 }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={dataMas30PorAsesor}
+                    margin={{ top: 20, right: 8, left: -16, bottom: 10 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f1f5f9"
+                    />
+                    <XAxis
+                      dataKey="label"
+                      interval={0}
+                      tickFormatter={(v) => getEtiquetaAsesor(String(v))}
+                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      axisLine={{ stroke: "#cbd5e1" }}
+                      tickLine={false}
+                      angle={0}
+                      textAnchor="middle"
+                      height={30}
+                    />
+                    <YAxis
+                      domain={[0, topMas30]}
+                      ticks={ticksMas30}
+                      allowDecimals={false}
+                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      content={<CustomBarTooltip />}
+                      cursor={{ fill: "rgba(241, 245, 249, 0.6)" }}
+                    />
+                    <Bar
+                      dataKey="i_Cantidad"
+                      name="Proyectos"
+                      fill="#e35d3a"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={38}
+                      onClick={(data) => handleClicMas30Asesor(data)}
                     >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="#f1f5f9"
+                      <LabelList
+                        dataKey="i_Cantidad"
+                        position="top"
+                        offset={6}
+                        style={labelListStyle}
                       />
-                      <XAxis
-                        dataKey="label"
-                        interval={0}
-                        tickFormatter={(v) => String(v).toUpperCase()}
-                        tick={{ fontSize: 11, fill: "#64748b" }}
-                        axisLine={{ stroke: "#cbd5e1" }}
-                        tickLine={false}
-                        angle={inclinarEstatus ? -35 : 0}
-                        textAnchor={inclinarEstatus ? "end" : "middle"}
-                        height={inclinarEstatus ? 70 : 30}
-                      />
-                      <YAxis
-                        domain={[0, topEstatus]}
-                        ticks={ticksEstatus}
-                        allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "#64748b" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        content={<CustomBarTooltip />}
-                        cursor={{ fill: "rgba(241, 245, 249, 0.6)" }}
-                      />
-                      <Bar
-                        dataKey="i_EnProceso"
-                        name="En proceso"
-                        fill="#f08c3a"
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={38}
-                        onClick={(data) =>
-                          handleClicEstatusAsesor(data, "En proceso")
-                        }
-                      >
-                        <LabelList
-                          dataKey="i_EnProceso"
-                          position="top"
-                          offset={6}
-                          style={labelListStyle}
-                        />
-                      </Bar>
-                      <Bar
-                        dataKey="i_Terminado"
-                        name="Terminado"
-                        fill="#2B8FCC"
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={38}
-                        onClick={(data) =>
-                          handleClicEstatusAsesor(data, "Terminado")
-                        }
-                      >
-                        <LabelList
-                          dataKey="i_Terminado"
-                          position="top"
-                          offset={6}
-                          style={labelListStyle}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Leyenda abajo */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "16px",
-                    justifyContent: "center",
-                    fontSize: "12px",
-                    color: "#64748b",
-                    marginTop: "12px",
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <i
-                      style={{
-                        width: "10px",
-                        height: "10px",
-                        borderRadius: "2px",
-                        backgroundColor: "#f08c3a",
-                        display: "inline-block",
-                      }}
-                    />
-                    En proceso
-                  </span>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <i
-                      style={{
-                        width: "10px",
-                        height: "10px",
-                        borderRadius: "2px",
-                        backgroundColor: "#2B8FCC",
-                        display: "inline-block",
-                      }}
-                    />
-                    Terminado
-                  </span>
-                </div>
-              </>
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
         </div>
@@ -817,7 +823,7 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
       {/* Segunda fila: 1.5fr 1fr */}
       <div className="proy-grid-2">
         {/* Card 4: Proyectos por rubro y asesor */}
-        <div style={cardStyle}>
+        <div style={{ ...cardStyle, gridColumn: "1 / -1" }}>
           <div
             style={{
               display: "flex",
@@ -856,14 +862,14 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
                       interval={0}
                       tickFormatter={(val) => {
                         const parts = String(val).split("__");
-                        return (parts[1] || val).toUpperCase();
+                        return getEtiquetaAsesor(parts[1] || String(val));
                       }}
                       tick={{ fontSize: 11, fill: "#64748b" }}
                       axisLine={{ stroke: "#cbd5e1" }}
                       tickLine={false}
-                      angle={inclinarRubroAsesor ? -35 : 0}
-                      textAnchor={inclinarRubroAsesor ? "end" : "middle"}
-                      height={inclinarRubroAsesor ? 70 : 30}
+                      angle={0}
+                      textAnchor="middle"
+                      height={30}
                     />
                     <YAxis
                       width={28}
@@ -930,8 +936,8 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
           )}
         </div>
 
-        {/* Card 5: Proyectos con más de 30 días por asesor */}
-        <div style={cardStyle}>
+        {/* Card 5: Estatus por asesor (a todo el ancho) */}
+        <div style={{ ...cardStyle, gridColumn: "1 / -1" }}>
           <div
             style={{
               display: "flex",
@@ -941,81 +947,141 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
               marginBottom: "4px",
             }}
           >
-            <h3 style={h3Style}>Proyectos con más de 30 días por asesor</h3>
-            <span
-              style={{
-                fontSize: "22px",
-                fontWeight: 700,
-                letterSpacing: "-0.5px",
-                color: "#dc2626",
-                lineHeight: 1,
-              }}
-            >
-              {proyectosMas30.length}
-            </span>
+            <h3 style={h3Style}>Estatus por asesor</h3>
           </div>
           <p style={descStyle}>
-            Proyectos en proceso que llevan más de 30 días desde su inicio.
+            Proyectos en proceso y terminados de cada asesor.
           </p>
 
           {sinDatos ? (
             <EmptyChartState />
           ) : (
-            <div
-              className="proy-chart-wrap"
-              style={{ width: "100%", height: 240 }}
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={dataMas30PorAsesor}
-                  margin={{ top: 20, right: 8, left: -16, bottom: 10 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#f1f5f9"
-                  />
-                  <XAxis
-                    dataKey="label"
-                    interval={0}
-                    tickFormatter={(v) => String(v).toUpperCase()}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
-                    axisLine={{ stroke: "#cbd5e1" }}
-                    tickLine={false}
-                    angle={inclinarMas30 ? -35 : 0}
-                    textAnchor={inclinarMas30 ? "end" : "middle"}
-                    height={inclinarMas30 ? 70 : 30}
-                  />
-                  <YAxis
-                    domain={[0, topMas30]}
-                    ticks={ticksMas30}
-                    allowDecimals={false}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    content={<CustomBarTooltip />}
-                    cursor={{ fill: "rgba(241, 245, 249, 0.6)" }}
-                  />
-                  <Bar
-                    dataKey="i_Cantidad"
-                    name="Proyectos"
-                    fill="#e35d3a"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={38}
-                    onClick={(data) => handleClicMas30Asesor(data)}
+            <>
+              <div
+                className="proy-chart-wrap"
+                style={{ width: "100%", height: 240 }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={dataEstatusPorAsesor}
+                    margin={{ top: 20, right: 8, left: -16, bottom: 10 }}
+                    barGap={6}
                   >
-                    <LabelList
-                      dataKey="i_Cantidad"
-                      position="top"
-                      offset={6}
-                      style={labelListStyle}
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f1f5f9"
                     />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+                    <XAxis
+                      dataKey="label"
+                      interval={0}
+                      tickFormatter={(v) => getEtiquetaAsesor(String(v))}
+                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      axisLine={{ stroke: "#cbd5e1" }}
+                      tickLine={false}
+                      angle={0}
+                      textAnchor="middle"
+                      height={30}
+                    />
+                    <YAxis
+                      domain={[0, topEstatus]}
+                      ticks={ticksEstatus}
+                      allowDecimals={false}
+                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      content={<CustomBarTooltip />}
+                      cursor={{ fill: "rgba(241, 245, 249, 0.6)" }}
+                    />
+                    <Bar
+                      dataKey="i_EnProceso"
+                      name="En proceso"
+                      fill="#f08c3a"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={38}
+                      onClick={(data) =>
+                        handleClicEstatusAsesor(data, "En proceso")
+                      }
+                    >
+                      <LabelList
+                        dataKey="i_EnProceso"
+                        position="top"
+                        offset={6}
+                        style={labelListStyle}
+                      />
+                    </Bar>
+                    <Bar
+                      dataKey="i_Terminado"
+                      name="Terminado"
+                      fill="#2B8FCC"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={38}
+                      onClick={(data) =>
+                        handleClicEstatusAsesor(data, "Terminado")
+                      }
+                    >
+                      <LabelList
+                        dataKey="i_Terminado"
+                        position="top"
+                        offset={6}
+                        style={labelListStyle}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Leyenda abajo */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "16px",
+                  justifyContent: "center",
+                  fontSize: "12px",
+                  color: "#64748b",
+                  marginTop: "12px",
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <i
+                    style={{
+                      width: "10px",
+                      height: "10px",
+                      borderRadius: "2px",
+                      backgroundColor: "#f08c3a",
+                      display: "inline-block",
+                    }}
+                  />
+                  En proceso
+                </span>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <i
+                    style={{
+                      width: "10px",
+                      height: "10px",
+                      borderRadius: "2px",
+                      backgroundColor: "#2B8FCC",
+                      display: "inline-block",
+                    }}
+                  />
+                  Terminado
+                </span>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -1023,6 +1089,7 @@ export const GraficasProyectos: React.FC<GraficasProyectosProps> = ({
       {/* Modal de Detalle de Proyectos al hacer clic en una barra */}
       <ModalDetalleProyectos
         detalle={detalleModal}
+        inicialesMap={inicialesMap}
         onCerrar={() => setDetalleModal(null)}
       />
     </div>

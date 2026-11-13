@@ -2,19 +2,20 @@
 
 import React from "react";
 import {
-  ProyectoDashboardMock,
-  calcularDiasTranscurridos,
-  esProyectoMasDe30Dias,
+  DashboardProyecto,
   formatearFechaMesAbrev,
+  formatearAsesoresIniciales,
 } from "@/types/dashboardProyectos";
 
 interface TablaProyectosMas30DiasProps {
-  proyectos: ProyectoDashboardMock[];
+  proyectos: DashboardProyecto[];
+  inicialesMap: Map<string, string>;
   cargando: boolean;
 }
 
 export const TablaProyectosMas30Dias: React.FC<TablaProyectosMas30DiasProps> = ({
   proyectos,
+  inicialesMap,
   cargando,
 }) => {
   if (cargando) {
@@ -62,12 +63,10 @@ export const TablaProyectosMas30Dias: React.FC<TablaProyectosMas30DiasProps> = (
   }
 
   const proyectosMas30 = proyectos
-    .filter((p) => esProyectoMasDe30Dias(p))
-    .map((p) => ({
-      ...p,
-      i_Dias: calcularDiasTranscurridos(p.d_FechaInicio),
-    }))
-    .sort((a, b) => b.i_Dias - a.i_Dias);
+    .filter((p) => p.b_MasDe30Dias)
+    .sort(
+      (a, b) => (b.i_DiasTranscurridos ?? 0) - (a.i_DiasTranscurridos ?? 0)
+    );
 
   return (
     <div
@@ -169,13 +168,14 @@ export const TablaProyectosMas30Dias: React.FC<TablaProyectosMas30DiasProps> = (
                     }
                   >
                     <td
+                      title={p.v_Asesores || undefined}
                       style={{
                         padding: "12px",
                         fontWeight: 600,
                         color: "#1e293b",
                       }}
                     >
-                      {p.v_Asesor}
+                      {formatearAsesoresIniciales(p.v_Asesores, inicialesMap)}
                     </td>
                     <td
                       style={{
@@ -223,7 +223,7 @@ export const TablaProyectosMas30Dias: React.FC<TablaProyectosMas30DiasProps> = (
                           color: "#b91c1c",
                         }}
                       >
-                        {p.i_Dias} días
+                        {p.i_DiasTranscurridos ?? 0} días
                       </span>
                     </td>
                   </tr>

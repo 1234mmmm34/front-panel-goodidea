@@ -3,25 +3,27 @@
 import React, { useEffect } from "react";
 import { X } from "lucide-react";
 import {
-  ProyectoDashboardMock,
-  calcularDiasTranscurridos,
+  DashboardProyecto,
   formatearFechaMesAbrev,
+  formatearAsesoresIniciales,
 } from "@/types/dashboardProyectos";
 
 export interface DetalleBarraSeleccionada {
   subtitulo: string;
-  proyectos: ProyectoDashboardMock[];
+  proyectos: DashboardProyecto[];
   ocultarAsesor: boolean;
   ocultarRubro: boolean;
 }
 
 interface ModalDetalleProyectosProps {
   detalle: DetalleBarraSeleccionada | null;
+  inicialesMap: Map<string, string>;
   onCerrar: () => void;
 }
 
 export const ModalDetalleProyectos: React.FC<ModalDetalleProyectosProps> = ({
   detalle,
+  inicialesMap,
   onCerrar,
 }) => {
   useEffect(() => {
@@ -38,21 +40,16 @@ export const ModalDetalleProyectos: React.FC<ModalDetalleProyectosProps> = ({
   if (!detalle) return null;
 
   // Orden: primero En proceso (de más días a menos) y después Terminados (fecha de inicio más reciente a más antigua)
-  const proyectosOrdenados = [...detalle.proyectos]
-    .map((p) => ({
-      ...p,
-      i_Dias: calcularDiasTranscurridos(p.d_FechaInicio),
-    }))
-    .sort((a, b) => {
-      const aEnProceso = a.v_Estatus === "En proceso";
-      const bEnProceso = b.v_Estatus === "En proceso";
-      if (aEnProceso && !bEnProceso) return -1;
-      if (!aEnProceso && bEnProceso) return 1;
-      if (aEnProceso && bEnProceso) {
-        return b.i_Dias - a.i_Dias;
-      }
-      return b.d_FechaInicio.localeCompare(a.d_FechaInicio);
-    });
+  const proyectosOrdenados = [...detalle.proyectos].sort((a, b) => {
+    const aEnProceso = !a.b_Terminado;
+    const bEnProceso = !b.b_Terminado;
+    if (aEnProceso && !bEnProceso) return -1;
+    if (!aEnProceso && bEnProceso) return 1;
+    if (aEnProceso && bEnProceso) {
+      return (b.i_DiasTranscurridos ?? 0) - (a.i_DiasTranscurridos ?? 0);
+    }
+    return b.d_FechaInicio.localeCompare(a.d_FechaInicio);
+  });
 
   const thStickyStyle: React.CSSProperties = {
     padding: "10px 12px",
@@ -198,8 +195,8 @@ export const ModalDetalleProyectos: React.FC<ModalDetalleProyectosProps> = ({
             <tbody>
               {proyectosOrdenados.map((p) => {
                 const esServicio = p.v_TipoServicio === "Servicios";
-                const esEnProceso = p.v_Estatus === "En proceso";
-                const esMasDe30 = esEnProceso && p.i_Dias > 30;
+                const esEnProceso = !p.b_Terminado;
+                const dias = p.i_DiasTranscurridos ?? 0;
 
                 return (
                   <tr
@@ -217,13 +214,14 @@ export const ModalDetalleProyectos: React.FC<ModalDetalleProyectosProps> = ({
                   >
                     {!detalle.ocultarAsesor && (
                       <td
+                        title={p.v_Asesores || undefined}
                         style={{
                           padding: "12px",
                           fontWeight: 600,
                           color: "#1e293b",
                         }}
                       >
-                        {p.v_Asesor}
+                        {formatearAsesoresIniciales(p.v_Asesores, inicialesMap)}
                       </td>
                     )}
                     <td
@@ -290,9 +288,9 @@ export const ModalDetalleProyectos: React.FC<ModalDetalleProyectosProps> = ({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {!esEnProceso ? (
+                      {p.b_Terminado ? (
                         <span style={{ color: "#94a3b8" }}>—</span>
-                      ) : esMasDe30 ? (
+                      ) : p.b_MasDe30Dias ? (
                         <span
                           style={{
                             display: "inline-block",
@@ -304,12 +302,10 @@ export const ModalDetalleProyectos: React.FC<ModalDetalleProyectosProps> = ({
                             color: "#b91c1c",
                           }}
                         >
-                          {p.i_Dias} días
+                          {dias} días
                         </span>
                       ) : (
-                        <span style={{ color: "#1e293b" }}>
-                          {p.i_Dias} días
-                        </span>
+                        <span style={{ color: "#1e293b" }}>{dias} días</span>
                       )}
                     </td>
                   </tr>

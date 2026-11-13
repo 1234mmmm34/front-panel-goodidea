@@ -1,20 +1,62 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { PROYECTOS_DASHBOARD_MOCK } from "@/types/dashboardProyectos";
+import { DashboardProyectos, mapaIniciales } from "@/types/dashboardProyectos";
+import { DashboardProyectosService } from "@/services/dashboardProyectos.service";
 import { FiltrosDashboardProyectos } from "@/components/dashboard-proyectos/FiltrosDashboardProyectos";
 import { TarjetasKpisProyectos } from "@/components/dashboard-proyectos/TarjetasKpisProyectos";
 import { GraficasProyectos } from "@/components/dashboard-proyectos/GraficasProyectos";
 import { TablaProyectosMas30Dias } from "@/components/dashboard-proyectos/TablaProyectosMas30Dias";
+import { useToast } from "@/context/ToastContext";
 
 export default function DashboardProyectosPage() {
-  const [fechaInicio, setFechaInicio] = useState<string>("2026-01-01");
-  const [fechaFin, setFechaFin] = useState<string>("2026-12-31");
-  const [rubroSeleccionado, setRubroSeleccionado] = useState<string>("");
-  const [asesorSeleccionado, setAsesorSeleccionado] = useState<string>("");
-  const [cargando, setCargando] = useState<boolean>(false);
-  const [reloadTick, setReloadTick] = useState<number>(0);
+  const { toast } = useToast();
+  const toastRef = useRef(toast);
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
+
+  const anioActual = new Date().getFullYear();
+  const [fechaInicio, setFechaInicio] = useState<string>(`${anioActual}-01-01`);
+  const [fechaFin, setFechaFin] = useState<string>(`${anioActual}-12-31`);
+  const [iCveRubro, setICveRubro] = useState<number>(0);
+  const [iCveInstructor, setICveInstructor] = useState<number>(0);
+  const [datos, setDatos] = useState<DashboardProyectos | null>(null);
+  const [cargando, setCargando] = useState<boolean>(true);
+
+  const cargarDatos = useCallback(async () => {
+    setCargando(true);
+    try {
+      const res = await DashboardProyectosService.getDashboard({
+        fechaInicio,
+        fechaFin,
+        iCveRubro,
+        iCveInstructor,
+      });
+      setDatos(res);
+      if (
+        iCveInstructor !== 0 &&
+        !res.asesores.some((a) => a.i_CveInstructor === iCveInstructor)
+      ) {
+        setICveInstructor(0);
+      }
+    } catch {
+      toastRef.current.error("No se pudo cargar el dashboard de proyectos.");
+      setDatos({
+        proyectos: [],
+        asignaciones: [],
+        rubros: [],
+        asesores: [],
+      });
+    } finally {
+      setCargando(false);
+    }
+  }, [fechaInicio, fechaFin, iCveRubro, iCveInstructor]);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   const handleCambiarFecha = (ini: string, fin: string) => {
     if (ini && fin && ini > fin) {
@@ -24,66 +66,59 @@ export default function DashboardProyectosPage() {
     setFechaFin(fin);
   };
 
-  // Recargar vuelve a pintar los mocks sin reiniciar los filtros
-  const handleRecargar = () => {
-    setCargando(true);
-    setTimeout(() => {
-      setReloadTick((prev) => prev + 1);
-      setCargando(false);
-    }, 180);
-  };
+  const proyectos = datos?.proyectos ?? [];
+  const asignaciones = datos?.asignaciones ?? [];
+  const rubros = datos?.rubros ?? [];
+  const asesores = datos?.asesores ?? [];
 
-  const proyectosFiltrados = useMemo(() => {
-    void reloadTick;
-    return PROYECTOS_DASHBOARD_MOCK.filter((p) => {
-      const cumpleRubro = !rubroSeleccionado || p.v_Rubro === rubroSeleccionado;
-      const cumpleAsesor =
-        !asesorSeleccionado || p.v_Asesor === asesorSeleccionado;
-      return cumpleRubro && cumpleAsesor;
-    });
-  }, [rubroSeleccionado, asesorSeleccionado, reloadTick]);
+  const inicialesMap = useMemo(
+    () => mapaIniciales(asesores.map((a) => a.v_Asesor)),
+    [asesores]
+  );
 
   return (
     <AppLayout>
-      <div
-        key={reloadTick}
-        style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
         {/* Encabezado y Barra de Filtros */}
         <FiltrosDashboardProyectos
           fechaInicio={fechaInicio}
           fechaFin={fechaFin}
-          rubroSeleccionado={rubroSeleccionado}
-          asesorSeleccionado={asesorSeleccionado}
+          iCveRubro={iCveRubro}
+          iCveInstructor={iCveInstructor}
+          rubros={rubros}
+          asesores={asesores}
           cargando={cargando}
           onCambiarFecha={handleCambiarFecha}
-          onCambiarRubro={setRubroSeleccionado}
-          onCambiarAsesor={setAsesorSeleccionado}
-          onRecargar={handleRecargar}
+          onCambiarRubro={setICveRubro}
+          onCambiarAsesor={setICveInstructor}
+          onRecargar={cargarDatos}
         />
 
         {/* Sección RESUMEN (KPIs) */}
         <TarjetasKpisProyectos
-          proyectos={proyectosFiltrados}
-          asesorSeleccionado={asesorSeleccionado}
+          proyectos={proyectos}
+          asignaciones={asignaciones}
+          iCveInstructor={iCveInstructor}
           cargando={cargando}
         />
 
         {/* Sección DISTRIBUCIÓN y Segunda Fila de Gráficas */}
         <GraficasProyectos
-          proyectos={proyectosFiltrados}
-          rubroSeleccionado={rubroSeleccionado}
-          asesorSeleccionado={asesorSeleccionado}
+          proyectos={proyectos}
+          asignaciones={asignaciones}
+          iCveRubro={iCveRubro}
+          iCveInstructor={iCveInstructor}
+          inicialesMap={inicialesMap}
           cargando={cargando}
         />
 
         {/* Tabla: Detalle de proyectos con más de 30 días */}
         <TablaProyectosMas30Dias
-          proyectos={proyectosFiltrados}
+          proyectos={proyectos}
+          inicialesMap={inicialesMap}
           cargando={cargando}
         />
       </div>
     </AppLayout>
   );
 }
-

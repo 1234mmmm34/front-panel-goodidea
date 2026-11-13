@@ -3,20 +3,21 @@
 import React, { useState } from "react";
 import { Info } from "lucide-react";
 import {
-  ProyectoDashboardMock,
-  ASESORES_MOCK,
-  esProyectoMasDe30Dias,
+  DashboardProyecto,
+  DashboardProyectoAsesor,
 } from "@/types/dashboardProyectos";
 
 interface TarjetasKpisProyectosProps {
-  proyectos: ProyectoDashboardMock[];
-  asesorSeleccionado: string;
+  proyectos: DashboardProyecto[];
+  asignaciones: DashboardProyectoAsesor[];
+  iCveInstructor: number;
   cargando: boolean;
 }
 
 export const TarjetasKpisProyectos: React.FC<TarjetasKpisProyectosProps> = ({
   proyectos,
-  asesorSeleccionado,
+  asignaciones,
+  iCveInstructor,
   cargando,
 }) => {
   const [tooltipActivo, setTooltipActivo] = useState<string | null>(null);
@@ -73,18 +74,23 @@ export const TarjetasKpisProyectos: React.FC<TarjetasKpisProyectosProps> = ({
   }
 
   const total = proyectos.length;
-  const enProceso = proyectos.filter((p) => p.v_Estatus === "En proceso").length;
-  const terminados = proyectos.filter((p) => p.v_Estatus === "Terminado").length;
-  const masDe30 = proyectos.filter((p) => esProyectoMasDe30Dias(p)).length;
+  const enProceso = proyectos.filter((p) => !p.b_Terminado).length;
+  const terminados = proyectos.filter((p) => p.b_Terminado).length;
+  const masDe30 = proyectos.filter((p) => p.b_MasDe30Dias).length;
 
   const pctEnProceso = total > 0 ? Math.round((enProceso / total) * 100) : 0;
   const pctTerminados = total > 0 ? Math.round((terminados / total) * 100) : 0;
   const pctMasDe30 =
     enProceso > 0 ? Math.round((masDe30 / enProceso) * 100) : 0;
 
-  const pieAsesores = asesorSeleccionado
-    ? "1 asesor"
-    : `${ASESORES_MOCK.length} asesores`;
+  const asesoresDistintos = new Set(asignaciones.map((a) => a.i_CveInstructor))
+    .size;
+  const pieAsesores =
+    iCveInstructor !== 0
+      ? "1 asesor"
+      : `${asesoresDistintos} ${
+          asesoresDistintos === 1 ? "asesor" : "asesores"
+        }`;
 
   const tarjetas = [
     {
