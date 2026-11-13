@@ -64,13 +64,13 @@ export const FiltrosConsultorSesiones: React.FC<Props> = ({
           <select
             className="form-select text-xs py-1.5"
             style={{ borderRadius: "20px", height: "32px", fontWeight: 600 }}
-            value="actividades"
+            value="sesiones"
             onChange={(e) =>
               onCambiarVisualizar(e.target.value as VistaConsultor)
             }
           >
-            <option value="actividades">Actividades</option>
             <option value="servicios">Servicios</option>
+            <option value="sesiones">Sesiones</option>
           </select>
         </div>
 
@@ -148,7 +148,7 @@ export const FiltrosConsultorSesiones: React.FC<Props> = ({
                   borderRadius: "20px",
                   height: "32px",
                 }}
-                placeholder="Buscar actividad (Enter)..."
+                placeholder="Buscar sesión (Enter)..."
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
                 onKeyDown={handleKeyDownSearch}

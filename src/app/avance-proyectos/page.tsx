@@ -1480,8 +1480,8 @@ export default function AvanceProyectosPage() {
       toast.error("El título de la actividad es obligatorio.");
       return;
     }
-    if (tituloTrim.length > 20) {
-      toast.error("El título no puede exceder los 20 caracteres.");
+    if (tituloTrim.length > 200) {
+      toast.error("El título no puede exceder los 200 caracteres.");
       return;
     }
     if (!formActividad.b_General && !formActividad.i_CveServAgendaDet) {
@@ -4447,7 +4447,7 @@ export default function AvanceProyectosPage() {
                 gap: "16px",
               }}
             >
-              {/* 1. Título * (máx. 20 caracteres con contador n/20) */}
+              {/* 1. Título * (máx. 200 caracteres con contador n/200) */}
               <div>
                 <div
                   style={{
@@ -4465,12 +4465,12 @@ export default function AvanceProyectosPage() {
                       fontSize: "11px",
                       fontWeight: 500,
                       color:
-                        formActividad.v_Titulo.length > 20
+                        formActividad.v_Titulo.length > 200
                           ? COLOR_ROJO_ALERTA
                           : "#64748b",
                     }}
                   >
-                    {formActividad.v_Titulo.length}/20
+                    {formActividad.v_Titulo.length}/200
                   </span>
                 </div>
                 <input
@@ -4490,7 +4490,7 @@ export default function AvanceProyectosPage() {
                     height: "36px",
                     borderRadius: "8px",
                     border:
-                      formActividad.v_Titulo.length > 20
+                      formActividad.v_Titulo.length > 200
                         ? "1px solid #dc3545"
                         : "1px solid #d0dce8",
                     padding: "0 12px",

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Sun } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AgendaGetDto } from "@/types/calendario";
 import { AgendaService } from "@/services/agenda.service";
 import {
@@ -17,21 +17,13 @@ import { es } from "date-fns/locale";
 import { GridCalendario } from "@/components/calendario/GridCalendario";
 import { CalendarioSkeleton } from "@/components/calendario/CalendarioSkeleton";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { obtenerSesionActual } from "@/lib/api-client";
-import { SesionAlmacenada } from "@/types/auth";
+import { SaludoBienvenida } from "@/components/ui/SaludoBienvenida";
 
 export default function CalendarioPage() {
   const [mesActual, setMesActual] = useState<Date>(startOfMonth(new Date()));
   const [eventos, setEventos] = useState<AgendaGetDto[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
-  const [sesion, setSesion] = useState<SesionAlmacenada | null>(null);
   const [, startTransition] = useTransition();
-
-  useEffect(() => {
-    setSesion(obtenerSesionActual());
-  }, []);
-
-  const nombreUsuario = sesion?.username || sesion?.email || "Usuario";
 
   const cargarEventosDelMes = async (fechaMes: Date) => {
     setCargando(true);
@@ -78,12 +70,7 @@ export default function CalendarioPage() {
     <AppLayout>
       <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "20px" }}>
         {/* Fila 1: Saludo con icono sol */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "8px" }}>
-          <Sun size={20} style={{ color: "#f59e0b", fill: "#fbbf24", flexShrink: 0 }} />
-          <h1 style={{ fontSize: "18px", fontWeight: "600", color: "#1e293b", margin: 0, padding: 0 }}>
-            Bienvenido/a, {nombreUsuario}
-          </h1>
-        </div>
+        <SaludoBienvenida />
 
         {/* Fila 2: Leyenda (Izquierda) | Navegación y Mes (Derecha) */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", width: "100%" }}>

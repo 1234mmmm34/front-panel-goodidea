@@ -4,6 +4,7 @@ import React from "react";
 import { Eye, AlertCircle } from "lucide-react";
 import { AgendaServicioConsultorGetDto } from "@/types/consultor";
 import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
+import { EstadoVacioTabla } from "@/components/ui/EstadoVacioTabla";
 import { formatearFechaTexto } from "@/lib/date-utils";
 import { VerDocumento } from "@/services/archivos.service";
 import {
@@ -23,82 +24,52 @@ interface Props {
 
 const BarraAvanceServicio: React.FC<{
   porcentaje: number | null;
-  cveEstatus: number;
-  diasExcedidos: number;
-  diasRestantes: number;
-}> = ({ porcentaje, cveEstatus, diasExcedidos, diasRestantes }) => {
+}> = ({ porcentaje }) => {
   const pct = Math.min(100, Math.max(0, Math.round(porcentaje ?? 0)));
   const esCero = pct === 0;
   const colorNumero = esCero ? COLOR_ROJO_ALERTA : COLOR_VERDE_AVANCE;
-
-  let textoInferior = "";
-  let esTextoRojo = false;
-
-  if (cveEstatus === 3) {
-    textoInferior = "Completado";
-  } else if (diasExcedidos > 0) {
-    textoInferior = "Fuera de tiempo";
-    esTextoRojo = true;
-  } else if (pct === 0) {
-    textoInferior = `Sin iniciar · ${diasRestantes} días restantes`;
-  } else {
-    textoInferior = `${diasRestantes} días restantes`;
-  }
 
   return (
     <div
       style={{
         display: "flex",
-        flexDirection: "column",
-        gap: "3px",
+        alignItems: "center",
+        gap: "6px",
         width: "100%",
         minWidth: "130px",
         maxWidth: "170px",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+      <div
+        style={{
+          flex: 1,
+          height: "6px",
+          backgroundColor: "#E9EEF3",
+          borderRadius: "4px",
+          overflow: "hidden",
+        }}
+      >
         <div
           style={{
-            flex: 1,
-            height: "6px",
-            backgroundColor: "#E9EEF3",
+            width: `${pct}%`,
+            height: "100%",
+            backgroundColor: COLOR_VERDE_AVANCE,
             borderRadius: "4px",
-            overflow: "hidden",
+            transition: "width 0.25s ease",
           }}
-        >
-          <div
-            style={{
-              width: `${pct}%`,
-              height: "100%",
-              backgroundColor: COLOR_VERDE_AVANCE,
-              borderRadius: "4px",
-              transition: "width 0.25s ease",
-            }}
-          />
-        </div>
-        <span
-          style={{
-            fontSize: "11px",
-            fontWeight: 600,
-            color: colorNumero,
-            whiteSpace: "nowrap",
-            minWidth: "34px",
-            textAlign: "right",
-          }}
-        >
-          {pct} %
-        </span>
+        />
       </div>
       <span
         style={{
           fontSize: "11px",
-          fontWeight: esTextoRojo ? 600 : 400,
-          color: esTextoRojo ? COLOR_ROJO_ALERTA : "#64748b",
-          lineHeight: 1.25,
+          fontWeight: 600,
+          color: colorNumero,
           whiteSpace: "nowrap",
+          minWidth: "34px",
+          textAlign: "right",
         }}
       >
-        {textoInferior}
+        {pct} %
       </span>
     </div>
   );
@@ -164,8 +135,7 @@ export const TablaConsultorServicios: React.FC<Props> = ({
             <th>Servicio</th>
             <th>Fechas</th>
             <th>Días</th>
-            <th>Avance</th>
-            <th style={{ minWidth: "135px" }}>Estatus</th>
+            <th style={{ minWidth: "150px" }}>Estatus</th>
             <th>Titular / Apoyo</th>
             <th>Entregables</th>
             <th
@@ -209,28 +179,14 @@ export const TablaConsultorServicios: React.FC<Props> = ({
                 <td>
                   <div
                     className="skeleton-box sm"
-                    style={{ width: "70px", marginBottom: "4px" }}
-                  ></div>
-                  <div
-                    className="skeleton-box sm"
-                    style={{ width: "55px" }}
-                  ></div>
-                </td>
-                <td>
-                  <div
-                    className="skeleton-box sm"
-                    style={{ width: "130px", marginBottom: "4px" }}
-                  ></div>
-                  <div
-                    className="skeleton-box sm"
-                    style={{ width: "90px" }}
+                    style={{ width: "70px" }}
                   ></div>
                 </td>
                 <td>
                   <div
                     className="skeleton-box"
                     style={{
-                      width: "75px",
+                      width: "130px",
                       height: "20px",
                       borderRadius: "10px",
                     }}
@@ -261,7 +217,7 @@ export const TablaConsultorServicios: React.FC<Props> = ({
             ))
           ) : error ? (
             <tr>
-              <td colSpan={9} className="text-center py-8">
+              <td colSpan={8} className="text-center py-8">
                 <div
                   style={{
                     display: "flex",
@@ -288,12 +244,7 @@ export const TablaConsultorServicios: React.FC<Props> = ({
               </td>
             </tr>
           ) : datos.length === 0 ? (
-            <tr>
-              <td colSpan={9} className="text-center py-8 text-secondary">
-                No se encontraron servicios agendados. Intenta ajustando los
-                filtros de búsqueda.
-              </td>
-            </tr>
+            <EstadoVacioTabla colSpan={8} alt="No hay servicios" />
           ) : (
             datos.map((row, idx) => {
               const tieneTitular =
@@ -369,68 +320,99 @@ export const TablaConsultorServicios: React.FC<Props> = ({
                     })()}
                   </td>
 
-                  {/* 4. Días (§1.3) */}
+                  {/* 4. Días */}
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        color: "#1e3a5f",
-                        fontSize: "12.5px",
-                        marginBottom: row.b_AplicaAvance ? "3px" : 0,
-                      }}
-                    >
-                      {row.i_DiasTotales !== null &&
-                      row.i_DiasTotales !== undefined
-                        ? `${row.i_DiasTotales} días`
-                        : "—"}
-                    </div>
-                    {row.b_AplicaAvance &&
-                      (row.i_DiasExcedidos > 0 ? (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            padding: "2px 7px",
-                            borderRadius: "10px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            backgroundColor: "#fee2e2",
-                            color: "#b91c1c",
-                          }}
-                        >
-                          +{row.i_DiasExcedidos} excedidos
-                        </span>
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: "11px",
-                            color: "#64748b",
-                          }}
-                        >
-                          En tiempo
-                        </span>
-                      ))}
+                    {(() => {
+                      if (row.i_DiasExcedidos > 0) {
+                        const n = row.i_DiasExcedidos;
+                        return (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "2px 7px",
+                              borderRadius: "10px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              backgroundColor: "#fee2e2",
+                              color: "#b91c1c",
+                            }}
+                          >
+                            {n} {n === 1 ? "día excedido" : "días excedidos"}
+                          </span>
+                        );
+                      }
+
+                      if (row.i_CveEstatus === 3) {
+                        const ant = row.i_DiasAnticipacion ?? 0;
+                        return (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "2px 7px",
+                              borderRadius: "10px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              backgroundColor: "#d1e7dd",
+                              color: "#0f5132",
+                            }}
+                          >
+                            {ant > 0
+                              ? `${ant} ${ant === 1 ? "día antes" : "días antes"}`
+                              : "A tiempo"}
+                          </span>
+                        );
+                      }
+
+                      if (row.i_DiasRestantes > 0) {
+                        const n = row.i_DiasRestantes;
+                        return (
+                          <span
+                            style={{
+                              fontSize: "12.5px",
+                              fontWeight: 700,
+                              color: "#1e293b",
+                            }}
+                          >
+                            {n} {n === 1 ? "día restante" : "días restantes"}
+                          </span>
+                        );
+                      }
+
+                      if (row.i_DiasRestantes === 0) {
+                        return (
+                          <span
+                            style={{
+                              fontSize: "12.5px",
+                              fontWeight: 700,
+                              color: "#d97706",
+                            }}
+                          >
+                            Vence hoy
+                          </span>
+                        );
+                      }
+
+                      return <span style={{ color: "#94a3b8" }}>—</span>;
+                    })()}
                   </td>
 
-                  {/* 5. Avance (§1.3) */}
-                  <td>
-                    {row.b_AplicaAvance ? (
-                      <BarraAvanceServicio
-                        porcentaje={row.i_PorcentajeAvance}
-                        cveEstatus={row.i_CveEstatus}
-                        diasExcedidos={row.i_DiasExcedidos ?? 0}
-                        diasRestantes={row.i_DiasRestantes ?? 0}
-                      />
-                    ) : (
-                      <span style={{ color: "#94a3b8" }}>—</span>
-                    )}
-                  </td>
-
-                  {/* 6. Estatus */}
+                  {/* 5. Estatus */}
                   <td>
                     {(() => {
+                      const mostrarBarra =
+                        row.i_CveEstatus === 2 && row.b_AplicaAvance;
+                      const contenidoEstatus = mostrarBarra ? (
+                        <BarraAvanceServicio
+                          porcentaje={row.i_PorcentajeAvance}
+                        />
+                      ) : (
+                        renderEstatusBadge(row.i_CveEstatus)
+                      );
+
                       if (!row.b_TienePlanContingencia) {
-                        return renderEstatusBadge(row.i_CveEstatus);
+                        return contenidoEstatus;
                       }
 
                       if (row.i_CveEstatus === 6) {
@@ -439,6 +421,7 @@ export const TablaConsultorServicios: React.FC<Props> = ({
                             row={row}
                             rutaChecklist={(id) => `/mis-servicios/pipc/${id}`}
                             sessionStorageKey="pipc_origen_mis_servicios"
+                            ocultarDias
                           />
                         );
                       }
@@ -446,7 +429,7 @@ export const TablaConsultorServicios: React.FC<Props> = ({
                       return (
                         <CeldaEstatusPipcBadge
                           row={row}
-                          badgeNode={renderEstatusBadge(row.i_CveEstatus)}
+                          badgeNode={contenidoEstatus}
                           rutaChecklist={(id) => `/mis-servicios/pipc/${id}`}
                           sessionStorageKey="pipc_origen_mis_servicios"
                         />

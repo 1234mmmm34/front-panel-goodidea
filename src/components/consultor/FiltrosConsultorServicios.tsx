@@ -67,8 +67,8 @@ export const FiltrosConsultorServicios: React.FC<Props> = ({
               onCambiarVisualizar(e.target.value as VistaConsultor)
             }
           >
-            <option value="actividades">Actividades</option>
             <option value="servicios">Servicios</option>
+            <option value="sesiones">Sesiones</option>
           </select>
         </div>
 

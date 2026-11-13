@@ -1,29 +1,26 @@
 "use client";
 
 import React from "react";
-import {
-  Eye,
-  Edit2,
-  RefreshCw,
-  Ban,
-  AlertCircle,
-  CheckCircle2,
-} from "lucide-react";
-import { ActividadConsultor, MomentoActividadConsultor } from "@/types/consultor";
-import { formatearFechaTexto } from "@/lib/date-utils";
+import { Eye, AlertCircle } from "lucide-react";
+import { AgendaGetDto } from "@/types/calendario";
+import { MomentoActividadConsultor } from "@/types/consultor";
+import { BadgeTipoServicio } from "@/components/ui/BadgeTipoServicio";
+import { EstadoVacioTabla } from "@/components/ui/EstadoVacioTabla";
+import { limpiarDecimales } from "@/lib/date-utils";
 import { isToday, isSameDay, addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
 
 interface Props {
-  datos: ActividadConsultor[];
+  datos: AgendaGetDto[];
   cargando: boolean;
   error?: string | null;
-  onVerHistorial: (item: ActividadConsultor) => void;
-  onConfirmarTermino: (item: ActividadConsultor) => void;
-  onEditarActividad: (item: ActividadConsultor) => void;
-  onReprogramarActividad: (item: ActividadConsultor) => void;
-  onCancelarActividad: (item: ActividadConsultor) => void;
+  onVerLineaTiempo: (item: AgendaGetDto) => void;
 }
+
+/* ------------------------------------------------------------------
+ * Helpers compartidos (usados por la vista Actividades, el historial
+ * de actividades y ModalDetalleServicioConsultor).
+ * ------------------------------------------------------------------ */
 
 export function formatearFechaActividadReal(fechaStr: string | null): {
   texto: string;
@@ -122,32 +119,100 @@ export const renderEstatusActividadBadge = (cveEstatus: number | null) => {
   }
 };
 
+/* ------------------------------------------------------------------
+ * Helpers de la tabla de sesiones (copiados de
+ * programacion/TablaAgendaSesiones.tsx).
+ * ------------------------------------------------------------------ */
+
+function formatearFechaSesion(fechaStr: string | null): { texto: string; esHoy: boolean } {
+  if (!fechaStr) return { texto: "—", esHoy: false };
+  try {
+    let d: Date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
+      const [year, month, day] = fechaStr.split("-").map(Number);
+      d = new Date(year, month - 1, day);
+    } else {
+      d = new Date(fechaStr);
+    }
+    if (isNaN(d.getTime())) return { texto: fechaStr, esHoy: false };
+
+    if (isToday(d)) return { texto: "Hoy", esHoy: true };
+    const manana = addDays(new Date(), 1);
+    if (isSameDay(d, manana)) return { texto: "Mañana", esHoy: false };
+
+    const res = format(d, "dd/MMM/yyyy", { locale: es });
+    return { texto: res.replace(/\./g, "").toLowerCase(), esHoy: false };
+  } catch {
+    return { texto: fechaStr, esHoy: false };
+  }
+}
+
+function formatearHoraSesion(fechaStr: string | null): string {
+  if (!fechaStr) return "—";
+  try {
+    const d = new Date(fechaStr);
+    if (isNaN(d.getTime())) return "—";
+
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    const hora = `${hh}:${mm}`;
+
+    if (hora === "00:00") return "";
+    return hora;
+  } catch {
+    return "—";
+  }
+}
+
+const renderEstatusBadge = (cveEstatus: number | null) => {
+  switch (cveEstatus) {
+    case 0:
+      return <span className="badge badge-danger">Cancelado</span>;
+    case 1:
+      return <span className="badge badge-primary">Programado</span>;
+    case 2:
+    case 6:
+      return <span className="badge badge-warning">En curso</span>;
+    case 3:
+      return <span className="badge badge-success">Terminado</span>;
+    case 4:
+      return <span className="badge badge-secondary">Reprogramado</span>;
+    case 5:
+      return (
+        <span
+          className="badge"
+          title="Llegó la fecha de finalización estimada. Falta confirmar que terminó."
+          style={{ backgroundColor: "#ffe5d0", color: "#984c0c" }}
+        >
+          Por confirmar
+        </span>
+      );
+    default:
+      return <span className="badge badge-primary">Programado</span>;
+  }
+};
+
 export const TablaConsultorSesiones: React.FC<Props> = ({
   datos,
   cargando,
   error,
-  onVerHistorial,
-  onConfirmarTermino,
-  onEditarActividad,
-  onReprogramarActividad,
-  onCancelarActividad,
+  onVerLineaTiempo,
 }) => {
   return (
     <div className="alegra-table-container">
       <table className="alegra-table">
         <thead>
           <tr>
-            <th>Fecha</th>
-            <th>Horario</th>
+            <th>Fecha inicio</th>
+            <th>Hora inicio</th>
+            <th>Hora fin</th>
             <th>Cliente</th>
-            <th style={{ minWidth: "300px", width: "34%" }}>Actividad</th>
-            <th style={{ whiteSpace: "nowrap" }}>Fin compromiso</th>
-            <th style={{ whiteSpace: "nowrap" }}>Fin real</th>
             <th>Estatus</th>
-            <th
-              className="text-center"
-              style={{ width: "150px", minWidth: "150px" }}
-            >
+            <th>Tema</th>
+            <th>Tipo</th>
+            <th>Titular / Apoyo</th>
+            <th>Total</th>
+            <th className="text-center" style={{ width: "60px", minWidth: "60px" }}>
               Acciones
             </th>
           </tr>
@@ -155,56 +220,34 @@ export const TablaConsultorSesiones: React.FC<Props> = ({
         <tbody>
           {cargando ? (
             Array.from({ length: 5 }).map((_, idx) => (
-              <tr key={`sk-actividades-${idx}`}>
+              <tr key={`sk-sesiones-${idx}`}>
                 <td>
-                  <div
-                    className="skeleton-box"
-                    style={{ width: "70px", height: "16px" }}
-                  ></div>
+                  <div className="skeleton-box" style={{ width: "70px", height: "16px" }}></div>
                 </td>
                 <td>
-                  <div
-                    className="skeleton-box sm"
-                    style={{ width: "75px" }}
-                  ></div>
+                  <div className="skeleton-box sm" style={{ width: "45px" }}></div>
                 </td>
                 <td>
-                  <div
-                    className="skeleton-box"
-                    style={{ width: "80%", marginBottom: "4px" }}
-                  ></div>
-                  <div
-                    className="skeleton-box sm"
-                    style={{ width: "45%" }}
-                  ></div>
+                  <div className="skeleton-box sm" style={{ width: "45px" }}></div>
                 </td>
                 <td>
-                  <div
-                    className="skeleton-box"
-                    style={{ width: "85%" }}
-                  ></div>
+                  <div className="skeleton-box" style={{ width: "80%", marginBottom: "4px" }}></div>
                 </td>
                 <td>
-                  <div
-                    className="skeleton-box sm"
-                    style={{ width: "75px" }}
-                  ></div>
+                  <div className="skeleton-box" style={{ width: "75px", height: "20px", borderRadius: "10px" }}></div>
                 </td>
                 <td>
-                  <div
-                    className="skeleton-box sm"
-                    style={{ width: "75px" }}
-                  ></div>
+                  <div className="skeleton-box" style={{ width: "75%", marginBottom: "4px" }}></div>
                 </td>
                 <td>
-                  <div
-                    className="skeleton-box"
-                    style={{
-                      width: "75px",
-                      height: "20px",
-                      borderRadius: "10px",
-                    }}
-                  ></div>
+                  <div className="skeleton-box" style={{ width: "70px", height: "20px", borderRadius: "10px" }}></div>
+                </td>
+                <td>
+                  <div className="skeleton-box sm" style={{ width: "70%", marginBottom: "4px" }}></div>
+                  <div className="skeleton-box sm" style={{ width: "40%" }}></div>
+                </td>
+                <td>
+                  <div className="skeleton-box sm" style={{ width: "50px" }}></div>
                 </td>
                 <td className="text-center">
                   <div className="flex items-center justify-center">
@@ -215,7 +258,7 @@ export const TablaConsultorSesiones: React.FC<Props> = ({
             ))
           ) : error ? (
             <tr>
-              <td colSpan={8} className="text-center py-8">
+              <td colSpan={10} className="text-center py-8">
                 <div
                   style={{
                     display: "flex",
@@ -242,218 +285,103 @@ export const TablaConsultorSesiones: React.FC<Props> = ({
               </td>
             </tr>
           ) : datos.length === 0 ? (
-            <tr>
-              <td colSpan={8} className="text-center py-8 text-secondary">
-                No se encontraron sesiones ni actividades. Intenta ajustando los
-                filtros de búsqueda.
-              </td>
-            </tr>
+            <EstadoVacioTabla colSpan={10} alt="No hay sesiones" />
           ) : (
             datos.map((item, idx) => {
-              const { texto: fechaTexto, esHoy } = formatearFechaActividadReal(
-                item.d_FechaInicio
-              );
-              const { texto: horarioTexto, esTodoElDia } =
-                formatearHorarioActividadReal(item);
-              const descripcionLimpia = item.v_Descripcion
-                ? item.v_Descripcion.trim()
-                : "";
-              const esActividadConsultor = item.v_Origen === "ACTIVIDAD";
-              const finCompromisoTexto = item.d_FinCompromiso
-                ? formatearFechaTexto(item.d_FinCompromiso) || "—"
-                : "—";
+              const { texto: fechaTexto, esHoy } = formatearFechaSesion(item.d_FechaInicio);
+              const horaIniStr = formatearHoraSesion(item.d_FechaInicio);
+              const horaFinStr = formatearHoraSesion(item.d_FechaFin);
 
-              const puedeConfirmar = Boolean(
-                item.b_RequiereConfirmacion && !item.d_FinReal
-              );
-              const tooltipConfirmar = puedeConfirmar
-                ? "Confirmar terminado"
-                : item.b_RequiereConfirmacion && Boolean(item.d_FinReal)
-                ? "Ya confirmado"
-                : "No requiere confirmación";
+              const tieneTitular = item.v_Titular && item.v_Titular.trim().length > 0 && item.v_Titular.trim() !== "—";
+              const tieneApoyo = item.v_Apoyo && item.v_Apoyo.trim().length > 0 && item.v_Apoyo.trim() !== "—";
+              const tipoUpper = (item.v_TipoServicio || "").toUpperCase();
+              const esEstudioOServicio =
+                (item as any).i_CveTipoServicio === 3 ||
+                (item as any).i_CveTipoServicio === 6 ||
+                tipoUpper.includes("ESTUDIO") ||
+                tipoUpper.includes("SERVICIO");
 
               return (
                 <tr
-                  key={`act-row-${item.v_Origen}-${item.v_Momento}-${
-                    item.i_CveActividad ??
-                    item.i_CveAgendaDetalle ??
-                    item.i_CveServAgendaDet ??
-                    idx
-                  }-${idx}`}
+                  key={`sesion-${item.i_CveAgendaDetalle || "det"}-${item.i_CveAgenda || "ag"}-${idx}`}
                   style={esHoy ? { backgroundColor: "#eef6fd" } : undefined}
                 >
-                  {/* 1. Fecha */}
+                  {/* 1. Fecha inicio */}
                   <td>
-                    <div
-                      style={{
-                        fontWeight: esHoy ? 700 : 400,
-                        color: esHoy ? "#188ae2" : "#1e3a5f",
-                      }}
-                    >
+                    <div style={{ fontWeight: esHoy ? 700 : 400, color: esHoy ? "#188ae2" : "#1e3a5f" }}>
                       {fechaTexto}
                     </div>
                   </td>
 
-                  {/* 2. Horario */}
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <span
-                      style={esTodoElDia ? { color: "#64748b" } : undefined}
-                    >
-                      {horarioTexto}
-                    </span>
+                  {/* 2. Hora inicio */}
+                  <td>
+                    <span>{esEstudioOServicio ? "—" : (horaIniStr || "—")}</span>
                   </td>
 
-                  {/* 3. Cliente */}
+                  {/* 3. Hora fin */}
                   <td>
-                    {item.v_Empresa && item.v_Empresa.trim() ? (
-                      <>
-                        <div
-                          style={{ fontWeight: 700, color: "#1e3a5f" }}
-                          className="uppercase"
-                        >
-                          {item.v_Empresa.trim()}
-                        </div>
-                        {item.v_Planta && (
-                          <span className="subtext">{item.v_Planta}</span>
-                        )}
-                      </>
-                    ) : (
-                      <span style={{ color: "#64748b" }}>—</span>
+                    <span>{esEstudioOServicio ? "—" : (horaFinStr || "—")}</span>
+                  </td>
+
+                  {/* 4. Cliente */}
+                  <td>
+                    <div style={{ fontWeight: 700, color: "#1e3a5f" }} className="uppercase">
+                      {item.v_Empresa || "—"}
+                    </div>
+                    {item.v_Planta && item.v_Planta.trim() !== "" && (
+                      <span className="subtext">{item.v_Planta}</span>
                     )}
                   </td>
 
-                  {/* 4. Actividad (v_Actividad: v_Descripcion sin chip de tipo) */}
-                  <td
-                    style={{
-                      whiteSpace: "normal",
-                      wordBreak: "break-word",
-                      minWidth: "260px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#1e3a5f",
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {descripcionLimpia ? (
-                        <>
-                          <span style={{ fontWeight: 700 }}>
-                            {item.v_Actividad}:
-                          </span>{" "}
-                          <span style={{ fontWeight: 400 }}>
-                            {descripcionLimpia}
-                          </span>
-                        </>
-                      ) : (
-                        <span style={{ fontWeight: 700 }}>
-                          {item.v_Actividad}
-                        </span>
-                      )}
+                  {/* 5. Estatus */}
+                  <td>{renderEstatusBadge(item.i_CveEstatus)}</td>
+
+                  {/* 6. Tema (Servicio) */}
+                  <td>
+                    <div style={{ fontWeight: 700, color: "#1e3a5f" }}>
+                      {item.v_Servicio || "—"}
                     </div>
                   </td>
 
-                  {/* 5. Fin compromiso */}
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <span>{finCompromisoTexto}</span>
+                  {/* 7. Tipo */}
+                  <td>
+                    <BadgeTipoServicio tipoServicio={item.v_TipoServicio} />
                   </td>
 
-                  {/* 6. Fin real */}
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    {item.v_Origen === "SESION" ? (
-                      <span style={{ color: "#64748b" }}>N/A</span>
-                    ) : item.b_RequiereConfirmacion && !item.d_FinReal ? (
-                      <span style={{ color: "#984c0c", fontWeight: 600 }}>
-                        Por confirmar
+                  {/* 8. Titular / Apoyo */}
+                  <td>
+                    {!tieneTitular && !tieneApoyo ? (
+                      <span
+                        style={{ color: "#DC3545", fontWeight: 600, fontSize: "13px" }}
+                        title="Pendiente de asignar"
+                      >
+                        Pendiente
                       </span>
-                    ) : item.d_FinReal ? (
-                      <span>{formatearFechaTexto(item.d_FinReal) || "—"}</span>
                     ) : (
-                      <span>—</span>
+                      <div>
+                        {tieneTitular && <div className="font-medium">{item.v_Titular}</div>}
+                        {tieneApoyo && <span className="subtext">Apoyo: {item.v_Apoyo}</span>}
+                      </div>
                     )}
                   </td>
 
-                  {/* 7. Estatus */}
-                  <td>{renderEstatusActividadBadge(item.i_CveEstatus)}</td>
+                  {/* 9. Total (duración o cantidad, no monto) */}
+                  <td>
+                    <span>{limpiarDecimales(item.v_Total)}</span>
+                  </td>
 
-                  {/* 8. Acciones */}
-                  <td
-                    className="text-center whitespace-nowrap"
-                    style={{ width: "150px", minWidth: "150px" }}
-                  >
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px",
-                      }}
-                    >
+                  {/* 10. Acciones */}
+                  <td className="text-center whitespace-nowrap" style={{ width: "60px", minWidth: "60px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <button
                         type="button"
                         className="btn-icon"
-                        onClick={() => onVerHistorial(item)}
-                        title="Historial de actividades"
+                        onClick={() => onVerLineaTiempo(item)}
+                        title="Sesiones"
                         style={{ color: "#188ae2" }}
                       >
                         <Eye size={16} />
                       </button>
-
-                      <span
-                        title={tooltipConfirmar}
-                        style={{ display: "inline-flex" }}
-                      >
-                        <button
-                          type="button"
-                          className="btn-icon"
-                          disabled={!puedeConfirmar}
-                          onClick={() => {
-                            if (puedeConfirmar) {
-                              onConfirmarTermino(item);
-                            }
-                          }}
-                          title={tooltipConfirmar}
-                          style={{
-                            color: puedeConfirmar ? "#16a34a" : "#94a3b8",
-                            cursor: puedeConfirmar ? "pointer" : "not-allowed",
-                            opacity: puedeConfirmar ? 1 : 0.65,
-                          }}
-                        >
-                          <CheckCircle2 size={16} />
-                        </button>
-                      </span>
-
-                      {esActividadConsultor && (
-                        <>
-                          <button
-                            type="button"
-                            className="btn-icon"
-                            onClick={() => onEditarActividad(item)}
-                            title="Editar actividad"
-                            style={{ color: "#2B8FCC" }}
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-icon"
-                            onClick={() => onReprogramarActividad(item)}
-                            title="Reprogramar actividad"
-                            style={{ color: "#d97706" }}
-                          >
-                            <RefreshCw size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-icon"
-                            onClick={() => onCancelarActividad(item)}
-                            title="Cancelar actividad"
-                            style={{ color: "#dc3545" }}
-                          >
-                            <Ban size={15} />
-                          </button>
-                        </>
-                      )}
                     </div>
                   </td>
                 </tr>

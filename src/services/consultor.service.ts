@@ -5,13 +5,15 @@ import {
   AgendaServicioConsultorGetDto,
   AgendaDetalleConsultorDto,
   EntregableResumen,
-  ActividadConsultor,
+  ActividadPendienteConsultor,
+  PrioridadActividad,
   HistorialActividad,
   ProyectoEnCursoConsultorDto,
   CrearEditarActividadPayload,
-  ReprogramarActividadPayload,
   CancelarActividadPayload,
   GuardarAvancePayload,
+  ActividadPersonal,
+  PersonalActividadesOpcion,
 } from "@/types/consultor";
 
 export function extraerMensajeErrorConsultor(
@@ -127,15 +129,22 @@ export const ConsultorService = {
     fechaInicio?: string;
     fechaFin?: string;
     searchTerm?: string;
+    iPrioridad?: number;
+    iLiga?: number;
     pagina?: number;
     tamano?: number;
-  }): Promise<PaginadoResponse<ActividadConsultor>> {
+  }): Promise<PaginadoResponse<ActividadPendienteConsultor>> {
     const queryParams: Record<string, unknown> = {
-      fechaInicio: params.fechaInicio || new Date().toISOString().split("T")[0],
+      iPrioridad: params.iPrioridad ?? 0,
+      iLiga: params.iLiga ?? 0,
       pagina: params.pagina ?? 1,
       tamano: params.tamano ?? 10,
     };
 
+    // SIN fecha default: sin rango se muestran todas las pendientes
+    if (params.fechaInicio && params.fechaInicio.trim()) {
+      queryParams.fechaInicio = params.fechaInicio.trim();
+    }
     if (params.fechaFin && params.fechaFin.trim()) {
       queryParams.fechaFin = params.fechaFin.trim();
     }
@@ -166,30 +175,141 @@ export const ConsultorService = {
       else if (typeof data.TotalPaginas === "number") totalPaginasFromBack = data.TotalPaginas;
     }
 
-    const datosParseados: ActividadConsultor[] = rawDatos.map((item: any) => ({
-      v_Origen: item.v_Origen ?? "ACTIVIDAD",
-      v_Momento: item.v_Momento ?? "UNICO",
-      i_CveActividad: item.i_CveActividad ?? null,
-      i_CveAgenda: item.i_CveAgenda ?? null,
+    const datosParseados: ActividadPendienteConsultor[] = rawDatos.map((item: any) => ({
+      i_CveActividad: Number(item.i_CveActividad ?? 0),
       i_CveServAgendaDet: item.i_CveServAgendaDet ?? null,
-      i_CveAgendaDetalle: item.i_CveAgendaDetalle ?? null,
-      d_FechaInicio: item.d_FechaInicio ?? "",
-      d_FechaFin: item.d_FechaFin ?? "",
-      b_TieneHorario: Boolean(item.b_TieneHorario),
+      i_CveAgenda: item.i_CveAgenda ?? null,
+      v_Titulo: item.v_Titulo ?? "",
+      v_Notas: item.v_Notas ?? null,
+      v_Proyecto: item.v_Proyecto ?? "GENERAL",
       v_Empresa: item.v_Empresa ?? null,
       v_Planta: item.v_Planta ?? null,
-      v_Actividad: item.v_Actividad ?? "",
-      v_Descripcion: item.v_Descripcion ?? null,
-      v_Titulo: item.v_Titulo ?? null,
-      v_Notas: item.v_Notas ?? null,
-      v_TipoServicio: item.v_TipoServicio ?? null,
-      i_CveTipoServicio: item.i_CveTipoServicio ?? null,
-      b_RequiereConfirmacion: Boolean(item.b_RequiereConfirmacion),
-      d_FinCompromiso: item.d_FinCompromiso ?? null,
+      d_FechaInicio: item.d_FechaInicio ?? "",
+      d_FinCompromiso: item.d_FinCompromiso ?? "",
       d_FinReal: item.d_FinReal ?? null,
-      v_Duracion: item.v_Duracion ?? null,
+      i_Prioridad: (item.i_Prioridad ?? 3) as PrioridadActividad,
+      v_Prioridad: item.v_Prioridad ?? "Baja",
       i_CveEstatus: item.i_CveEstatus ?? 1,
       i_TotalRegistros: item.i_TotalRegistros ?? 0,
+    }));
+
+    if (!total) {
+      total = rawDatos[0]?.i_TotalRegistros ?? datosParseados.length;
+    }
+    const tam = params.tamano || 10;
+    const totalPaginas =
+      totalPaginasFromBack && totalPaginasFromBack > 0
+        ? totalPaginasFromBack
+        : Math.ceil(total / tam) || 1;
+
+    return {
+      datos: datosParseados,
+      total,
+      pagina: params.pagina ?? 1,
+      tamano: tam,
+      totalPaginas,
+    };
+  },
+
+  /**
+   * GET instructores/consultor/actividades/personal/catalogo
+   */
+  async getPersonalActividades(): Promise<PersonalActividadesOpcion[]> {
+    const resp = await apiClient.get<any>(
+      "instructores/consultor/actividades/personal/catalogo"
+    );
+    const data = resp.data;
+    const raw: any[] = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.datos)
+      ? data.datos
+      : Array.isArray(data?.data)
+      ? data.data
+      : Array.isArray(data?.Datos)
+      ? data.Datos
+      : [];
+
+    return raw.map((item: any) => ({
+      i_CveInstructor: Number(item.i_CveInstructor ?? 0),
+      v_Nombre: item.v_Nombre ?? "",
+      b_EsPropio: Boolean(item.b_EsPropio),
+    }));
+  },
+
+  /**
+   * GET instructores/consultor/actividades/personal
+   */
+  async getActividadesPersonal(params: {
+    iCvePersonal?: number;
+    fechaInicio?: string;
+    fechaFin?: string;
+    searchTerm?: string;
+    iPrioridad?: number;
+    iLiga?: number;
+    pagina?: number;
+    tamano?: number;
+  }): Promise<PaginadoResponse<ActividadPersonal>> {
+    const queryParams: Record<string, unknown> = {
+      iCvePersonal: params.iCvePersonal ?? 0,
+      iPrioridad: params.iPrioridad ?? 0,
+      iLiga: params.iLiga ?? 0,
+      pagina: params.pagina ?? 1,
+      tamano: params.tamano ?? 10,
+    };
+
+    if (params.fechaInicio && params.fechaInicio.trim()) {
+      queryParams.fechaInicio = params.fechaInicio.trim();
+    }
+    if (params.fechaFin && params.fechaFin.trim()) {
+      queryParams.fechaFin = params.fechaFin.trim();
+    }
+    if (params.searchTerm && params.searchTerm.trim()) {
+      queryParams.searchTerm = params.searchTerm.trim();
+    }
+
+    const resp = await apiClient.get<any>(
+      "instructores/consultor/actividades/personal",
+      { params: queryParams }
+    );
+
+    const data = resp.data;
+    let rawDatos: any[] = [];
+    let total = 0;
+    let totalPaginasFromBack: number | null = null;
+
+    if (Array.isArray(data)) {
+      rawDatos = data;
+    } else if (data && typeof data === "object") {
+      if (Array.isArray(data.datos)) rawDatos = data.datos;
+      else if (Array.isArray(data.data)) rawDatos = data.data;
+      else if (Array.isArray(data.Datos)) rawDatos = data.Datos;
+
+      if (typeof data.total === "number") total = data.total;
+      else if (typeof data.Total === "number") total = data.Total;
+
+      if (typeof data.totalPaginas === "number") totalPaginasFromBack = data.totalPaginas;
+      else if (typeof data.TotalPaginas === "number") totalPaginasFromBack = data.TotalPaginas;
+    }
+
+    const datosParseados: ActividadPersonal[] = rawDatos.map((item: any) => ({
+      i_CveActividad: Number(item.i_CveActividad ?? 0),
+      i_CveServAgendaDet: item.i_CveServAgendaDet ?? null,
+      i_CveAgenda: item.i_CveAgenda ?? null,
+      v_Titulo: item.v_Titulo ?? "",
+      v_Notas: item.v_Notas ?? null,
+      v_Proyecto: item.v_Proyecto ?? "GENERAL",
+      v_Empresa: item.v_Empresa ?? null,
+      v_Planta: item.v_Planta ?? null,
+      d_FechaInicio: item.d_FechaInicio ?? "",
+      d_FinCompromiso: item.d_FinCompromiso ?? "",
+      d_FinReal: item.d_FinReal ?? null,
+      i_Prioridad: (item.i_Prioridad ?? 3) as PrioridadActividad,
+      v_Prioridad: item.v_Prioridad ?? "Baja",
+      i_CveEstatus: item.i_CveEstatus ?? 1,
+      i_TotalRegistros: item.i_TotalRegistros ?? 0,
+      i_CveInstructor: Number(item.i_CveInstructor ?? 0),
+      v_Personal: item.v_Personal ?? "",
+      b_EsPropia: Boolean(item.b_EsPropia),
     }));
 
     if (!total) {
@@ -321,6 +441,7 @@ export const ConsultorService = {
             : null,
         i_DiasExcedidos: Number(item.i_DiasExcedidos ?? 0),
         i_DiasRestantes: Number(item.i_DiasRestantes ?? 0),
+        i_DiasAnticipacion: Number(item.i_DiasAnticipacion ?? 0),
       };
     });
 
@@ -566,17 +687,6 @@ export const ConsultorService = {
     body: CrearEditarActividadPayload
   ): Promise<void> {
     await apiClient.put(`instructores/consultor/actividades/${id}`, body);
-  },
-
-  /**
-   * POST instructores/consultor/actividades/{id}/reprogramar
-   * §3.5 Reprogramar actividad del consultor
-   */
-  async reprogramarActividad(
-    id: number,
-    body: ReprogramarActividadPayload
-  ): Promise<void> {
-    await apiClient.post(`instructores/consultor/actividades/${id}/reprogramar`, body);
   },
 
   /**

@@ -39,6 +39,7 @@ export interface AgendaServicioConsultorGetDto {
   i_DiasTotales: number | null;
   i_DiasExcedidos: number;
   i_DiasRestantes: number;
+  i_DiasAnticipacion: number;
 }
 
 export interface AgendaDetalleConsultorCabeceraDto {
@@ -174,20 +175,32 @@ export interface ProyectoEnCursoConsultorDto {
   v_Planta: string | null;
 }
 
+export type PrioridadActividad = 1 | 2 | 3; // 1 Alta · 2 Media · 3 Baja
+
+export interface ActividadPendienteConsultor {
+  i_CveActividad: number;
+  i_CveServAgendaDet: number | null; // null = General
+  i_CveAgenda: number | null;
+  v_Titulo: string;
+  v_Notas: string | null;
+  v_Proyecto: string;                // nombre del servicio o "GENERAL"
+  v_Empresa: string | null;          // null en GENERAL
+  v_Planta: string | null;           // null en GENERAL
+  d_FechaInicio: string;
+  d_FinCompromiso: string;
+  d_FinReal: string | null;          // siempre null (solo vienen pendientes)
+  i_Prioridad: PrioridadActividad;
+  v_Prioridad: string;               // "Alta" | "Media" | "Baja"
+  i_CveEstatus: number;              // 1 Programado · 2 En curso · 5 Por confirmar
+  i_TotalRegistros: number;
+}
+
 export interface CrearEditarActividadPayload {
   v_Titulo: string;
   i_CveServAgendaDet: number | null;
   v_Notas: string | null;
   d_FechaInicio: string;
-  d_FechaFin: string;
-  b_TieneHorario: boolean;
-}
-
-export interface ReprogramarActividadPayload {
-  d_FechaInicio: string;
-  d_FechaFin: string;
-  b_TieneHorario: boolean;
-  v_Motivo: string | null;
+  d_FechaFin: string;   // fecha compromiso
 }
 
 export interface CancelarActividadPayload {
@@ -200,7 +213,7 @@ export interface GuardarAvancePayload {
   v_Nota: string | null;
 }
 
-export type VistaConsultor = "actividades" | "servicios";
+export type VistaConsultor = "servicios" | "sesiones";
 
 export interface FiltrosConsultorSesionesState {
   visualizar: VistaConsultor;
@@ -210,7 +223,14 @@ export interface FiltrosConsultorSesionesState {
   searchTerm: string;
 }
 
-export type FiltrosConsultorActividadesState = FiltrosConsultorSesionesState;
+export interface FiltrosConsultorActividadesState {
+  fechaInicio: string;   // "" = sin filtro (filtra por fecha compromiso)
+  fechaFin: string;
+  usarRango: boolean;
+  searchTerm: string;
+  iPrioridad: 0 | PrioridadActividad; // 0 = todas
+  iLiga: 0 | 1 | 2;                   // 0 todas · 1 Proyecto · 2 General
+}
 
 export interface FiltrosConsultorServiciosState {
   visualizar: VistaConsultor;
@@ -219,4 +239,20 @@ export interface FiltrosConsultorServiciosState {
   usarRango: boolean;
   searchTerm: string;
   soloExcedidos: boolean;
+}
+
+export interface ActividadPersonal extends ActividadPendienteConsultor {
+  i_CveInstructor: number;
+  v_Personal: string;
+  b_EsPropia: boolean;
+}
+
+export interface PersonalActividadesOpcion {
+  i_CveInstructor: number;
+  v_Nombre: string;
+  b_EsPropio: boolean;
+}
+
+export interface FiltrosActividadesPersonalState extends FiltrosConsultorActividadesState {
+  iCvePersonal: number; // -1 = Mías, 0 = Todos, > 0 = i_CveInstructor
 }

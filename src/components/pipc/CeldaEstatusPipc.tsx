@@ -18,12 +18,14 @@ export interface CeldaEstatusPipcProps {
   row: ItemServicioPipc;
   rutaChecklist?: (id: number) => string;
   sessionStorageKey?: string;
+  ocultarDias?: boolean;
 }
 
 export const CeldaEstatusPipc: React.FC<CeldaEstatusPipcProps> = ({
   row,
   rutaChecklist = (id) => `/programacion/pipc/${id}`,
   sessionStorageKey = "pipc_origen_programacion",
+  ocultarDias = false,
 }) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -35,12 +37,12 @@ export const CeldaEstatusPipc: React.FC<CeldaEstatusPipcProps> = ({
   const pct = sinIniciar ? 0 : Math.min(100, Math.max(0, Math.round(row.i_AvancePipc ?? 0)));
   const colorSemaforo = getColorSemaforo(pct);
 
-  const dias = diasRestantes(row.d_FechaFin);
+  const dias = ocultarDias ? null : diasRestantes(row.d_FechaFin);
   let textoDias = "";
   let colorDias = "#64748b";
   let pesoDias: number | string = 400;
 
-  if (dias !== null) {
+  if (!ocultarDias && dias !== null) {
     if (dias > 1) {
       textoDias = `${dias} días restantes`;
       colorDias = "#64748b";
@@ -157,30 +159,32 @@ export const CeldaEstatusPipc: React.FC<CeldaEstatusPipcProps> = ({
           {pct} %
         </span>
       </div>
-      <div
-        style={{
-          fontSize: "11px",
-          lineHeight: 1.2,
-          fontWeight: isActivo ? 600 : pesoDias,
-          color: isActivo ? "#2B8FCC" : colorDias,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          display: "flex",
-          alignItems: "center",
-          gap: "4px",
-          minHeight: "14px",
-        }}
-      >
-        {isActivo ? (
-          <>
-            <span>{sinIniciar ? (iniciando ? "Iniciando…" : "Iniciar checklist") : "Ir al checklist"}</span>
-            <i className="bi bi-box-arrow-up-right" style={{ fontSize: "10px" }} />
-          </>
-        ) : (
-          <span>{lineaInferior}</span>
-        )}
-      </div>
+      {(isActivo || lineaInferior || !ocultarDias) && (
+        <div
+          style={{
+            fontSize: "11px",
+            lineHeight: 1.2,
+            fontWeight: isActivo ? 600 : pesoDias,
+            color: isActivo ? "#2B8FCC" : colorDias,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            minHeight: "14px",
+          }}
+        >
+          {isActivo ? (
+            <>
+              <span>{sinIniciar ? (iniciando ? "Iniciando…" : "Iniciar checklist") : "Ir al checklist"}</span>
+              <i className="bi bi-box-arrow-up-right" style={{ fontSize: "10px" }} />
+            </>
+          ) : (
+            <span>{lineaInferior}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 };

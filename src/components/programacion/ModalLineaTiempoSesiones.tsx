@@ -23,6 +23,11 @@ interface Props {
   iCveAgenda: number | null;
   iCveServAgendaDet: number | null;
   iCveAgendaDetalleResaltar?: number | null;
+  /**
+   * Modo consulta (p. ej. Mis servicios): oculta acciones que modifiquen la sesión
+   * y montos. Hoy el modal no tiene acciones ni montos, así que no cambia nada visual.
+   */
+  soloLectura?: boolean;
   onCerrar: () => void;
 }
 
@@ -175,6 +180,8 @@ export const ModalLineaTiempoSesiones: React.FC<Props> = ({
   iCveAgenda,
   iCveServAgendaDet,
   iCveAgendaDetalleResaltar,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  soloLectura = false,
   onCerrar,
 }) => {
   const [detalle, setDetalle] = useState<AgendaDetalleGetDto | null>(null);
