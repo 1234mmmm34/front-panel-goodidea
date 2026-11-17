@@ -14,7 +14,18 @@ import {
   GuardarAvancePayload,
   ActividadPersonal,
   PersonalActividadesOpcion,
+  OrdenCampoActividad,
+  ProyectoFiltroActividad,
 } from "@/types/consultor";
+
+function serializarListaFiltro(
+  valores: number[] | null | undefined,
+  valorVacio: string
+): string | undefined {
+  if (valores == null) return undefined;
+  if (valores.length === 0) return valorVacio;
+  return valores.join(",");
+}
 
 export function extraerMensajeErrorConsultor(
   err: any,
@@ -129,14 +140,15 @@ export const ConsultorService = {
     fechaInicio?: string;
     fechaFin?: string;
     searchTerm?: string;
-    iPrioridad?: number;
-    iLiga?: number;
+    prioridades?: number[] | null;
+    estatus?: number[] | null;
+    proyectos?: number[] | null;
+    ordenCampo?: OrdenCampoActividad | null;
+    ordenDir?: "ASC" | "DESC" | null;
     pagina?: number;
     tamano?: number;
   }): Promise<PaginadoResponse<ActividadPendienteConsultor>> {
     const queryParams: Record<string, unknown> = {
-      iPrioridad: params.iPrioridad ?? 0,
-      iLiga: params.iLiga ?? 0,
       pagina: params.pagina ?? 1,
       tamano: params.tamano ?? 10,
     };
@@ -150,6 +162,22 @@ export const ConsultorService = {
     }
     if (params.searchTerm && params.searchTerm.trim()) {
       queryParams.searchTerm = params.searchTerm.trim();
+    }
+    const prioParam = serializarListaFiltro(params.prioridades, "0");
+    if (prioParam !== undefined) {
+      queryParams.prioridades = prioParam;
+    }
+    const estParam = serializarListaFiltro(params.estatus, "0");
+    if (estParam !== undefined) {
+      queryParams.estatus = estParam;
+    }
+    const proyParam = serializarListaFiltro(params.proyectos, "-1");
+    if (proyParam !== undefined) {
+      queryParams.proyectos = proyParam;
+    }
+    if (params.ordenCampo && params.ordenDir) {
+      queryParams.ordenCampo = params.ordenCampo;
+      queryParams.ordenDir = params.ordenDir;
     }
 
     const resp = await apiClient.get<any>("instructores/consultor/actividades", {
@@ -175,23 +203,26 @@ export const ConsultorService = {
       else if (typeof data.TotalPaginas === "number") totalPaginasFromBack = data.TotalPaginas;
     }
 
-    const datosParseados: ActividadPendienteConsultor[] = rawDatos.map((item: any) => ({
-      i_CveActividad: Number(item.i_CveActividad ?? 0),
-      i_CveServAgendaDet: item.i_CveServAgendaDet ?? null,
-      i_CveAgenda: item.i_CveAgenda ?? null,
-      v_Titulo: item.v_Titulo ?? "",
-      v_Notas: item.v_Notas ?? null,
-      v_Proyecto: item.v_Proyecto ?? "GENERAL",
-      v_Empresa: item.v_Empresa ?? null,
-      v_Planta: item.v_Planta ?? null,
-      d_FechaInicio: item.d_FechaInicio ?? "",
-      d_FinCompromiso: item.d_FinCompromiso ?? "",
-      d_FinReal: item.d_FinReal ?? null,
-      i_Prioridad: (item.i_Prioridad ?? 3) as PrioridadActividad,
-      v_Prioridad: item.v_Prioridad ?? "Baja",
-      i_CveEstatus: item.i_CveEstatus ?? 1,
-      i_TotalRegistros: item.i_TotalRegistros ?? 0,
-    }));
+    const datosParseados: ActividadPendienteConsultor[] = rawDatos.map((item: any) => {
+      const estatus = item.i_CveEstatus ?? 1;
+      return {
+        i_CveActividad: Number(item.i_CveActividad ?? 0),
+        i_CveServAgendaDet: item.i_CveServAgendaDet ?? null,
+        i_CveAgenda: item.i_CveAgenda ?? null,
+        v_Titulo: item.v_Titulo ?? "",
+        v_Notas: item.v_Notas ?? null,
+        v_Proyecto: item.v_Proyecto ?? "GENERAL",
+        v_Empresa: item.v_Empresa ?? null,
+        v_Planta: item.v_Planta ?? null,
+        d_FechaInicio: item.d_FechaInicio ?? "",
+        d_FinCompromiso: item.d_FinCompromiso ?? "",
+        d_FinReal: item.d_FinReal ?? null,
+        i_Prioridad: (item.i_Prioridad ?? (estatus === 3 ? 0 : 3)) as 0 | PrioridadActividad,
+        v_Prioridad: item.v_Prioridad ?? (estatus === 3 ? null : "Baja"),
+        i_CveEstatus: estatus,
+        i_TotalRegistros: item.i_TotalRegistros ?? 0,
+      };
+    });
 
     if (!total) {
       total = rawDatos[0]?.i_TotalRegistros ?? datosParseados.length;
@@ -244,15 +275,16 @@ export const ConsultorService = {
     fechaInicio?: string;
     fechaFin?: string;
     searchTerm?: string;
-    iPrioridad?: number;
-    iLiga?: number;
+    prioridades?: number[] | null;
+    estatus?: number[] | null;
+    proyectos?: number[] | null;
+    ordenCampo?: OrdenCampoActividad | null;
+    ordenDir?: "ASC" | "DESC" | null;
     pagina?: number;
     tamano?: number;
   }): Promise<PaginadoResponse<ActividadPersonal>> {
     const queryParams: Record<string, unknown> = {
       iCvePersonal: params.iCvePersonal ?? 0,
-      iPrioridad: params.iPrioridad ?? 0,
-      iLiga: params.iLiga ?? 0,
       pagina: params.pagina ?? 1,
       tamano: params.tamano ?? 10,
     };
@@ -265,6 +297,22 @@ export const ConsultorService = {
     }
     if (params.searchTerm && params.searchTerm.trim()) {
       queryParams.searchTerm = params.searchTerm.trim();
+    }
+    const prioParam = serializarListaFiltro(params.prioridades, "0");
+    if (prioParam !== undefined) {
+      queryParams.prioridades = prioParam;
+    }
+    const estParam = serializarListaFiltro(params.estatus, "0");
+    if (estParam !== undefined) {
+      queryParams.estatus = estParam;
+    }
+    const proyParam = serializarListaFiltro(params.proyectos, "-1");
+    if (proyParam !== undefined) {
+      queryParams.proyectos = proyParam;
+    }
+    if (params.ordenCampo && params.ordenDir) {
+      queryParams.ordenCampo = params.ordenCampo;
+      queryParams.ordenDir = params.ordenDir;
     }
 
     const resp = await apiClient.get<any>(
@@ -291,26 +339,29 @@ export const ConsultorService = {
       else if (typeof data.TotalPaginas === "number") totalPaginasFromBack = data.TotalPaginas;
     }
 
-    const datosParseados: ActividadPersonal[] = rawDatos.map((item: any) => ({
-      i_CveActividad: Number(item.i_CveActividad ?? 0),
-      i_CveServAgendaDet: item.i_CveServAgendaDet ?? null,
-      i_CveAgenda: item.i_CveAgenda ?? null,
-      v_Titulo: item.v_Titulo ?? "",
-      v_Notas: item.v_Notas ?? null,
-      v_Proyecto: item.v_Proyecto ?? "GENERAL",
-      v_Empresa: item.v_Empresa ?? null,
-      v_Planta: item.v_Planta ?? null,
-      d_FechaInicio: item.d_FechaInicio ?? "",
-      d_FinCompromiso: item.d_FinCompromiso ?? "",
-      d_FinReal: item.d_FinReal ?? null,
-      i_Prioridad: (item.i_Prioridad ?? 3) as PrioridadActividad,
-      v_Prioridad: item.v_Prioridad ?? "Baja",
-      i_CveEstatus: item.i_CveEstatus ?? 1,
-      i_TotalRegistros: item.i_TotalRegistros ?? 0,
-      i_CveInstructor: Number(item.i_CveInstructor ?? 0),
-      v_Personal: item.v_Personal ?? "",
-      b_EsPropia: Boolean(item.b_EsPropia),
-    }));
+    const datosParseados: ActividadPersonal[] = rawDatos.map((item: any) => {
+      const estatus = item.i_CveEstatus ?? 1;
+      return {
+        i_CveActividad: Number(item.i_CveActividad ?? 0),
+        i_CveServAgendaDet: item.i_CveServAgendaDet ?? null,
+        i_CveAgenda: item.i_CveAgenda ?? null,
+        v_Titulo: item.v_Titulo ?? "",
+        v_Notas: item.v_Notas ?? null,
+        v_Proyecto: item.v_Proyecto ?? "GENERAL",
+        v_Empresa: item.v_Empresa ?? null,
+        v_Planta: item.v_Planta ?? null,
+        d_FechaInicio: item.d_FechaInicio ?? "",
+        d_FinCompromiso: item.d_FinCompromiso ?? "",
+        d_FinReal: item.d_FinReal ?? null,
+        i_Prioridad: (item.i_Prioridad ?? (estatus === 3 ? 0 : 3)) as 0 | PrioridadActividad,
+        v_Prioridad: item.v_Prioridad ?? (estatus === 3 ? null : "Baja"),
+        i_CveEstatus: estatus,
+        i_TotalRegistros: item.i_TotalRegistros ?? 0,
+        i_CveInstructor: Number(item.i_CveInstructor ?? 0),
+        v_Personal: item.v_Personal ?? "",
+        b_EsPropia: Boolean(item.b_EsPropia),
+      };
+    });
 
     if (!total) {
       total = rawDatos[0]?.i_TotalRegistros ?? datosParseados.length;
@@ -328,6 +379,69 @@ export const ConsultorService = {
       tamano: tam,
       totalPaginas,
     };
+  },
+
+  /**
+   * GET instructores/consultor/actividades/proyectos-filtro
+   */
+  async getActividadesProyectosFiltro(params: {
+    vistaPersonal?: boolean;
+    iCvePersonal?: number;
+    fechaInicio?: string;
+    fechaFin?: string;
+    searchTerm?: string;
+    prioridades?: number[] | null;
+    estatus?: number[] | null;
+  }): Promise<ProyectoFiltroActividad[]> {
+    try {
+      const queryParams: Record<string, unknown> = {};
+      if (params.vistaPersonal !== undefined) {
+        queryParams.vistaPersonal = params.vistaPersonal;
+      }
+      if (params.iCvePersonal !== undefined) {
+        queryParams.iCvePersonal = params.iCvePersonal;
+      }
+      if (params.fechaInicio && params.fechaInicio.trim()) {
+        queryParams.fechaInicio = params.fechaInicio.trim();
+      }
+      if (params.fechaFin && params.fechaFin.trim()) {
+        queryParams.fechaFin = params.fechaFin.trim();
+      }
+      if (params.searchTerm && params.searchTerm.trim()) {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+      const prioParam = serializarListaFiltro(params.prioridades, "0");
+      if (prioParam !== undefined) {
+        queryParams.prioridades = prioParam;
+      }
+      const estParam = serializarListaFiltro(params.estatus, "0");
+      if (estParam !== undefined) {
+        queryParams.estatus = estParam;
+      }
+
+      const resp = await apiClient.get<any>(
+        "instructores/consultor/actividades/proyectos-filtro",
+        { params: queryParams }
+      );
+      const data = resp.data;
+      const raw: any[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.datos)
+        ? data.datos
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.Datos)
+        ? data.Datos
+        : [];
+
+      return raw.map((item: any) => ({
+        i_CveServAgendaDet: Number(item.i_CveServAgendaDet ?? 0),
+        v_Etiqueta: item.v_Etiqueta ?? "",
+        i_OrdenGrupo: Number(item.i_OrdenGrupo ?? 0),
+      }));
+    } catch {
+      return [];
+    }
   },
 
   /**

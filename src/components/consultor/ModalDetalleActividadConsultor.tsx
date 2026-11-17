@@ -37,6 +37,10 @@ export const ModalDetalleActividadConsultor: React.FC<Props> = ({
   const esGeneral = actividad.i_CveServAgendaDet == null;
   const notasLimpias = actividad.v_Notas?.trim() || "";
   const esAtrasada = actividad.i_CveEstatus === 5;
+  const esTerminada = actividad.i_CveEstatus === 3;
+  const finRealTexto = actividad.d_FinReal
+    ? formatearFechaTexto(actividad.d_FinReal)
+    : "";
 
   return (
     <div
@@ -285,11 +289,11 @@ export const ModalDetalleActividadConsultor: React.FC<Props> = ({
             )}
           </div>
 
-          {/* 5. Fecha inicio · Fecha compromiso */}
+          {/* 5. Fecha inicio · Fecha compromiso (· Fin real) */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: finRealTexto ? "1fr 1fr 1fr" : "1fr 1fr",
               gap: "16px",
             }}
           >
@@ -312,6 +316,13 @@ export const ModalDetalleActividadConsultor: React.FC<Props> = ({
                 {formatearFechaTexto(actividad.d_FinCompromiso) || "—"}
               </div>
             </div>
+
+            {finRealTexto && (
+              <div>
+                <span style={labelStyle}>Fin real</span>
+                <div style={valueStyle}>{finRealTexto}</div>
+              </div>
+            )}
           </div>
 
           {/* 6. Prioridad · Estatus */}
@@ -325,9 +336,13 @@ export const ModalDetalleActividadConsultor: React.FC<Props> = ({
             <div>
               <span style={labelStyle}>Prioridad</span>
               <div>
-                {renderPrioridadActividadBadge(
-                  actividad.i_Prioridad,
-                  actividad.v_Prioridad
+                {esTerminada ? (
+                  <span style={{ ...valueStyle, color: "#94a3b8" }}>—</span>
+                ) : (
+                  renderPrioridadActividadBadge(
+                    actividad.i_Prioridad,
+                    actividad.v_Prioridad
+                  )
                 )}
               </div>
             </div>

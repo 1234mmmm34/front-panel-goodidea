@@ -21,7 +21,7 @@ import {
   ActividadPendienteConsultor,
   CrearEditarActividadPayload,
   FiltrosConsultorActividadesState,
-  PrioridadActividad,
+  OrdenCampoActividad,
   ProyectoEnCursoConsultorDto,
 } from "@/types/consultor";
 import {
@@ -32,10 +32,55 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PaginadorCustom } from "@/components/ui/PaginadorCustom";
 import { AvisoInfo } from "@/components/ui/AvisoInfo";
 import { SaludoBienvenida } from "@/components/ui/SaludoBienvenida";
+import { OpcionFiltro } from "@/components/ui/FiltroColumnaChecklist";
 import { FiltrosConsultorActividades } from "@/components/consultor/FiltrosConsultorActividades";
-import { TablaConsultorActividades } from "@/components/consultor/TablaConsultorActividades";
+import {
+  FiltrosColumnaActividades,
+  TablaConsultorActividades,
+} from "@/components/consultor/TablaConsultorActividades";
 import { ModalDetalleActividadConsultor } from "@/components/consultor/ModalDetalleActividadConsultor";
 import { useToast } from "@/context/ToastContext";
+
+const ESTATUS_DEFAULT: number[] = [1, 2, 5];
+const TODOS_ESTATUS = [1, 2, 5, 3];
+
+const OPCIONES_PRIORIDAD: OpcionFiltro[] = [
+  { valor: 1, etiqueta: "Alta" },
+  { valor: 2, etiqueta: "Media" },
+  { valor: 3, etiqueta: "Baja" },
+];
+
+const OPCIONES_ESTATUS: OpcionFiltro[] = [
+  { valor: 1, etiqueta: "Programado" },
+  { valor: 2, etiqueta: "En curso" },
+  { valor: 5, etiqueta: "Por confirmar" },
+  { valor: 3, etiqueta: "Terminado" },
+];
+
+function esEstatusDefault(est: number[] | null): boolean {
+  if (!est || est.length !== ESTATUS_DEFAULT.length) return false;
+  return ESTATUS_DEFAULT.every((v) => est.includes(v));
+}
+
+function parseListaParam(
+  raw: string | null,
+  valorVacio: string,
+  defaultValue: number[] | null,
+  todosLosValores?: number[]
+): number[] | null {
+  if (raw === null || raw.trim() === "") return defaultValue;
+  const trimmed = raw.trim();
+  if (trimmed === valorVacio) return [];
+  const nums = trimmed
+    .split(",")
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n));
+  if (nums.length === 0) return defaultValue;
+  if (todosLosValores && todosLosValores.every((v) => nums.includes(v))) {
+    return null;
+  }
+  return nums;
+}
 
 function MisActividadesContent() {
   const { toast, confirmModal } = useToast();
@@ -52,8 +97,11 @@ function MisActividadesContent() {
   const paramHasta = searchParams.get("hasta");
   const paramQ = searchParams.get("q");
   const paramPagina = searchParams.get("pagina");
-  const paramPrioridad = searchParams.get("prioridad");
-  const paramLiga = searchParams.get("liga");
+  const paramPrio = searchParams.get("prio");
+  const paramEst = searchParams.get("est");
+  const paramProy = searchParams.get("proy");
+  const paramOrdc = searchParams.get("ordc");
+  const paramOrdd = searchParams.get("ordd");
 
   const hoy = useMemo(() => new Date().toISOString().split("T")[0], []);
 
@@ -77,24 +125,31 @@ function MisActividadesContent() {
   >([]);
   const [filtrosActividades, setFiltrosActividades] =
     useState<FiltrosConsultorActividadesState>(() => {
-      const prio =
-        paramPrioridad === "1" ||
-        paramPrioridad === "2" ||
-        paramPrioridad === "3"
-          ? (Number(paramPrioridad) as PrioridadActividad)
-          : 0;
-      const liga =
-        paramLiga === "1" || paramLiga === "2"
-          ? (Number(paramLiga) as 1 | 2)
-          : 0;
+      const ordenCampoValido: OrdenCampoActividad | null =
+        paramOrdc === "proyecto" ||
+        paramOrdc === "prioridad" ||
+        paramOrdc === "estatus"
+          ? paramOrdc
+          : null;
+      const ordenDirValido: "ASC" | "DESC" | null =
+        paramOrdd === "ASC" || paramOrdd === "DESC" ? paramOrdd : null;
 
       return {
         fechaInicio: paramDesde || "",
         fechaFin: paramHasta || "",
         usarRango: Boolean(paramDesde || paramHasta),
         searchTerm: paramQ || "",
-        iPrioridad: prio,
-        iLiga: liga,
+        prioridades: parseListaParam(paramPrio, "0", null, [1, 2, 3]),
+        estatus: parseListaParam(
+          paramEst,
+          "0",
+          ESTATUS_DEFAULT,
+          TODOS_ESTATUS
+        ),
+        proyectos: parseListaParam(paramProy, "-1", null),
+        ordenCampo:
+          ordenCampoValido && ordenDirValido ? ordenCampoValido : null,
+        ordenDir: ordenCampoValido && ordenDirValido ? ordenDirValido : null,
       };
     });
 
@@ -160,11 +215,29 @@ function MisActividadesContent() {
       if (fact.searchTerm && fact.searchTerm.trim() !== "") {
         params.set("q", fact.searchTerm.trim());
       }
-      if (fact.iPrioridad !== 0) {
-        params.set("prioridad", String(fact.iPrioridad));
+      if (fact.prioridades !== null) {
+        params.set(
+          "prio",
+          fact.prioridades.length === 0 ? "0" : fact.prioridades.join(",")
+        );
       }
-      if (fact.iLiga !== 0) {
-        params.set("liga", String(fact.iLiga));
+      if (fact.estatus === null) {
+        params.set("est", TODOS_ESTATUS.join(","));
+      } else if (!esEstatusDefault(fact.estatus)) {
+        params.set(
+          "est",
+          fact.estatus.length === 0 ? "0" : fact.estatus.join(",")
+        );
+      }
+      if (fact.proyectos !== null) {
+        params.set(
+          "proy",
+          fact.proyectos.length === 0 ? "-1" : fact.proyectos.join(",")
+        );
+      }
+      if (fact.ordenCampo && fact.ordenDir) {
+        params.set("ordc", fact.ordenCampo);
+        params.set("ordd", fact.ordenDir);
       }
       if (targetPagina > 1) {
         params.set("pagina", String(targetPagina));
@@ -192,8 +265,11 @@ function MisActividadesContent() {
             ? filtrosActividades.fechaFin
             : undefined,
         searchTerm: filtrosActividades.searchTerm || undefined,
-        iPrioridad: filtrosActividades.iPrioridad,
-        iLiga: filtrosActividades.iLiga,
+        prioridades: filtrosActividades.prioridades,
+        estatus: filtrosActividades.estatus,
+        proyectos: filtrosActividades.proyectos,
+        ordenCampo: filtrosActividades.ordenCampo,
+        ordenDir: filtrosActividades.ordenDir,
         pagina: paginaActual,
         tamano: tamanoPagina,
       });
@@ -228,8 +304,11 @@ function MisActividadesContent() {
     filtrosActividades.fechaFin,
     filtrosActividades.usarRango,
     filtrosActividades.searchTerm,
-    filtrosActividades.iPrioridad,
-    filtrosActividades.iLiga,
+    filtrosActividades.prioridades,
+    filtrosActividades.estatus,
+    filtrosActividades.proyectos,
+    filtrosActividades.ordenCampo,
+    filtrosActividades.ordenDir,
     paginaActual,
     tamanoPagina,
   ]);
@@ -436,11 +515,132 @@ function MisActividadesContent() {
     });
   };
 
+  const aplicarFiltroColumna = useCallback(
+    (
+      campo: OrdenCampoActividad,
+      seleccion: number[] | null,
+      nuevoOrden: "ASC" | "DESC" | null
+    ) => {
+      const nuevosFiltros: FiltrosConsultorActividadesState = {
+        ...filtrosActividades,
+        prioridades:
+          campo === "prioridad" ? seleccion : filtrosActividades.prioridades,
+        estatus: campo === "estatus" ? seleccion : filtrosActividades.estatus,
+        proyectos:
+          campo === "proyecto" ? seleccion : filtrosActividades.proyectos,
+        ordenCampo:
+          nuevoOrden !== null
+            ? campo
+            : filtrosActividades.ordenCampo === campo
+            ? null
+            : filtrosActividades.ordenCampo,
+        ordenDir:
+          nuevoOrden !== null
+            ? nuevoOrden
+            : filtrosActividades.ordenCampo === campo
+            ? null
+            : filtrosActividades.ordenDir,
+      };
+      setFiltrosActividades(nuevosFiltros);
+      setPaginaActual(1);
+      actualizarUrl({
+        nuevosFiltrosActividades: nuevosFiltros,
+        nuevaPagina: 1,
+      });
+    },
+    [filtrosActividades, actualizarUrl]
+  );
+
+  const cargarOpcionesProyecto = useCallback(async (): Promise<
+    OpcionFiltro[]
+  > => {
+    const lista = await ConsultorService.getActividadesProyectosFiltro({
+      vistaPersonal: false,
+      fechaInicio:
+        filtrosActividades.usarRango && filtrosActividades.fechaInicio
+          ? filtrosActividades.fechaInicio
+          : undefined,
+      fechaFin:
+        filtrosActividades.usarRango && filtrosActividades.fechaFin
+          ? filtrosActividades.fechaFin
+          : undefined,
+      searchTerm: filtrosActividades.searchTerm || undefined,
+      prioridades: filtrosActividades.prioridades,
+      estatus: filtrosActividades.estatus,
+    });
+    return lista.map((p) => ({
+      valor: p.i_CveServAgendaDet,
+      etiqueta: p.v_Etiqueta,
+    }));
+  }, [
+    filtrosActividades.usarRango,
+    filtrosActividades.fechaInicio,
+    filtrosActividades.fechaFin,
+    filtrosActividades.searchTerm,
+    filtrosActividades.prioridades,
+    filtrosActividades.estatus,
+  ]);
+
+  const cargarOpcionesPrioridad = useCallback(
+    async (): Promise<OpcionFiltro[]> => OPCIONES_PRIORIDAD,
+    []
+  );
+
+  const cargarOpcionesEstatus = useCallback(
+    async (): Promise<OpcionFiltro[]> => OPCIONES_ESTATUS,
+    []
+  );
+
+  const filtrosColumna: FiltrosColumnaActividades = useMemo(
+    () => ({
+      proyecto: {
+        cargarOpciones: cargarOpcionesProyecto,
+        seleccionados: filtrosActividades.proyectos,
+        orden:
+          filtrosActividades.ordenCampo === "proyecto"
+            ? filtrosActividades.ordenDir
+            : null,
+        onAplicar: (sel, ord) => aplicarFiltroColumna("proyecto", sel, ord),
+      },
+      prioridad: {
+        cargarOpciones: cargarOpcionesPrioridad,
+        seleccionados: filtrosActividades.prioridades,
+        orden:
+          filtrosActividades.ordenCampo === "prioridad"
+            ? filtrosActividades.ordenDir
+            : null,
+        onAplicar: (sel, ord) => aplicarFiltroColumna("prioridad", sel, ord),
+      },
+      estatus: {
+        cargarOpciones: cargarOpcionesEstatus,
+        seleccionados: filtrosActividades.estatus,
+        orden:
+          filtrosActividades.ordenCampo === "estatus"
+            ? filtrosActividades.ordenDir
+            : null,
+        onAplicar: (sel, ord) => aplicarFiltroColumna("estatus", sel, ord),
+      },
+    }),
+    [
+      cargarOpcionesProyecto,
+      cargarOpcionesPrioridad,
+      cargarOpcionesEstatus,
+      filtrosActividades.proyectos,
+      filtrosActividades.prioridades,
+      filtrosActividades.estatus,
+      filtrosActividades.ordenCampo,
+      filtrosActividades.ordenDir,
+      aplicarFiltroColumna,
+    ]
+  );
+
   const hayFiltrosActivosActividades = Boolean(
     filtrosActividades.usarRango ||
       filtrosActividades.searchTerm.trim() !== "" ||
-      filtrosActividades.iPrioridad !== 0 ||
-      filtrosActividades.iLiga !== 0
+      filtrosActividades.prioridades !== null ||
+      filtrosActividades.proyectos !== null ||
+      !esEstatusDefault(filtrosActividades.estatus) ||
+      filtrosActividades.ordenCampo !== null
   );
 
   return (
@@ -536,10 +736,7 @@ function MisActividadesContent() {
                 nuevaPagina: 1,
               });
             }}
-            onBuscar={() => {
-              setPaginaActual(1);
-              actualizarUrl({ nuevaPagina: 1 });
-            }}
+            onBuscar={() => {}}
             onAgregarActividad={handleAbrirCrearActividad}
           />
 
@@ -548,6 +745,7 @@ function MisActividadesContent() {
             cargando={cargando}
             error={errorActividades}
             hayFiltrosActivos={hayFiltrosActivosActividades}
+            filtrosColumna={filtrosColumna}
             onVerHistorial={(item) => setActividadDetalle(item)}
             onConfirmar={handleConfirmarActividadPendiente}
             onEditar={handleAbrirEditarActividad}

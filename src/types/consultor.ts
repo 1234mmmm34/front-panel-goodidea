@@ -188,10 +188,10 @@ export interface ActividadPendienteConsultor {
   v_Planta: string | null;           // null en GENERAL
   d_FechaInicio: string;
   d_FinCompromiso: string;
-  d_FinReal: string | null;          // siempre null (solo vienen pendientes)
-  i_Prioridad: PrioridadActividad;
-  v_Prioridad: string;               // "Alta" | "Media" | "Baja"
-  i_CveEstatus: number;              // 1 Programado · 2 En curso · 5 Por confirmar
+  d_FinReal: string | null;          // fecha real de término; null si sigue pendiente
+  i_Prioridad: 0 | PrioridadActividad; // 0 cuando i_CveEstatus === 3
+  v_Prioridad: string | null;        // "Alta" | "Media" | "Baja" | null (null cuando i_CveEstatus === 3)
+  i_CveEstatus: number;              // 1 Programado · 2 En curso · 3 Terminado · 5 Por confirmar
   i_TotalRegistros: number;
 }
 
@@ -223,13 +223,24 @@ export interface FiltrosConsultorSesionesState {
   searchTerm: string;
 }
 
+export type OrdenCampoActividad = "proyecto" | "prioridad" | "estatus";
+
+export interface ProyectoFiltroActividad {
+  i_CveServAgendaDet: number;
+  v_Etiqueta: string;
+  i_OrdenGrupo: number;
+}
+
 export interface FiltrosConsultorActividadesState {
   fechaInicio: string;   // "" = sin filtro (filtra por fecha compromiso)
   fechaFin: string;
   usarRango: boolean;
   searchTerm: string;
-  iPrioridad: 0 | PrioridadActividad; // 0 = todas
-  iLiga: 0 | 1 | 2;                   // 0 todas · 1 Proyecto · 2 General
+  prioridades: number[] | null;   // null = todas
+  estatus: number[] | null;       // null = todos
+  proyectos: number[] | null;     // null = todos (0 = GENERAL)
+  ordenCampo: OrdenCampoActividad | null;
+  ordenDir: "ASC" | "DESC" | null;
 }
 
 export interface FiltrosConsultorServiciosState {

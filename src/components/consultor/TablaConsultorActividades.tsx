@@ -15,7 +15,27 @@ import {
 } from "@/types/consultor";
 import { formatearFechaTexto } from "@/lib/date-utils";
 import { EstadoVacioTabla } from "@/components/ui/EstadoVacioTabla";
+import {
+  FiltroColumnaChecklist,
+  OpcionFiltro,
+} from "@/components/ui/FiltroColumnaChecklist";
 import { renderEstatusActividadBadge } from "./TablaConsultorSesiones";
+
+export interface FiltroColumnaActividadConfig {
+  cargarOpciones: () => Promise<OpcionFiltro[]>;
+  seleccionados: number[] | null;
+  orden: "ASC" | "DESC" | null;
+  onAplicar: (
+    seleccionados: number[] | null,
+    orden: "ASC" | "DESC" | null
+  ) => void;
+}
+
+export interface FiltrosColumnaActividades {
+  proyecto: FiltroColumnaActividadConfig;
+  prioridad: FiltroColumnaActividadConfig;
+  estatus: FiltroColumnaActividadConfig;
+}
 
 interface Props {
   datos: (ActividadPendienteConsultor | ActividadPersonal)[];
@@ -23,6 +43,7 @@ interface Props {
   error?: string | null;
   hayFiltrosActivos?: boolean;
   mostrarPersonal?: boolean;
+  filtrosColumna: FiltrosColumnaActividades;
   onVerHistorial: (item: ActividadPendienteConsultor) => void;
   onConfirmar: (item: ActividadPendienteConsultor) => void;
   onEditar: (item: ActividadPendienteConsultor) => void;
@@ -68,6 +89,7 @@ export const TablaConsultorActividades: React.FC<Props> = ({
   cargando,
   error,
   mostrarPersonal = false,
+  filtrosColumna,
   onVerHistorial,
   onConfirmar,
   onEditar,
@@ -82,12 +104,40 @@ export const TablaConsultorActividades: React.FC<Props> = ({
           <tr>
             {mostrarPersonal && <th style={{ minWidth: "160px" }}>Personal</th>}
             <th style={{ minWidth: "240px" }}>Título</th>
-            <th style={{ minWidth: "220px" }}>Proyecto</th>
+            <th style={{ minWidth: "220px" }}>
+              <FiltroColumnaChecklist
+                titulo="Proyecto"
+                cargarOpciones={filtrosColumna.proyecto.cargarOpciones}
+                seleccionados={filtrosColumna.proyecto.seleccionados}
+                orden={filtrosColumna.proyecto.orden}
+                onAplicar={filtrosColumna.proyecto.onAplicar}
+              />
+            </th>
             <th style={{ whiteSpace: "nowrap" }}>Fecha inicio</th>
             <th style={{ whiteSpace: "nowrap" }}>Fin compromiso</th>
             <th style={{ whiteSpace: "nowrap" }}>Fin real</th>
-            <th style={{ whiteSpace: "nowrap" }}>Prioridad</th>
-            <th>Estatus</th>
+            <th style={{ whiteSpace: "nowrap" }}>
+              <FiltroColumnaChecklist
+                titulo="Prioridad"
+                cargarOpciones={filtrosColumna.prioridad.cargarOpciones}
+                seleccionados={filtrosColumna.prioridad.seleccionados}
+                orden={filtrosColumna.prioridad.orden}
+                onAplicar={filtrosColumna.prioridad.onAplicar}
+                etiquetaOrdenAsc="Alta → Baja"
+                etiquetaOrdenDesc="Baja → Alta"
+              />
+            </th>
+            <th style={{ whiteSpace: "nowrap" }}>
+              <FiltroColumnaChecklist
+                titulo="Estatus"
+                cargarOpciones={filtrosColumna.estatus.cargarOpciones}
+                seleccionados={filtrosColumna.estatus.seleccionados}
+                orden={filtrosColumna.estatus.orden}
+                onAplicar={filtrosColumna.estatus.onAplicar}
+                etiquetaOrdenAsc="Programado → Terminado"
+                etiquetaOrdenDesc="Terminado → Programado"
+              />
+            </th>
             <th
               className="text-center"
               style={{ width: "150px", minWidth: "150px" }}
@@ -204,12 +254,16 @@ export const TablaConsultorActividades: React.FC<Props> = ({
               const esPropia = "b_EsPropia" in item ? item.b_EsPropia : true;
               const nombrePersonal = "v_Personal" in item ? item.v_Personal : "";
               const esVencida = item.i_CveEstatus === 5;
+              const esTerminada = item.i_CveEstatus === 3;
               const fechaInicioTexto = item.d_FechaInicio
                 ? formatearFechaTexto(item.d_FechaInicio) || "—"
                 : "—";
               const finCompromisoTexto = item.d_FinCompromiso
                 ? formatearFechaTexto(item.d_FinCompromiso) || "—"
                 : "—";
+              const finRealTexto = item.d_FinReal
+                ? formatearFechaTexto(item.d_FinReal)
+                : "";
 
               return (
                 <tr key={`act-pend-row-${item.i_CveActividad}`}>
@@ -322,16 +376,24 @@ export const TablaConsultorActividades: React.FC<Props> = ({
 
                   {/* 5. Fin real */}
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <span style={{ color: "#984c0c", fontWeight: 600 }}>
-                      Por confirmar
-                    </span>
+                    {finRealTexto ? (
+                      <span>{finRealTexto}</span>
+                    ) : (
+                      <span style={{ color: "#984c0c", fontWeight: 600 }}>
+                        Por confirmar
+                      </span>
+                    )}
                   </td>
 
                   {/* 6. Prioridad */}
                   <td style={{ whiteSpace: "nowrap" }}>
-                    {renderPrioridadActividadBadge(
-                      item.i_Prioridad,
-                      item.v_Prioridad
+                    {esTerminada ? (
+                      <span style={{ color: "#94a3b8" }}>—</span>
+                    ) : (
+                      renderPrioridadActividadBadge(
+                        item.i_Prioridad,
+                        item.v_Prioridad
+                      )
                     )}
                   </td>
 
@@ -361,7 +423,7 @@ export const TablaConsultorActividades: React.FC<Props> = ({
                         <Eye size={16} />
                       </button>
 
-                      {esPropia && (
+                      {esPropia && !esTerminada && (
                         <>
                           <button
                             type="button"

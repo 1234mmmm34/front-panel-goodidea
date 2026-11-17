@@ -18,6 +18,8 @@ export interface FiltroColumnaChecklistProps {
     seleccionados: number[] | null,
     orden: "ASC" | "DESC" | null
   ) => void;
+  etiquetaOrdenAsc?: string;
+  etiquetaOrdenDesc?: string;
 }
 
 export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
@@ -26,6 +28,8 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
   seleccionados,
   orden,
   onAplicar,
+  etiquetaOrdenAsc = "Ordenar A → Z",
+  etiquetaOrdenDesc = "Ordenar Z → A",
 }) => {
   const [abierto, setAbierto] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -312,7 +316,7 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
                   }}
                 >
                   <ArrowDownAZ size={15} />
-                  <span>Ordenar A → Z</span>
+                  <span>{etiquetaOrdenAsc}</span>
                 </button>
 
                 <button
@@ -341,7 +345,7 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
                   }}
                 >
                   <ArrowUpZA size={15} />
-                  <span>Ordenar Z → A</span>
+                  <span>{etiquetaOrdenDesc}</span>
                 </button>
               </div>
 

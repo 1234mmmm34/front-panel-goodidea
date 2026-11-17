@@ -6,7 +6,6 @@ import DateRangePickerPopover from "@/components/ui/DateRangePickerPopover";
 import {
   FiltrosConsultorActividadesState,
   PersonalActividadesOpcion,
-  PrioridadActividad,
 } from "@/types/consultor";
 
 interface Props {
@@ -143,64 +142,7 @@ export const FiltrosConsultorActividades: React.FC<Props> = ({
             />
           </div>
 
-          {/* 3. Prioridad */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "4px",
-              minWidth: "130px",
-            }}
-          >
-            <label className="form-label" style={{ marginBottom: 0 }}>
-              Prioridad
-            </label>
-            <select
-              className="form-select text-xs py-1.5"
-              style={{ borderRadius: "20px", height: "32px", fontWeight: 500 }}
-              value={filtros.iPrioridad}
-              onChange={(e) => {
-                const val = Number(e.target.value) as 0 | PrioridadActividad;
-                onCambiarFiltros({ ...filtros, iPrioridad: val });
-                onBuscar();
-              }}
-            >
-              <option value={0}>Todas</option>
-              <option value={1}>Alta</option>
-              <option value={2}>Media</option>
-              <option value={3}>Baja</option>
-            </select>
-          </div>
-
-          {/* 4. Ligada a */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "4px",
-              minWidth: "130px",
-            }}
-          >
-            <label className="form-label" style={{ marginBottom: 0 }}>
-              Ligada a
-            </label>
-            <select
-              className="form-select text-xs py-1.5"
-              style={{ borderRadius: "20px", height: "32px", fontWeight: 500 }}
-              value={filtros.iLiga}
-              onChange={(e) => {
-                const val = Number(e.target.value) as 0 | 1 | 2;
-                onCambiarFiltros({ ...filtros, iLiga: val });
-                onBuscar();
-              }}
-            >
-              <option value={0}>Todas</option>
-              <option value={1}>Proyecto</option>
-              <option value={2}>General</option>
-            </select>
-          </div>
-
-          {/* 5. Buscador + 6. Botón Agregar actividad */}
+          {/* 2. Buscador + 3. Botón Agregar actividad */}
           <div
             style={{
               display: "flex",

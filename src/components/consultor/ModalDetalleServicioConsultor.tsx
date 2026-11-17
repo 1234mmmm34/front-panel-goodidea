@@ -695,10 +695,12 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
     (sliderPorcentaje === (cabecera?.i_PorcentajeAvance ?? 0) &&
       notaAvance.trim() === "");
 
-  // §2.3 Entregables habilitados: si b_AplicaAvance && (i_PorcentajeAvance ?? 0) < 100, deshabilitado
-  const entregablesDeshabilitadosPorAvance = Boolean(
-    cabecera?.b_AplicaAvance && (cabecera?.i_PorcentajeAvance ?? 0) < 100
-  );
+  // §2.3 Entregables habilitados: si el avance es 100 % o si el término ya está confirmado
+  const entregablesHabilitados =
+    !cabecera?.b_AplicaAvance ||
+    (cabecera?.i_PorcentajeAvance ?? 0) >= 100 ||
+    Boolean(cabecera?.d_FechaConfirmacionTermino);
+  const entregablesDeshabilitadosPorAvance = !entregablesHabilitados;
 
   return (
     <div
@@ -1092,6 +1094,18 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                       <span>75 %</span>
                       <span>100 %</span>
                     </div>
+                    {servicioConfirmado && (
+                      <p
+                        style={{
+                          fontSize: "11px",
+                          color: "#64748b",
+                          margin: "6px 0 0 0",
+                          fontWeight: 400,
+                        }}
+                      >
+                        El servicio ya fue confirmado; el avance ya no se puede modificar.
+                      </p>
+                    )}
                   </div>
 
                   {/* Nota del avance + botón Guardar avance (se oculta botón si d_FechaConfirmacionTermino tiene valor) */}
