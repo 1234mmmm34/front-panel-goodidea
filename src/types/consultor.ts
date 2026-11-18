@@ -189,9 +189,10 @@ export interface ActividadPendienteConsultor {
   d_FechaInicio: string;
   d_FinCompromiso: string;
   d_FinReal: string | null;          // fecha real de término; null si sigue pendiente
-  i_Prioridad: 0 | PrioridadActividad; // 0 cuando i_CveEstatus === 3
+  i_Prioridad: PrioridadActividad | null; // null cuando i_CveEstatus === 3
   v_Prioridad: string | null;        // "Alta" | "Media" | "Baja" | null (null cuando i_CveEstatus === 3)
   i_CveEstatus: number;              // 1 Programado · 2 En curso · 3 Terminado · 5 Por confirmar
+  v_AsignadaPor: string | null;
   i_TotalRegistros: number;
 }
 
@@ -201,6 +202,7 @@ export interface CrearEditarActividadPayload {
   v_Notas: string | null;
   d_FechaInicio: string;
   d_FechaFin: string;   // fecha compromiso
+  i_CveInstructorAsignado?: number | null;
 }
 
 export interface CancelarActividadPayload {
@@ -256,6 +258,7 @@ export interface ActividadPersonal extends ActividadPendienteConsultor {
   i_CveInstructor: number;
   v_Personal: string;
   b_EsPropia: boolean;
+  b_PuedeGestionar: boolean;
 }
 
 export interface PersonalActividadesOpcion {

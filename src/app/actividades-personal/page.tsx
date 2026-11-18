@@ -142,8 +142,8 @@ function ActividadesPersonalContent() {
     useState<FiltrosConsultorActividadesState>(() => {
       const ordenCampoValido: OrdenCampoActividad | null =
         paramOrdc === "proyecto" ||
-        paramOrdc === "prioridad" ||
-        paramOrdc === "estatus"
+          paramOrdc === "prioridad" ||
+          paramOrdc === "estatus"
           ? paramOrdc
           : null;
       const ordenDirValido: "ASC" | "DESC" | null =
@@ -178,7 +178,10 @@ function ActividadesPersonalContent() {
   const [modalActividadAbierto, setModalActividadAbierto] =
     useState<boolean>(false);
   const [actividadEditando, setActividadEditando] =
-    useState<ActividadPendienteConsultor | null>(null);
+    useState<ActividadPersonal | null>(null);
+  const [instructorAsignado, setInstructorAsignado] = useState<number | null>(
+    null
+  );
   const [guardandoActividad, setGuardandoActividad] = useState<boolean>(false);
   const [selectProyectoAbierto, setSelectProyectoAbierto] =
     useState<boolean>(false);
@@ -396,11 +399,29 @@ function ActividadesPersonalContent() {
     cargarActividades();
   }, [cargarActividades]);
 
+  const opcionesPersonalOrdenadas = useMemo(() => {
+    return [...opcionesPersonal].sort((a, b) =>
+      a.v_Nombre.localeCompare(b.v_Nombre, "es", { sensitivity: "base" })
+    );
+  }, [opcionesPersonal]);
+
+  const personaAsignadaSeleccionada = useMemo(() => {
+    if (!instructorAsignado) return null;
+    return (
+      opcionesPersonal.find((o) => o.i_CveInstructor === instructorAsignado) ??
+      null
+    );
+  }, [instructorAsignado, opcionesPersonal]);
+
   // --- Cargar proyectos en curso para el select del modal de actividad ---
-  const asegurarProyectosEnCurso = async () => {
+  const asegurarProyectosEnCurso = async (idInstructor?: number | null) => {
+    if (!idInstructor) {
+      setProyectosEnCurso([]);
+      return;
+    }
     setCargandoProyectos(true);
     try {
-      const lista = await ConsultorService.getProyectosEnCurso();
+      const lista = await ConsultorService.getProyectosEnCurso(idInstructor);
       setProyectosEnCurso(lista);
     } catch (err: any) {
       toastRef.current.error(
@@ -418,16 +439,31 @@ function ActividadesPersonalContent() {
     const q = busquedaProyectoSelect.trim().toLowerCase();
     if (!q) return proyectosEnCurso;
     return proyectosEnCurso.filter((p) => {
-      const label = `${p.v_Servicio} · ${p.v_Empresa}${
-        p.v_Planta ? ` (${p.v_Planta})` : ""
-      }`.toLowerCase();
+      const label = `${p.v_Servicio} · ${p.v_Empresa}${p.v_Planta ? ` (${p.v_Planta})` : ""
+        }`.toLowerCase();
       return label.includes(q);
     });
   }, [proyectosEnCurso, busquedaProyectoSelect]);
 
   // --- Handlers Modal Agregar / Editar actividad ---
+  const handleCambiarInstructorAsignado = (nuevoId: number | null) => {
+    setInstructorAsignado(nuevoId);
+    setFormActividad((prev) => ({
+      ...prev,
+      i_CveServAgendaDet: null,
+    }));
+    if (nuevoId) {
+      asegurarProyectosEnCurso(nuevoId);
+    } else {
+      setProyectosEnCurso([]);
+    }
+  };
+
   const handleAbrirCrearActividad = () => {
     setActividadEditando(null);
+    const opcionPropia = opcionesPersonal.find((o) => o.b_EsPropio);
+    const idDefault = opcionPropia ? opcionPropia.i_CveInstructor : null;
+    setInstructorAsignado(idDefault);
     setFormActividad({
       v_Titulo: "",
       b_General: false,
@@ -439,15 +475,20 @@ function ActividadesPersonalContent() {
     setSelectProyectoAbierto(false);
     setBusquedaProyectoSelect("");
     setModalActividadAbierto(true);
-    asegurarProyectosEnCurso();
+    if (idDefault !== null) {
+      asegurarProyectosEnCurso(idDefault);
+    } else {
+      setProyectosEnCurso([]);
+    }
   };
 
-  const handleAbrirEditarActividad = (item: ActividadPendienteConsultor) => {
+  const handleAbrirEditarActividad = (item: ActividadPersonal) => {
     const fechaIniStr = (item.d_FechaInicio || "").substring(0, 10) || hoy;
     const fechaFinStr =
       (item.d_FinCompromiso || "").substring(0, 10) || fechaIniStr;
 
     setActividadEditando(item);
+    setInstructorAsignado(item.i_CveInstructor ?? null);
     setFormActividad({
       v_Titulo: (item.v_Titulo || "").slice(0, 200),
       b_General: item.i_CveServAgendaDet == null,
@@ -459,18 +500,27 @@ function ActividadesPersonalContent() {
     setSelectProyectoAbierto(false);
     setBusquedaProyectoSelect("");
     setModalActividadAbierto(true);
-    asegurarProyectosEnCurso();
+    if (item.i_CveInstructor) {
+      asegurarProyectosEnCurso(item.i_CveInstructor);
+    } else {
+      setProyectosEnCurso([]);
+    }
   };
 
   const handleCerrarModalActividad = () => {
     if (guardandoActividad) return;
     setModalActividadAbierto(false);
     setActividadEditando(null);
+    setInstructorAsignado(null);
     setSelectProyectoAbierto(false);
     setBusquedaProyectoSelect("");
   };
 
   const handleGuardarActividad = async () => {
+    if (actividadEditando === null && !instructorAsignado) {
+      toast.error("Selecciona a quién se le asigna la actividad.");
+      return;
+    }
     const tituloTrim = formActividad.v_Titulo.trim();
     if (!tituloTrim) {
       toast.error("El título de la actividad es obligatorio.");
@@ -498,6 +548,12 @@ function ActividadesPersonalContent() {
       return;
     }
 
+    const opcionPropia = opcionesPersonal.find((o) => o.b_EsPropio);
+    const esYo = Boolean(
+      opcionPropia && opcionPropia.i_CveInstructor === instructorAsignado
+    );
+    const cveAsignadoPayload = esYo ? null : instructorAsignado;
+
     const payload: CrearEditarActividadPayload = {
       v_Titulo: tituloTrim,
       i_CveServAgendaDet: formActividad.b_General
@@ -508,6 +564,9 @@ function ActividadesPersonalContent() {
         : null,
       d_FechaInicio: `${formActividad.fechaInicio}T00:00:00`,
       d_FechaFin: `${formActividad.fechaFin}T00:00:00`,
+      ...(actividadEditando === null
+        ? { i_CveInstructorAsignado: cveAsignadoPayload }
+        : {}),
     };
 
     setGuardandoActividad(true);
@@ -524,6 +583,7 @@ function ActividadesPersonalContent() {
       }
       setModalActividadAbierto(false);
       setActividadEditando(null);
+      setInstructorAsignado(null);
       cargarActividades();
     } catch (err: any) {
       toast.error(
@@ -612,14 +672,14 @@ function ActividadesPersonalContent() {
           nuevoOrden !== null
             ? campo
             : filtrosActividades.ordenCampo === campo
-            ? null
-            : filtrosActividades.ordenCampo,
+              ? null
+              : filtrosActividades.ordenCampo,
         ordenDir:
           nuevoOrden !== null
             ? nuevoOrden
             : filtrosActividades.ordenCampo === campo
-            ? null
-            : filtrosActividades.ordenDir,
+              ? null
+              : filtrosActividades.ordenDir,
       };
       setFiltrosActividades(nuevosFiltros);
       setPaginaActual(1);
@@ -718,11 +778,11 @@ function ActividadesPersonalContent() {
 
   const hayFiltrosActivosActividades = Boolean(
     filtrosActividades.usarRango ||
-      filtrosActividades.searchTerm.trim() !== "" ||
-      filtrosActividades.prioridades !== null ||
-      filtrosActividades.proyectos !== null ||
-      !esEstatusDefault(filtrosActividades.estatus) ||
-      filtrosActividades.ordenCampo !== null
+    filtrosActividades.searchTerm.trim() !== "" ||
+    filtrosActividades.prioridades !== null ||
+    filtrosActividades.proyectos !== null ||
+    !esEstatusDefault(filtrosActividades.estatus) ||
+    filtrosActividades.ordenCampo !== null
   );
 
   return (
@@ -818,10 +878,8 @@ function ActividadesPersonalContent() {
                 nuevaPagina: 1,
               });
             }}
-            onBuscar={() => {}}
-            onAgregarActividad={
-              usuarioLigado ? handleAbrirCrearActividad : undefined
-            }
+            onBuscar={() => { }}
+            onAgregarActividad={handleAbrirCrearActividad}
             opcionesPersonal={opcionesPersonal}
             personalSeleccionado={iCvePersonal}
             onCambiarPersonal={(id) => {
@@ -842,7 +900,7 @@ function ActividadesPersonalContent() {
               setActividadDetalle(item as ActividadPersonal)
             }
             onConfirmar={handleConfirmarActividadPendiente}
-            onEditar={handleAbrirEditarActividad}
+            onEditar={(item) => handleAbrirEditarActividad(item as ActividadPersonal)}
             onCancelar={handleAbrirCancelarActividad}
           />
 
@@ -967,6 +1025,80 @@ function ActividadesPersonalContent() {
                 gap: "16px",
               }}
             >
+              {/* Asignar a (solo al agregar) / Asignada a (solo lectura al editar si no es propia) */}
+              {actividadEditando === null ? (
+                <div>
+                  <label className="form-label" style={{ marginBottom: "6px" }}>
+                    Asignar a <span style={{ color: "#2B8FCC" }}>*</span>
+                  </label>
+                  <select
+                    className="form-control"
+                    value={instructorAsignado ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const nuevoId = val ? parseInt(val, 10) : null;
+                      handleCambiarInstructorAsignado(nuevoId);
+                    }}
+                    style={{
+                      width: "100%",
+                      height: "36px",
+                      fontSize: "13px",
+                      borderRadius: "8px",
+                      border: "1px solid #d0dce8",
+                      padding: "0 12px",
+                      backgroundColor: "#ffffff",
+                      color: "#0f172a",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {(!usuarioLigado || !instructorAsignado) && (
+                      <option value="">Seleccionar personal...</option>
+                    )}
+                    {opcionesPersonalOrdenadas.map((op) => (
+                      <option
+                        key={op.i_CveInstructor}
+                        value={op.i_CveInstructor}
+                      >
+                        {op.b_EsPropio ? `Yo (${op.v_Nombre})` : op.v_Nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {personaAsignadaSeleccionada &&
+                    !personaAsignadaSeleccionada.b_EsPropio && (
+                      <div style={{ marginTop: "8px" }}>
+                        <AvisoInfo tipo="info">
+                          La actividad aparecerá en Mis actividades de{" "}
+                          {personaAsignadaSeleccionada.v_Nombre}. Tú y{" "}
+                          {personaAsignadaSeleccionada.v_Nombre} podrán editarla,
+                          confirmarla o cancelarla.
+                        </AvisoInfo>
+                      </div>
+                    )}
+                </div>
+              ) : (
+                !actividadEditando.b_EsPropia && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "8px 12px",
+                      backgroundColor: "#f8fafc",
+                      borderRadius: "8px",
+                      border: "1px solid #e2e8f0",
+                      fontSize: "12.5px",
+                      color: "#475569",
+                      fontWeight: 500,
+                    }}
+                  >
+                    <span>Asignada a:</span>
+                    <strong style={{ color: "#0f172a" }}>
+                      {actividadEditando.v_Personal}
+                    </strong>
+                  </div>
+                )
+              )}
+
               {/* 1. Título * (máximo 200 caracteres, con contador n/200) */}
               <div>
                 <div
@@ -1095,12 +1227,11 @@ function ActividadesPersonalContent() {
                         formActividad.i_CveServAgendaDet
                     );
                     const textoSeleccionado = proySel
-                      ? `${proySel.v_Servicio} · ${proySel.v_Empresa.trim()}${
-                          proySel.v_Planta ? ` (${proySel.v_Planta})` : ""
-                        }`
+                      ? `${proySel.v_Servicio} · ${proySel.v_Empresa.trim()}${proySel.v_Planta ? ` (${proySel.v_Planta})` : ""
+                      }`
                       : cargandoProyectos
-                      ? "Cargando proyectos..."
-                      : "Seleccionar proyecto en curso...";
+                        ? "Cargando proyectos..."
+                        : "Seleccionar proyecto en curso...";
 
                     return (
                       <>

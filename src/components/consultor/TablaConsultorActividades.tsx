@@ -7,6 +7,7 @@ import {
   Ban,
   AlertCircle,
   CheckCircle2,
+  UserPlus,
 } from "lucide-react";
 import {
   ActividadPendienteConsultor,
@@ -51,7 +52,7 @@ interface Props {
 }
 
 export const renderPrioridadActividadBadge = (
-  prioridad: PrioridadActividad | number,
+  prioridad: PrioridadActividad | number | null | undefined,
   etiqueta?: string | null
 ) => {
   if (prioridad === 1) {
@@ -74,14 +75,17 @@ export const renderPrioridadActividadBadge = (
       </span>
     );
   }
-  return (
-    <span
-      className="badge"
-      style={{ backgroundColor: "#d1e7dd", color: "#0f5132" }}
-    >
-      {etiqueta || "Baja"}
-    </span>
-  );
+  if (prioridad === 3) {
+    return (
+      <span
+        className="badge"
+        style={{ backgroundColor: "#d1e7dd", color: "#0f5132" }}
+      >
+        {etiqueta || "Baja"}
+      </span>
+    );
+  }
+  return <span style={{ color: "#94a3b8" }}>—</span>;
 };
 
 export const TablaConsultorActividades: React.FC<Props> = ({
@@ -252,6 +256,10 @@ export const TablaConsultorActividades: React.FC<Props> = ({
           ) : (
             datos.map((item) => {
               const esPropia = "b_EsPropia" in item ? item.b_EsPropia : true;
+              const puedeGestionar =
+                "b_PuedeGestionar" in item
+                  ? Boolean(item.b_PuedeGestionar)
+                  : true;
               const nombrePersonal = "v_Personal" in item ? item.v_Personal : "";
               const esVencida = item.i_CveEstatus === 5;
               const esTerminada = item.i_CveEstatus === 3;
@@ -317,6 +325,22 @@ export const TablaConsultorActividades: React.FC<Props> = ({
                     >
                       {item.v_Titulo}
                     </div>
+                    {item.v_AsignadaPor && (
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          fontSize: "11px",
+                          color: "#64748b",
+                          marginTop: "4px",
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        <UserPlus size={12} style={{ flexShrink: 0 }} />
+                        <span>Asignada por {item.v_AsignadaPor}</span>
+                      </div>
+                    )}
                   </td>
 
                   {/* 2. Proyecto */}
@@ -423,7 +447,7 @@ export const TablaConsultorActividades: React.FC<Props> = ({
                         <Eye size={16} />
                       </button>
 
-                      {esPropia && !esTerminada && (
+                      {puedeGestionar && !esTerminada && (
                         <>
                           <button
                             type="button"

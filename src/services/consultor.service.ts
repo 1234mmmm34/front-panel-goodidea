@@ -205,6 +205,7 @@ export const ConsultorService = {
 
     const datosParseados: ActividadPendienteConsultor[] = rawDatos.map((item: any) => {
       const estatus = item.i_CveEstatus ?? 1;
+      const prio = item.i_Prioridad;
       return {
         i_CveActividad: Number(item.i_CveActividad ?? 0),
         i_CveServAgendaDet: item.i_CveServAgendaDet ?? null,
@@ -217,9 +218,10 @@ export const ConsultorService = {
         d_FechaInicio: item.d_FechaInicio ?? "",
         d_FinCompromiso: item.d_FinCompromiso ?? "",
         d_FinReal: item.d_FinReal ?? null,
-        i_Prioridad: (item.i_Prioridad ?? (estatus === 3 ? 0 : 3)) as 0 | PrioridadActividad,
-        v_Prioridad: item.v_Prioridad ?? (estatus === 3 ? null : "Baja"),
+        i_Prioridad: (prio === 1 || prio === 2 || prio === 3 ? prio : null) as PrioridadActividad | null,
+        v_Prioridad: item.v_Prioridad ?? null,
         i_CveEstatus: estatus,
+        v_AsignadaPor: item.v_AsignadaPor ?? null,
         i_TotalRegistros: item.i_TotalRegistros ?? 0,
       };
     });
@@ -341,6 +343,7 @@ export const ConsultorService = {
 
     const datosParseados: ActividadPersonal[] = rawDatos.map((item: any) => {
       const estatus = item.i_CveEstatus ?? 1;
+      const prio = item.i_Prioridad;
       return {
         i_CveActividad: Number(item.i_CveActividad ?? 0),
         i_CveServAgendaDet: item.i_CveServAgendaDet ?? null,
@@ -353,13 +356,15 @@ export const ConsultorService = {
         d_FechaInicio: item.d_FechaInicio ?? "",
         d_FinCompromiso: item.d_FinCompromiso ?? "",
         d_FinReal: item.d_FinReal ?? null,
-        i_Prioridad: (item.i_Prioridad ?? (estatus === 3 ? 0 : 3)) as 0 | PrioridadActividad,
-        v_Prioridad: item.v_Prioridad ?? (estatus === 3 ? null : "Baja"),
+        i_Prioridad: (prio === 1 || prio === 2 || prio === 3 ? prio : null) as PrioridadActividad | null,
+        v_Prioridad: item.v_Prioridad ?? null,
         i_CveEstatus: estatus,
+        v_AsignadaPor: item.v_AsignadaPor ?? null,
         i_TotalRegistros: item.i_TotalRegistros ?? 0,
         i_CveInstructor: Number(item.i_CveInstructor ?? 0),
         v_Personal: item.v_Personal ?? "",
         b_EsPropia: Boolean(item.b_EsPropia),
+        b_PuedeGestionar: Boolean(item.b_PuedeGestionar),
       };
     });
 
@@ -759,8 +764,16 @@ export const ConsultorService = {
    * GET instructores/consultor/proyectosEnCurso
    * §3.5 Proyectos en curso para asociar actividades
    */
-  async getProyectosEnCurso(): Promise<ProyectoEnCursoConsultorDto[]> {
-    const resp = await apiClient.get<any>("instructores/consultor/proyectosEnCurso");
+  async getProyectosEnCurso(
+    iCveInstructorAsignado?: number | null
+  ): Promise<ProyectoEnCursoConsultorDto[]> {
+    const queryParams: Record<string, unknown> = {};
+    if (iCveInstructorAsignado !== undefined && iCveInstructorAsignado !== null) {
+      queryParams.iCveInstructorAsignado = iCveInstructorAsignado;
+    }
+    const resp = await apiClient.get<any>("instructores/consultor/proyectosEnCurso", {
+      params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+    });
     const data = resp.data;
     const rawList: any[] = Array.isArray(data)
       ? data

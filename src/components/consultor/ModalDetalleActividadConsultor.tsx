@@ -175,6 +175,14 @@ export const ModalDetalleActividadConsultor: React.FC<Props> = ({
             </div>
           )}
 
+          {/* 0.1 Asignada por */}
+          {actividad.v_AsignadaPor && (
+            <div>
+              <span style={labelStyle}>Asignada por</span>
+              <div style={valueStyle}>{actividad.v_AsignadaPor}</div>
+            </div>
+          )}
+
           {/* 1. Tema */}
           <div>
             <span style={labelStyle}>Tema</span>
