@@ -165,6 +165,7 @@ export interface HistorialActividad
   extends Omit<ActividadConsultor, "i_TotalRegistros"> {
   v_Motivo: string | null; // motivo de cancelación o reprogramación
   d_FechaReprogramada: string | null; // fecha de la nueva, si fue reprogramada
+  v_NotasFinales?: string | null;
 }
 
 export interface ProyectoEnCursoConsultorDto {

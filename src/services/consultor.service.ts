@@ -757,6 +757,7 @@ export const ConsultorService = {
       i_CveEstatus: item.i_CveEstatus ?? 1,
       v_Motivo: item.v_Motivo ?? null,
       d_FechaReprogramada: item.d_FechaReprogramada ?? null,
+      v_NotasFinales: item.v_NotasFinales ?? null,
     }));
   },
 
@@ -829,10 +830,16 @@ export const ConsultorService = {
 
   /**
    * POST instructores/consultor/actividades/{id}/confirmar
-   * Confirma la terminación de una actividad del consultor (sin body)
+   * Confirma la terminación de una actividad del consultor con notas finales opcionales.
    */
-  async confirmarActividad(id: number): Promise<void> {
-    await apiClient.post(`instructores/consultor/actividades/${id}/confirmar`);
+  async confirmarActividad(
+    id: number,
+    v_NotasFinales?: string | null
+  ): Promise<void> {
+    const notasLimpias = v_NotasFinales?.trim() || null;
+    await apiClient.post(`instructores/consultor/actividades/${id}/confirmar`, {
+      v_NotasFinales: notasLimpias,
+    });
   },
 
   /**

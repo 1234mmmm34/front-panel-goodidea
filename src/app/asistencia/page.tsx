@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AsistenciaTopBar } from "@/components/asistencia/AsistenciaTopBar";
+import { ChevronRight } from "lucide-react";
+import { useNetwork } from "@/context/NetworkContext";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { BannerRechazados } from "@/components/asistencia/BannerRechazados";
 import { CursoAsistenciaCard } from "@/components/asistencia/CursoAsistenciaCard";
 import { DetalleSesionView } from "@/components/asistencia/DetalleSesionView";
@@ -15,7 +17,10 @@ import {
   obtenerUltimaDescarga,
   reemplazarSesionesRango,
 } from "@/lib/asistencia-db";
-import { agruparCursosPorDia } from "@/lib/asistencia-utils";
+import {
+  agruparCursosPorDia,
+  formatearActualizado,
+} from "@/lib/asistencia-utils";
 import {
   AsistenciaService,
   fechaLocalSinZona,
@@ -39,9 +44,7 @@ function obtenerHoyYManana() {
 }
 
 export default function AsistenciaPage() {
-  const [online, setOnline] = useState<boolean>(() =>
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
+  const { online } = useNetwork();
   const [sesiones, setSesiones] = useState<AsistenciaSesion[]>([]);
   const [cola, setCola] = useState<AsistenciaRegistro[]>([]);
   const [ultimaDescarga, setUltimaDescarga] = useState<string | null>(null);
@@ -147,23 +150,14 @@ export default function AsistenciaPage() {
     };
   }, [cargarEstadoLocal, sincronizarYDescargar]);
 
-  // Listeners online / offline
+  // Sincronizar y descargar al recuperar conexión (transición offline -> online)
+  const prevOnlineRef = useRef<boolean>(online);
   useEffect(() => {
-    const handleOnline = () => {
-      setOnline(true);
+    if (!prevOnlineRef.current && online) {
       sincronizarYDescargar();
-    };
-    const handleOffline = () => {
-      setOnline(false);
-    };
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, [sincronizarYDescargar]);
+    }
+    prevOnlineRef.current = online;
+  }, [online, sincronizarYDescargar]);
 
   // Auto-sincronización cada 60 s si hay conexión y cola no está vacía
   useEffect(() => {
@@ -229,6 +223,31 @@ export default function AsistenciaPage() {
     );
   }, [cursosDelDia, cursoSeleccionadoId]);
 
+  // Botón "atrás" del navegador o teléfono regresa a la vista de cards
+  useEffect(() => {
+    const handlePopState = () => {
+      setCursoSeleccionadoId(null);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const handleSeleccionarCurso = useCallback((curso: CursoAsistenciaDia) => {
+    window.history.pushState(
+      { asistenciaCursoId: curso.i_CveServAgendaDet },
+      ""
+    );
+    setCursoSeleccionadoId(curso.i_CveServAgendaDet);
+  }, []);
+
+  const handleVolverACursos = useCallback(() => {
+    if (window.history.state?.asistenciaCursoId) {
+      window.history.back();
+    } else {
+      setCursoSeleccionadoId(null);
+    }
+  }, []);
+
   const handleMarcarAlumno = async (
     i_CveAgendaDetalle: number,
     i_CveAlumnoAgenda: number,
@@ -272,27 +291,174 @@ export default function AsistenciaPage() {
   };
 
   return (
-    <>
-      <AsistenciaTopBar
-        online={online}
-        ultimaDescarga={ultimaDescarga}
-        pendientesCount={cola.length}
-        sincronizando={sincronizando}
-        onSincronizar={sincronizarYDescargar}
-      />
+    <AppLayout>
+      {/* Breadcrumb solo en vista de detalle */}
+      {cursoActivo && (
+        <div
+          style={{
+            fontSize: "12px",
+            color: "#7a96b0",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            marginBottom: "14px",
+            minWidth: 0,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleVolverACursos}
+            style={{
+              color: "#7a96b0",
+              textDecoration: "none",
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontSize: "12px",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+            className="hover:text-slate-900 transition-colors"
+          >
+            Asistencia
+          </button>
+          <ChevronRight size={13} style={{ color: "#b5cfe8", flexShrink: 0 }} />
+          <span
+            style={{
+              color: "#1e293b",
+              fontWeight: 500,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              minWidth: 0,
+            }}
+            title={cursoActivo.v_Servicio}
+          >
+            {cursoActivo.v_Servicio}
+          </span>
+        </div>
+      )}
 
-      <main
+      {/* Encabezado del módulo */}
+      <div className="page-header" style={{ marginBottom: "14px" }}>
+        <div>
+          <h1 className="page-title">
+            <i
+              className="bi bi-clipboard-check"
+              style={{ color: "#2B8FCC" }}
+            />
+            Asistencia
+          </h1>
+          <p className="subtext">
+            Toma de asistencia por sesión. Funciona sin internet y se sincroniza
+            al volver la conexión.
+          </p>
+        </div>
+      </div>
+
+      <div
         style={{
-          flex: 1,
-          width: "100%",
-          maxWidth: "1100px",
-          margin: "0 auto",
-          padding: "16px",
           display: "flex",
           flexDirection: "column",
           gap: "14px",
         }}
       >
+        {/* Barra de estado del módulo */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+            flexWrap: "wrap",
+            backgroundColor: "#ffffff",
+            border: "1px solid #e2e8f0",
+            borderRadius: "10px",
+            padding: "8px 12px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+              fontSize: "12px",
+              color: "#64748b",
+            }}
+          >
+            <span
+              className="asistencia-status-network-chip"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "3px 10px",
+                borderRadius: "999px",
+                fontSize: "11px",
+                fontWeight: 600,
+                backgroundColor: online ? "#dcfce7" : "#fee2e2",
+                color: online ? "#15803d" : "#b91c1c",
+              }}
+            >
+              <i className={`bi ${online ? "bi-wifi" : "bi-wifi-off"}`} />
+              {online ? "En línea" : "Sin conexión"}
+            </span>
+
+            <span>
+              <i
+                className="bi bi-clock-history"
+                style={{ marginRight: "4px" }}
+              />
+              {formatearActualizado(ultimaDescarga)}
+            </span>
+
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "3px 9px",
+                borderRadius: "999px",
+                fontSize: "11px",
+                fontWeight: 600,
+                backgroundColor: cola.length > 0 ? "#fef3c7" : "#f1f5f9",
+                color: cola.length > 0 ? "#b45309" : "#64748b",
+              }}
+            >
+              <i
+                className={`bi ${
+                  cola.length > 0 ? "bi-cloud-arrow-up" : "bi-check2-circle"
+                }`}
+              />
+              {cola.length}{" "}
+              {cola.length === 1 ? "pendiente" : "pendientes"}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={sincronizarYDescargar}
+            disabled={!online || sincronizando}
+          >
+            <i
+              className={`bi ${
+                sincronizando ? "bi-arrow-repeat" : "bi-arrow-clockwise"
+              }`}
+              style={
+                sincronizando
+                  ? {
+                      display: "inline-block",
+                      animation: "spin 1s linear infinite",
+                    }
+                  : undefined
+              }
+            />
+            {sincronizando ? "Sincronizando..." : "Sincronizar"}
+          </button>
+        </div>
+
         <BannerRechazados
           rechazados={rechazados}
           sesiones={sesiones}
@@ -304,7 +470,6 @@ export default function AsistenciaPage() {
             curso={cursoActivo}
             cola={cola}
             ahora={ahora}
-            onVolver={() => setCursoSeleccionadoId(null)}
             onMarcarAlumno={handleMarcarAlumno}
             onMarcarVarios={handleMarcarVarios}
           />
@@ -428,16 +593,14 @@ export default function AsistenciaPage() {
                   <CursoAsistenciaCard
                     key={curso.i_CveServAgendaDet}
                     curso={curso}
-                    onSelect={(c) =>
-                      setCursoSeleccionadoId(c.i_CveServAgendaDet)
-                    }
+                    onSelect={handleSeleccionarCurso}
                   />
                 ))}
               </div>
             )}
           </>
         )}
-      </main>
-    </>
+      </div>
+    </AppLayout>
   );
 }

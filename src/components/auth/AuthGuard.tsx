@@ -6,6 +6,7 @@ import { obtenerSesionActual } from "@/lib/api-client";
 
 import { ToastProvider } from "@/context/ToastContext";
 import { MenuProvider } from "@/context/MenuContext";
+import { NetworkProvider } from "@/context/NetworkContext";
 
 interface Props {
   children: React.ReactNode;
@@ -45,18 +46,19 @@ export const AuthGuard: React.FC<Props> = ({ children }) => {
     );
   }
 
-  // Rutas sin MenuProvider (públicas o módulo offline sin sidebar)
+  // Rutas sin MenuProvider (públicas / fallback offline)
   if (
     pathname.startsWith("/confirmar-termino") ||
-    pathname.startsWith("/asistencia") ||
     pathname.startsWith("/offline")
   ) {
     return <ToastProvider>{children}</ToastProvider>;
   }
 
   return (
-    <ToastProvider>
-      <MenuProvider>{children}</MenuProvider>
-    </ToastProvider>
+    <NetworkProvider>
+      <ToastProvider>
+        <MenuProvider>{children}</MenuProvider>
+      </ToastProvider>
+    </NetworkProvider>
   );
 };

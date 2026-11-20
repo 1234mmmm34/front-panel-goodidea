@@ -1861,6 +1861,30 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                                     Motivo: {act.v_Motivo}
                                   </div>
                                 )}
+                                {(act.v_Momento === "FIN" ||
+                                  act.v_Momento === "UNICO") &&
+                                  act.i_CveEstatus === 3 &&
+                                  act.v_NotasFinales &&
+                                  act.v_NotasFinales.trim() !== "" && (
+                                    <div
+                                      style={{
+                                        marginTop: "6px",
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        backgroundColor: "#f8fafc",
+                                        border: "1px solid #e2e8f0",
+                                        fontSize: "11.5px",
+                                        color: "#334155",
+                                        whiteSpace: "pre-wrap",
+                                        lineHeight: 1.4,
+                                      }}
+                                    >
+                                      <strong style={{ color: "#0f172a" }}>
+                                        Notas finales:
+                                      </strong>{" "}
+                                      {act.v_NotasFinales.trim()}
+                                    </div>
+                                  )}
                               </td>
                               <td
                                 style={{

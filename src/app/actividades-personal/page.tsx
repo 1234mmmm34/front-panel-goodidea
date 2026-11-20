@@ -41,6 +41,7 @@ import {
   TablaConsultorActividades,
 } from "@/components/consultor/TablaConsultorActividades";
 import { ModalDetalleActividadConsultor } from "@/components/consultor/ModalDetalleActividadConsultor";
+import { ModalConfirmarTerminoActividad } from "@/components/consultor/ModalConfirmarTerminoActividad";
 import { useToast } from "@/context/ToastContext";
 
 const ESTATUS_DEFAULT: number[] = [1, 2, 5];
@@ -631,28 +632,36 @@ function ActividadesPersonalContent() {
   };
 
   // --- Acción Confirmar terminado ---
+  const [actividadAConfirmar, setActividadAConfirmar] =
+    useState<ActividadPendienteConsultor | null>(null);
+  const [confirmandoTermino, setConfirmandoTermino] = useState<boolean>(false);
+
   const handleConfirmarActividadPendiente = (
     item: ActividadPendienteConsultor
   ) => {
-    confirmModal({
-      title: `¿Confirmas que «${item.v_Titulo}» ya terminó?`,
-      message:
-        "Se guardará hoy como fecha de fin real y la actividad dejará de aparecer en pendientes. Esta acción no se puede deshacer.",
-      confirmText: "Confirmar",
-      cancelText: "Cancelar",
-      variant: "warning",
-      onConfirm: async () => {
-        try {
-          await ConsultorService.confirmarActividad(item.i_CveActividad);
-          toast.success("Actividad confirmada como terminada");
-          cargarActividades();
-        } catch (err: any) {
-          toast.error(
-            extraerMensajeErrorConsultor(err, "Error al confirmar terminado")
-          );
-        }
-      },
-    });
+    setActividadAConfirmar(item);
+  };
+
+  const handleEjecutarConfirmarTermino = async (
+    v_NotasFinales: string | null
+  ) => {
+    if (!actividadAConfirmar) return;
+    setConfirmandoTermino(true);
+    try {
+      await ConsultorService.confirmarActividad(
+        actividadAConfirmar.i_CveActividad,
+        v_NotasFinales
+      );
+      toast.success("Actividad confirmada como terminada");
+      setActividadAConfirmar(null);
+      cargarActividades();
+    } catch (err: any) {
+      toast.error(
+        extraerMensajeErrorConsultor(err, "Error al confirmar terminado")
+      );
+    } finally {
+      setConfirmandoTermino(false);
+    }
   };
 
   const aplicarFiltroColumna = useCallback(
@@ -928,6 +937,17 @@ function ActividadesPersonalContent() {
         actividad={actividadDetalle}
         onCerrar={() => setActividadDetalle(null)}
       />
+
+      {/* Modal Confirmar término con notas finales */}
+      {actividadAConfirmar && (
+        <ModalConfirmarTerminoActividad
+          key={actividadAConfirmar.i_CveActividad}
+          actividad={actividadAConfirmar}
+          confirmando={confirmandoTermino}
+          onCerrar={() => setActividadAConfirmar(null)}
+          onConfirmar={handleEjecutarConfirmarTermino}
+        />
+      )}
 
       {/* ====================================================================
           MODAL "AGREGAR ACTIVIDAD" / "EDITAR ACTIVIDAD"

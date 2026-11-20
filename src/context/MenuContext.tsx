@@ -54,6 +54,43 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const guardarNavBarLocal = (cvePerfil: number, rutas: RutaDto[]) => {
+    if (typeof window === "undefined") return;
+    if (!cvePerfil || cvePerfil <= 0 || !Array.isArray(rutas) || rutas.length === 0) return;
+    try {
+      localStorage.setItem(
+        "navBarCache",
+        JSON.stringify({ id_perfil: cvePerfil, rutas })
+      );
+    } catch (e) {
+      console.warn("Error guardando navBarCache en localStorage:", e);
+    }
+  };
+
+  const leerNavBarLocal = (cvePerfil: number): RutaDto[] | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("navBarCache");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        Array.isArray(parsed.rutas) &&
+        parsed.rutas.length > 0 &&
+        (!parsed.id_perfil || parsed.id_perfil === cvePerfil)
+      ) {
+        return parsed.rutas;
+      }
+    } catch (e) {
+      console.warn("Error leyendo navBarCache de localStorage:", e);
+    }
+    return null;
+  };
+
   // Inicialización síncrona inmediata desde sessionStorage para evitar esqueleto en F5
   const [rutasNavBar, setRutasNavBar] = useState<RutaDto[]>(() => {
     if (typeof window !== "undefined") {
@@ -161,14 +198,31 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // No guardar en caché un menú vacío ni un menú sin id_perfil válido
         if (validas.length > 0 && cvePerfil > 0) {
           guardarCache(cvePerfil, validas);
+          guardarNavBarLocal(cvePerfil, validas);
         }
 
         setRutasNavBar(validas);
         setHaCargadoExitoso(true);
         perfilCargadoRef.current = cvePerfil;
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Error cargando menú del usuario:", err);
-        toastRef.current.error("No se pudo cargar el menú del sistema.");
+        const enLocal = leerNavBarLocal(cvePerfil);
+        if (enLocal && enLocal.length > 0) {
+          setRutasNavBar(enLocal);
+          setHaCargadoExitoso(true);
+          perfilCargadoRef.current = cvePerfil;
+        } else {
+          setRutasNavBar([]);
+          const hasResponse = Boolean(
+            (err as { response?: unknown } | null)?.response
+          );
+          const esErrorRed =
+            (typeof navigator !== "undefined" && !navigator.onLine) ||
+            !hasResponse;
+          if (!esErrorRed) {
+            toastRef.current.error("No se pudo cargar el menú del sistema.");
+          }
+        }
       } finally {
         setCargandoMenu(false);
       }
@@ -205,14 +259,31 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // No guardar en caché un menú vacío ni sin id_perfil válido
       if (validas.length > 0 && idPerfil > 0) {
         guardarCache(idPerfil, validas);
+        guardarNavBarLocal(idPerfil, validas);
       }
 
       setRutasNavBar(validas);
       setHaCargadoExitoso(true);
       perfilCargadoRef.current = idPerfil;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error al recargar menú del usuario:", err);
-      toastRef.current.error("No se pudo cargar el menú del sistema.");
+      const enLocal = leerNavBarLocal(idPerfil);
+      if (enLocal && enLocal.length > 0) {
+        setRutasNavBar(enLocal);
+        setHaCargadoExitoso(true);
+        perfilCargadoRef.current = idPerfil;
+      } else {
+        setRutasNavBar([]);
+        const hasResponse = Boolean(
+          (err as { response?: unknown } | null)?.response
+        );
+        const esErrorRed =
+          (typeof navigator !== "undefined" && !navigator.onLine) ||
+          !hasResponse;
+        if (!esErrorRed) {
+          toastRef.current.error("No se pudo cargar el menú del sistema.");
+        }
+      }
     } finally {
       setCargandoMenu(false);
     }

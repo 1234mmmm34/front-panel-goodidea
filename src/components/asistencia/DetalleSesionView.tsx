@@ -20,7 +20,6 @@ interface Props {
   curso: CursoAsistenciaDia;
   cola: AsistenciaRegistro[];
   ahora: Date;
-  onVolver: () => void;
   onMarcarAlumno: (
     i_CveAgendaDetalle: number,
     i_CveAlumnoAgenda: number,
@@ -37,7 +36,6 @@ export const DetalleSesionView: React.FC<Props> = ({
   curso,
   cola,
   ahora,
-  onVolver,
   onMarcarAlumno,
   onMarcarVarios,
 }) => {
@@ -156,30 +154,6 @@ export const DetalleSesionView: React.FC<Props> = ({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-      {/* Botón volver */}
-      <div>
-        <button
-          type="button"
-          onClick={onVolver}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "8px 14px",
-            borderRadius: "10px",
-            border: "1px solid #cbd5e1",
-            backgroundColor: "#ffffff",
-            color: "#1e293b",
-            fontSize: "13px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          <i className="bi bi-arrow-left" />
-          Volver a cursos
-        </button>
-      </div>
-
       {/* Tabs si el curso tiene más de una sesión ese día */}
       {curso.sesiones.length > 1 && (
         <div

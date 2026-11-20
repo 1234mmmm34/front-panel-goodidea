@@ -9,6 +9,8 @@ import { RutaDto } from "@/types/rutas";
 import { SesionAlmacenada } from "@/types/auth";
 import { useToast } from "@/context/ToastContext";
 import { useMenu } from "@/context/MenuContext";
+import { useNetwork } from "@/context/NetworkContext";
+import { UserAvatarMenu } from "./HeaderActions";
 
 interface GrupoMenu {
   v_RutaRaiz: string;
@@ -20,10 +22,14 @@ export const MobileNav: React.FC = () => {
   const pathname = usePathname();
   const { confirmModal, toast } = useToast();
   const { rutasNavBar, cargandoMenu, haCargadoExitoso } = useMenu();
+  const { online } = useNetwork();
+  const esAsistencia = pathname?.startsWith("/asistencia") ?? false;
 
   const [abierto, setAbierto] = useState<boolean>(false);
   const [gruposAbiertos, setGruposAbiertos] = useState<Record<string, boolean>>({});
-  const [sesion] = useState<SesionAlmacenada | null>(() => obtenerSesionActual());
+  const [sesion] = useState<SesionAlmacenada | null>(() =>
+    obtenerSesionActual()
+  );
 
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const menuContainerRef = useRef<HTMLDivElement>(null);
@@ -73,14 +79,12 @@ export const MobileNav: React.FC = () => {
     return current === cleanRuta || current.startsWith(cleanRuta + "/");
   };
 
-  // Cerrar si el usuario navega con botón atrás del navegador
   useEffect(() => {
     const handlePopState = () => setAbierto(false);
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Bloquear scroll del body y manejar tecla Escape + foco accesible
   useEffect(() => {
     if (!abierto) {
       if (prevAbiertoRef.current) {
@@ -94,11 +98,11 @@ export const MobileNav: React.FC = () => {
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // Foco al primer elemento interactivo del menú
     const timer = requestAnimationFrame(() => {
-      const primerElemento = menuContainerRef.current?.querySelector<HTMLElement>(
-        "a[href], button:not([disabled])"
-      );
+      const primerElemento =
+        menuContainerRef.current?.querySelector<HTMLElement>(
+          "a[href], button:not([disabled])"
+        );
       primerElemento?.focus();
     });
 
@@ -139,7 +143,7 @@ export const MobileNav: React.FC = () => {
 
   const nombreTenant = sesion?.tenant || "GOODiDEA";
   const nombreUsuario = sesion?.username || sesion?.email || "Usuario";
-  const inicial = nombreUsuario.charAt(0).toUpperCase() || "U";
+  const emailUsuario = sesion?.email || "administracion@good-idea.com.mx";
 
   const renderizarGrupo = (grupo: GrupoMenu) => {
     const esEnlaceDirecto =
@@ -164,23 +168,24 @@ export const MobileNav: React.FC = () => {
       );
     }
 
-    const tieneHijaActiva = grupo.opciones.some((opt) => isRutaActiva(opt.v_Ruta));
+    const tieneHijaActiva = grupo.opciones.some((opt) =>
+      isRutaActiva(opt.v_Ruta)
+    );
     const abiertoGrupo = gruposAbiertos[grupo.v_RutaRaiz] ?? tieneHijaActiva;
 
     return (
       <div key={grupo.v_RutaRaiz} className="mobile-nav-group">
         <button
           type="button"
-          className={`mobile-nav-item mobile-nav-group-btn ${
-            tieneHijaActiva && !abiertoGrupo ? "active" : ""
-          }`}
+          className="mobile-nav-group-header"
           onClick={() => toggleGrupo(grupo.v_RutaRaiz, abiertoGrupo)}
           aria-expanded={abiertoGrupo}
         >
-          <i className={`${grupo.v_Icon || "bi bi-folder"} mobile-nav-icon`} />
-          <span className="mobile-nav-label">{grupo.v_RutaRaiz}</span>
+          <span className="mobile-nav-group-title">{grupo.v_RutaRaiz}</span>
           <i
-            className={`bi bi-chevron-${abiertoGrupo ? "down" : "right"} mobile-nav-chevron`}
+            className={`bi bi-chevron-down mobile-nav-chevron ${
+              abiertoGrupo ? "open" : ""
+            }`}
           />
         </button>
 
@@ -193,9 +198,14 @@ export const MobileNav: React.FC = () => {
                   key={`${opcion.v_Ruta}_${idx}`}
                   href={opcion.v_Ruta}
                   onClick={() => setAbierto(false)}
-                  className={`mobile-nav-subitem ${subActiva ? "active" : ""}`}
+                  className={`mobile-nav-item ${subActiva ? "active" : ""}`}
                 >
-                  <span>{opcion.v_RutaHija}</span>
+                  <i
+                    className={`${
+                      opcion.v_Icon || grupo.v_Icon || "bi bi-circle"
+                    } mobile-nav-icon`}
+                  />
+                  <span className="mobile-nav-label">{opcion.v_RutaHija}</span>
                 </Link>
               );
             })}
@@ -207,7 +217,7 @@ export const MobileNav: React.FC = () => {
 
   return (
     <>
-      <header className="mobile-topbar">
+      <header className="top-header-mobile">
         <button
           ref={hamburgerRef}
           type="button"
@@ -230,22 +240,41 @@ export const MobileNav: React.FC = () => {
           <img
             src="/assets/gi_slogo.png"
             alt="GOODiDEA"
-            style={{ height: "24px", width: "auto" }}
+            style={{ height: "22px", width: "auto" }}
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/assets/gi_logo.png"
             alt="GOODiDEA"
-            style={{ height: "20px", width: "auto" }}
+            style={{ height: "22px", width: "auto" }}
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
           />
         </Link>
 
-        <div className="mobile-topbar-user" title={`${nombreUsuario} (${nombreTenant})`}>
-          <span className="mobile-topbar-avatar">{inicial}</span>
-        </div>
+        <div style={{ flex: 1 }} />
+
+        {esAsistencia && (
+          <span
+            className={`mobile-network-chip ${online ? "online" : "offline"}`}
+            aria-label={online ? "En línea" : "Sin conexión"}
+            title={online ? "En línea" : "Sin conexión"}
+          >
+            <i className={`bi ${online ? "bi-wifi" : "bi-wifi-off"}`} />
+            <span className="mobile-network-chip-text">
+              {online ? "En línea" : "Sin conexión"}
+            </span>
+          </span>
+        )}
+
+        <UserAvatarMenu
+          nombreUsuario={nombreUsuario}
+          emailUsuario={emailUsuario}
+          nombreTenant={nombreTenant}
+          avatarSize={32}
+          showTenantInDropdown
+        />
       </header>
 
       {abierto && (
@@ -262,25 +291,45 @@ export const MobileNav: React.FC = () => {
             className="mobile-nav-drawer"
             aria-label="Menú principal"
           >
-            {/* Info compacta de usuario/tenant */}
-            <div className="mobile-nav-user-card">
-              <div className="mobile-nav-user-avatar">{inicial}</div>
-              <div className="mobile-nav-user-info">
-                <div className="mobile-nav-user-name">{nombreUsuario}</div>
-                <div className="mobile-nav-user-tenant">{nombreTenant}</div>
-              </div>
+            {/* Primera línea: tenant */}
+            <div className="mobile-nav-tenant-line">
+              <i className="bi bi-building" />
+              <span>{nombreTenant}</span>
             </div>
 
             <div className="mobile-nav-list">
               {cargandoMenu ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px 0" }}>
-                  <div className="skeleton-box" style={{ height: "44px", borderRadius: "8px" }} />
-                  <div className="skeleton-box" style={{ height: "44px", borderRadius: "8px" }} />
-                  <div className="skeleton-box" style={{ height: "44px", borderRadius: "8px" }} />
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    padding: "8px 0",
+                  }}
+                >
+                  <div
+                    className="skeleton-box"
+                    style={{ height: "44px", borderRadius: "8px" }}
+                  />
+                  <div
+                    className="skeleton-box"
+                    style={{ height: "44px", borderRadius: "8px" }}
+                  />
+                  <div
+                    className="skeleton-box"
+                    style={{ height: "44px", borderRadius: "8px" }}
+                  />
                 </div>
               ) : gruposMenu.length === 0 ? (
                 haCargadoExitoso ? (
-                  <div style={{ padding: "16px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+                  <div
+                    style={{
+                      padding: "16px",
+                      textAlign: "center",
+                      color: "#94a3b8",
+                      fontSize: "13px",
+                    }}
+                  >
                     Sin opciones disponibles
                   </div>
                 ) : null
