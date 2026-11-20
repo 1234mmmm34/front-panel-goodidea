@@ -103,6 +103,7 @@ function MisActividadesContent() {
   const paramProy = searchParams.get("proy");
   const paramOrdc = searchParams.get("ordc");
   const paramOrdd = searchParams.get("ordd");
+  const paramActividad = searchParams.get("actividad");
 
   const hoy = useMemo(() => new Date().toISOString().split("T")[0], []);
 
@@ -524,6 +525,63 @@ function MisActividadesContent() {
     }
   };
 
+  // Abrir detalle desde query param ?actividad={id}
+  const actividadUrlProcesadaRef = useRef<number | null>(null);
+  useEffect(() => {
+    const idNum = paramActividad ? parseInt(paramActividad, 10) : NaN;
+    if (!idNum || isNaN(idNum) || idNum <= 0) {
+      actividadUrlProcesadaRef.current = null;
+      return;
+    }
+    if (actividadUrlProcesadaRef.current === idNum) return;
+
+    const enTabla = datosActividades.find((a) => a.i_CveActividad === idNum);
+    if (enTabla) {
+      actividadUrlProcesadaRef.current = idNum;
+      const timer = setTimeout(() => setActividadDetalle(enTabla), 0);
+      return () => clearTimeout(timer);
+    }
+
+    if (cargando) return;
+
+    actividadUrlProcesadaRef.current = idNum;
+    let cancelado = false;
+    ConsultorService.getHistorialActividades({ iCveActividad: idNum })
+      .then((lista) => {
+        if (cancelado || !lista || lista.length === 0) return;
+        const h = lista[0];
+        const detalle: ActividadPendienteConsultor = {
+          i_CveActividad: h.i_CveActividad ?? idNum,
+          i_CveServAgendaDet: h.i_CveServAgendaDet ?? null,
+          i_CveAgenda: h.i_CveAgenda ?? null,
+          v_Titulo: h.v_Titulo || h.v_Actividad || "Actividad",
+          v_Notas: h.v_Notas ?? h.v_Descripcion ?? null,
+          v_Proyecto:
+            h.i_CveServAgendaDet == null
+              ? "GENERAL"
+              : h.v_Descripcion || "Proyecto",
+          v_Empresa: h.v_Empresa ?? null,
+          v_Planta: h.v_Planta ?? null,
+          d_FechaInicio: h.d_FechaInicio,
+          d_FinCompromiso: h.d_FinCompromiso || h.d_FechaFin,
+          d_FinReal: h.d_FinReal ?? null,
+          i_Prioridad: null,
+          v_Prioridad: null,
+          i_CveEstatus: h.i_CveEstatus,
+          v_AsignadaPor: null,
+          i_TotalRegistros: 1,
+        };
+        setActividadDetalle(detalle);
+      })
+      .catch(() => {
+        // Sin toast si falla
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [paramActividad, datosActividades, cargando]);
+
   const aplicarFiltroColumna = useCallback(
     (
       campo: OrdenCampoActividad,
@@ -783,7 +841,12 @@ function MisActividadesContent() {
       <ModalDetalleActividadConsultor
         abierto={!!actividadDetalle}
         actividad={actividadDetalle}
-        onCerrar={() => setActividadDetalle(null)}
+        onCerrar={() => {
+          setActividadDetalle(null);
+          if (paramActividad) {
+            router.replace("/actividades");
+          }
+        }}
       />
 
       {/* Modal Confirmar término con notas finales */}

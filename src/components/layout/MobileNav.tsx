@@ -11,6 +11,7 @@ import { useToast } from "@/context/ToastContext";
 import { useMenu } from "@/context/MenuContext";
 import { useNetwork } from "@/context/NetworkContext";
 import { UserAvatarMenu } from "./HeaderActions";
+import { NotificacionesBell } from "./NotificacionesBell";
 
 interface GrupoMenu {
   v_RutaRaiz: string;
@@ -267,6 +268,8 @@ export const MobileNav: React.FC = () => {
             </span>
           </span>
         )}
+
+        <NotificacionesBell buttonSize={32} />
 
         <UserAvatarMenu
           nombreUsuario={nombreUsuario}

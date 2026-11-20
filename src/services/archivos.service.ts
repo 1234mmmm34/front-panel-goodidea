@@ -3,6 +3,8 @@ import {
   ServiciosPendientesArchivoDto,
   ServicioConEntregablesDto,
   SubirArchivoRequestDto,
+  EliminarArchivoDto,
+  EliminarArchivoResponse,
 } from "@/types/archivos";
 import { EntregableDetalleDto } from "@/types/servicios";
 
@@ -151,6 +153,36 @@ export const ArchivosService = {
       const raw = Array.isArray(resp.data) ? resp.data : resp.data?.datos || resp.data?.data || [];
       return Array.isArray(raw) ? raw : [];
     }, []);
+  },
+
+  /**
+   * POST api/archivos/eliminar (Programación)
+   */
+  async eliminarArchivo(
+    dto: EliminarArchivoDto
+  ): Promise<EliminarArchivoResponse> {
+    const resp = await apiClient.post<EliminarArchivoResponse>(
+      "archivos/eliminar",
+      dto
+    );
+    return {
+      v_Advertencia: resp.data?.v_Advertencia ?? null,
+    };
+  },
+
+  /**
+   * POST api/archivos/consultor/eliminar (Mis servicios)
+   */
+  async eliminarArchivoConsultor(
+    dto: EliminarArchivoDto
+  ): Promise<EliminarArchivoResponse> {
+    const resp = await apiClient.post<EliminarArchivoResponse>(
+      "archivos/consultor/eliminar",
+      dto
+    );
+    return {
+      v_Advertencia: resp.data?.v_Advertencia ?? null,
+    };
   },
 };
 

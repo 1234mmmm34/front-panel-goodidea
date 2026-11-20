@@ -56,6 +56,11 @@ import { AlumnosService } from "@/services/alumnos.service";
 import { CatalogosService } from "@/services/catalogos.service";
 import { entregables as entregablesCat } from "@/types/catalogos";
 import { VerDocumento } from "@/services/archivos.service";
+import {
+  BotonEliminarArchivo,
+  ModalConfirmarEliminarArchivo,
+  TargetEliminarArchivo,
+} from "@/components/archivos/EliminarArchivoModal";
 import { formatearFechaCorta, formatearFechaTexto, esFechaPasada } from "@/lib/date-utils";
 import { esPrecioValido, calcularImportes, formatearPrecioUnitario, redondear2 } from "@/lib/montos";
 import { AvisoInfo } from "@/components/ui/AvisoInfo";
@@ -171,6 +176,8 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [cotizacionGI, setCotizacionGI] = useState<string>("");
   const [ordenCompra, setOrdenCompra] = useState<string>("");
   const [editandoCotizacion, setEditandoCotizacion] = useState<boolean>(false);
+  const [targetEliminarArchivo, setTargetEliminarArchivo] =
+    useState<TargetEliminarArchivo | null>(null);
   const [editandoOC, setEditandoOC] = useState<boolean>(false);
 
   // Estados para "Editar montos"
@@ -740,13 +747,13 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     const fInicioStr = fechaInicio
       ? formatearFechaTexto(fechaInicio)
       : (detalle as any).d_FechaInicio
-      ? formatearFechaTexto((detalle as any).d_FechaInicio)
-      : "";
+        ? formatearFechaTexto((detalle as any).d_FechaInicio)
+        : "";
     const fFinStr = fechaFin
       ? formatearFechaTexto(fechaFin)
       : (detalle as any).d_FechaFin
-      ? formatearFechaTexto((detalle as any).d_FechaFin)
-      : "";
+        ? formatearFechaTexto((detalle as any).d_FechaFin)
+        : "";
 
     let config = {
       bg: "#e7f1fb",
@@ -1302,21 +1309,21 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     });
   };
 
-const MESES_ABREV_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const MESES_ABREV_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-function formatearFechaVoBo(fechaIso: string | null | undefined): string {
-  if (!fechaIso) return "";
-  const parts = fechaIso.split("T")[0].split("-");
-  if (parts.length === 3) {
-    const year = parts[0];
-    const monthIdx = parseInt(parts[1], 10) - 1;
-    const day = parts[2].padStart(2, "0");
-    if (monthIdx >= 0 && monthIdx < 12) {
-      return `${day}/${MESES_ABREV_ES[monthIdx]}/${year}`;
+  function formatearFechaVoBo(fechaIso: string | null | undefined): string {
+    if (!fechaIso) return "";
+    const parts = fechaIso.split("T")[0].split("-");
+    if (parts.length === 3) {
+      const year = parts[0];
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      const day = parts[2].padStart(2, "0");
+      if (monthIdx >= 0 && monthIdx < 12) {
+        return `${day}/${MESES_ABREV_ES[monthIdx]}/${year}`;
+      }
     }
+    return fechaIso;
   }
-  return fechaIso;
-}
 
   // Resumen de Pendientes client-side
   const calcularPendientes = (): string[] => {
@@ -2038,56 +2045,56 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                                           <RefreshCw size={15} />
                                         </button>
 
-                                      {bCancelada ? (
-                                        <button
-                                          type="button"
-                                          className="btn-icon"
-                                          title="Esta sesión ya se encuentra cancelada"
-                                          disabled
-                                          onClick={(e) => e.stopPropagation()}
-                                          style={{
-                                            padding: "4px",
-                                            border: "none",
-                                            background: "transparent",
-                                            color: "#cbd5e1",
-                                            cursor: "not-allowed",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            opacity: 0.6,
-                                          }}
-                                        >
-                                          <Ban size={15} />
-                                        </button>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          className="btn-icon"
-                                          title="Cancelar esta sesión"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSesionACancelar(sesion);
-                                            setModalCancelarAbierto(true);
-                                          }}
-                                          style={{
-                                            padding: "4px",
-                                            border: "none",
-                                            background: "transparent",
-                                            color: "#ef4444",
-                                            cursor: "pointer",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                          }}
-                                        >
-                                          <Ban size={15} />
-                                        </button>
-                                      )}
-                                    </>
-                                  )}
-                                  {esExpandible && (
-                                    estaAbierto ? <ChevronUp size={14} style={{ color: "#94a3b8" }} /> : <ChevronDown size={14} style={{ color: "#94a3b8" }} />
-                                  )}
+                                        {bCancelada ? (
+                                          <button
+                                            type="button"
+                                            className="btn-icon"
+                                            title="Esta sesión ya se encuentra cancelada"
+                                            disabled
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{
+                                              padding: "4px",
+                                              border: "none",
+                                              background: "transparent",
+                                              color: "#cbd5e1",
+                                              cursor: "not-allowed",
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              opacity: 0.6,
+                                            }}
+                                          >
+                                            <Ban size={15} />
+                                          </button>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            className="btn-icon"
+                                            title="Cancelar esta sesión"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSesionACancelar(sesion);
+                                              setModalCancelarAbierto(true);
+                                            }}
+                                            style={{
+                                              padding: "4px",
+                                              border: "none",
+                                              background: "transparent",
+                                              color: "#ef4444",
+                                              cursor: "pointer",
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                            }}
+                                          >
+                                            <Ban size={15} />
+                                          </button>
+                                        )}
+                                      </>
+                                    )}
+                                    {esExpandible && (
+                                      estaAbierto ? <ChevronUp size={14} style={{ color: "#94a3b8" }} /> : <ChevronDown size={14} style={{ color: "#94a3b8" }} />
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -2908,6 +2915,42 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                         </button>
                       </div>
                     )}
+                    {detalle.v_KeyCotizacion && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "4px" }}>
+                        <button
+                          type="button"
+                          onClick={() => VerDocumento(detalle.v_KeyCotizacion)}
+                          style={{
+                            padding: "2px 4px",
+                            color: "#2B8FCC",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          <Paperclip size={13} />
+                          <span>Ver archivo</span>
+                        </button>
+                        <BotonEliminarArchivo
+                          title="Eliminar archivo de cotización"
+                          onClick={() =>
+                            setTargetEliminarArchivo({
+                              dto: {
+                                v_Tipo: "cotizacion_cliente",
+                                i_CveServAgendaDet: detalle.i_CveServAgendaDet,
+                              },
+                              nombreElemento: detalle.v_Servicio,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* OC Cliente Inline */}
@@ -2949,6 +2992,42 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                         >
                           <Edit2 size={12} />
                         </button>
+                      </div>
+                    )}
+                    {detalle.v_KeyOC && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "4px" }}>
+                        <button
+                          type="button"
+                          onClick={() => VerDocumento(detalle.v_KeyOC)}
+                          style={{
+                            padding: "2px 4px",
+                            color: "#2B8FCC",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          <Paperclip size={13} />
+                          <span>Ver archivo</span>
+                        </button>
+                        <BotonEliminarArchivo
+                          title="Eliminar archivo de orden de compra"
+                          onClick={() =>
+                            setTargetEliminarArchivo({
+                              dto: {
+                                v_Tipo: "oc_cliente",
+                                i_CveServAgendaDet: detalle.i_CveServAgendaDet,
+                              },
+                              nombreElemento: detalle.v_Servicio,
+                            })
+                          }
+                        />
                       </div>
                     )}
                   </div>
@@ -3220,31 +3299,45 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                             </div>
 
                             {keyArchivo && (
-                              <button
-                                type="button"
-                                className="btn-icon"
-                                style={{
-                                  padding: "4px 8px",
-                                  color: "#2B8FCC",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  fontSize: "12px",
-                                  fontWeight: 500,
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  textDecoration: "underline",
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  VerDocumento(keyArchivo);
-                                }}
-                                title={`Ver archivo de ${ent.v_Nombre}`}
-                              >
-                                <Paperclip size={14} />
-                                <span>Ver archivo</span>
-                              </button>
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                                <button
+                                  type="button"
+                                  className="btn-icon"
+                                  style={{
+                                    padding: "4px 8px",
+                                    color: "#2B8FCC",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    fontSize: "12px",
+                                    fontWeight: 500,
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    textDecoration: "underline",
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    VerDocumento(keyArchivo);
+                                  }}
+                                  title={`Ver archivo de ${ent.v_Nombre}`}
+                                >
+                                  <Paperclip size={14} />
+                                  <span>Ver archivo</span>
+                                </button>
+                                <BotonEliminarArchivo
+                                  title={`Eliminar archivo de ${ent.v_Nombre}`}
+                                  onClick={() =>
+                                    setTargetEliminarArchivo({
+                                      dto: {
+                                        v_Tipo: "entregable",
+                                        i_CveAgendaEntregables: ent.i_CveAgendaEntregables,
+                                      },
+                                      nombreElemento: ent.v_Nombre,
+                                    })
+                                  }
+                                />
+                              </div>
                             )}
                           </div>
 
@@ -3300,28 +3393,42 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
                     </div>
 
                     {detalle.v_KeyVoBo && (
-                      <button
-                        type="button"
-                        className="btn-icon"
-                        style={{
-                          padding: "4px 8px",
-                          color: "#2B8FCC",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "12px",
-                          fontWeight: 500,
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          textDecoration: "underline",
-                        }}
-                        onClick={() => VerDocumento(detalle.v_KeyVoBo)}
-                        title="Ver visto bueno de la autoridad"
-                      >
-                        <Paperclip size={14} />
-                        <span>Ver archivo</span>
-                      </button>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          style={{
+                            padding: "4px 8px",
+                            color: "#2B8FCC",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                          }}
+                          onClick={() => VerDocumento(detalle.v_KeyVoBo)}
+                          title="Ver visto bueno de la autoridad"
+                        >
+                          <Paperclip size={14} />
+                          <span>Ver archivo</span>
+                        </button>
+                        <BotonEliminarArchivo
+                          title="Eliminar visto bueno de la autoridad"
+                          onClick={() =>
+                            setTargetEliminarArchivo({
+                              dto: {
+                                v_Tipo: "vobo_autoridad",
+                                i_CveServAgendaDet: detalle.i_CveServAgendaDet,
+                              },
+                              nombreElemento: detalle.v_Servicio,
+                            })
+                          }
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -4361,7 +4468,7 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
         }}
         onSiguienteSecuencial={handleSiguienteSecuencial}
         onTerminarSecuencial={handleTerminarSecuencial}
-        onGuardadoExitoso={() => {}}
+        onGuardadoExitoso={() => { }}
       />
 
       {/* Modal Facturas Asociadas (Conflicto 409 CONFIRMAR_FACTURAS) */}
@@ -4858,6 +4965,15 @@ function formatearFechaVoBo(fechaIso: string | null | undefined): string {
           </div>
         </div>
       )}
+      <ModalConfirmarEliminarArchivo
+        target={targetEliminarArchivo}
+        modo="admin"
+        onCerrar={() => setTargetEliminarArchivo(null)}
+        onEliminado={async () => {
+          await cargarDetalle();
+          onGuardadoExitoso?.();
+        }}
+      />
     </div>
   );
 };

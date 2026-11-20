@@ -35,3 +35,18 @@ export interface SubirArchivoRequestDto {
   EntregablesSeleccionados?: number[];
   d_FechaEntrega?: string;
 }
+
+export interface EliminarArchivoDto {
+  v_Tipo:
+    | "entregable"
+    | "carta_entrega"
+    | "cotizacion_cliente"
+    | "oc_cliente"
+    | "vobo_autoridad";
+  i_CveServAgendaDet?: number; // cotización / OC / VoBo
+  i_CveAgendaEntregables?: number; // entregable / carta
+}
+
+export interface EliminarArchivoResponse {
+  v_Advertencia: string | null;
+}

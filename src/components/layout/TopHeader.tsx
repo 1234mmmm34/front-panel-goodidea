@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { obtenerSesionActual } from "@/lib/api-client";
 import { SesionAlmacenada } from "@/types/auth";
 import { QuickActionsMenu, UserAvatarMenu } from "./HeaderActions";
+import { NotificacionesBell } from "./NotificacionesBell";
 
 export const TopHeader: React.FC = () => {
   const [sesion] = useState<SesionAlmacenada | null>(() =>
@@ -34,6 +35,7 @@ export const TopHeader: React.FC = () => {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <NotificacionesBell buttonSize={32} />
         <QuickActionsMenu buttonSize={32} />
 
         <div className="tenant-dropdown-pill">

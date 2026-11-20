@@ -34,6 +34,11 @@ import {
   extraerMensajeErrorConsultor,
 } from "@/services/consultor.service";
 import { ArchivosService, VerDocumento } from "@/services/archivos.service";
+import {
+  BotonEliminarArchivo,
+  ModalConfirmarEliminarArchivo,
+  TargetEliminarArchivo,
+} from "@/components/archivos/EliminarArchivoModal";
 import { formatearFechaTexto } from "@/lib/date-utils";
 import { useToast } from "@/context/ToastContext";
 import { PipcService, extraerMensajeError } from "@/services/pipc.service";
@@ -137,6 +142,8 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
     v_Tipo: "entregable" | "carta_entrega";
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [targetEliminarArchivo, setTargetEliminarArchivo] =
+    useState<TargetEliminarArchivo | null>(null);
 
   // Acordeones
   const [acordeonSesiones, setAcordeonSesiones] = useState<boolean>(true);
@@ -352,13 +359,13 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
     const fInicioStr = fechaInicio
       ? formatearFechaTexto(fechaInicio)
       : cabecera.d_FechaInicio
-      ? formatearFechaTexto(cabecera.d_FechaInicio)
-      : "";
+        ? formatearFechaTexto(cabecera.d_FechaInicio)
+        : "";
     const fFinStr = fechaFin
       ? formatearFechaTexto(fechaFin)
       : cabecera.d_FechaFin
-      ? formatearFechaTexto(cabecera.d_FechaFin)
-      : "";
+        ? formatearFechaTexto(cabecera.d_FechaFin)
+        : "";
 
     let config = {
       bg: "#e7f1fb",
@@ -405,9 +412,8 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
           text: "#067647",
           icon: CheckCircle2,
           texto: cabecera.d_FechaConfirmacionTermino
-            ? `Terminado · Confirmado ${
-                porQuien ? `por ${porQuien} ` : ""
-              }el ${formatearFechaTexto(cabecera.d_FechaConfirmacionTermino)}`
+            ? `Terminado · Confirmado ${porQuien ? `por ${porQuien} ` : ""
+            }el ${formatearFechaTexto(cabecera.d_FechaConfirmacionTermino)}`
             : "Terminado",
         };
         break;
@@ -526,10 +532,10 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
       prev.map((e) =>
         e.i_CveAgendaEntregables === ent.i_CveAgendaEntregables
           ? {
-              ...e,
-              b_Entregado: nuevoValor,
-              f_FechaEntregable: nuevoValor ? new Date().toISOString() : null,
-            }
+            ...e,
+            b_Entregado: nuevoValor,
+            f_FechaEntregable: nuevoValor ? new Date().toISOString() : null,
+          }
           : e
       )
     );
@@ -579,11 +585,11 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
   // Lógica de Cupos y Alumnos (2 = Capacitación)
   const esCapacitacion =
     cabecera?.i_CveTipoServicio !== undefined &&
-    cabecera?.i_CveTipoServicio !== null
+      cabecera?.i_CveTipoServicio !== null
       ? Number(cabecera.i_CveTipoServicio) === 2
       : cabecera?.v_TipoServicio
-      ? cabecera.v_TipoServicio.toUpperCase().includes("CAPACITACI")
-      : false;
+        ? cabecera.v_TipoServicio.toUpperCase().includes("CAPACITACI")
+        : false;
 
   const cupos = cabecera?.i_NumAlumnos ?? 0;
   const inscritos = alumnos.length;
@@ -610,8 +616,8 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
     return esCapacitacion
       ? "Sin personal"
       : esProveedorApoyo
-      ? ""
-      : "Sin apoyo";
+        ? ""
+        : "Sin apoyo";
   };
 
   const renderBadgeSesion = (sesion: SesionConsultorDto) => {
@@ -688,7 +694,7 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
   );
   const servicioConfirmado = Boolean(
     cabecera?.d_FechaConfirmacionTermino &&
-      cabecera.d_FechaConfirmacionTermino.trim() !== ""
+    cabecera.d_FechaConfirmacionTermino.trim() !== ""
   );
   const deshabilitarGuardarAvance =
     guardandoAvance ||
@@ -1416,15 +1422,14 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                           const estaAbierto = sesionAbiertaIdx === sIdx;
                           const sesionNueva = esReprogramada
                             ? sesiones.find(
-                                (s) => s.i_CveAgendaDetalle === iCveReprograma
-                              )
+                              (s) => s.i_CveAgendaDetalle === iCveReprograma
+                            )
                             : null;
 
                           return (
                             <div
-                              key={`det-sesion-${
-                                sesion.i_CveAgendaDetalle || "det"
-                              }-${sIdx}`}
+                              key={`det-sesion-${sesion.i_CveAgendaDetalle || "det"
+                                }-${sIdx}`}
                               style={{
                                 border: "1px solid #e2e8f0",
                                 borderRadius: "6px",
@@ -1470,7 +1475,7 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                                     Sesión {sesion.i_Orden || sIdx + 1}
                                   </span>
                                   {cabecera.i_CveTipoServicio === 3 ||
-                                  cabecera.i_CveTipoServicio === 6 ? (
+                                    cabecera.i_CveTipoServicio === 6 ? (
                                     <span style={{ color: "#475569" }}>
                                       —{" "}
                                       {formatearFechaTexto(
@@ -1776,9 +1781,8 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
 
                           return (
                             <tr
-                              key={`act-proy-${act.v_Origen}-${act.v_Momento}-${
-                                act.i_CveActividad ?? idx
-                              }-${idx}`}
+                              key={`act-proy-${act.v_Origen}-${act.v_Momento}-${act.i_CveActividad ?? idx
+                                }-${idx}`}
                               style={
                                 esHoy && !esCanceladaOReprogramada
                                   ? { backgroundColor: "#eef6fd" }
@@ -1793,8 +1797,8 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                                   color: esCanceladaOReprogramada
                                     ? "#94a3b8"
                                     : esHoy
-                                    ? "#188ae2"
-                                    : "#1e3a5f",
+                                      ? "#188ae2"
+                                      : "#1e3a5f",
                                   fontWeight:
                                     esHoy && !esCanceladaOReprogramada
                                       ? 700
@@ -2018,9 +2022,8 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                           </p>
                         ) : (
                           <div
-                            className={`alegra-table-container ${
-                              alumnos.length >= 7 ? "custom-scrollbar" : ""
-                            }`}
+                            className={`alegra-table-container ${alumnos.length >= 7 ? "custom-scrollbar" : ""
+                              }`}
                             style={{
                               borderRadius: "6px",
                               border: "1px solid #e2e8f0",
@@ -2370,8 +2373,8 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                                   title={
                                     ent.f_FechaEntregable
                                       ? `Entregado el ${formatearFechaTexto(
-                                          ent.f_FechaEntregable
-                                        )}`
+                                        ent.f_FechaEntregable
+                                      )}`
                                       : undefined
                                   }
                                   style={{
@@ -2472,10 +2475,10 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                                     ...btnOutlineStyle,
                                     ...(ent.b_Entregado && !deshabilitado
                                       ? {
-                                          backgroundColor: "#f0fdf4",
-                                          border: "1px solid #86efac",
-                                          color: "#15803d",
-                                        }
+                                        backgroundColor: "#f0fdf4",
+                                        border: "1px solid #86efac",
+                                        color: "#15803d",
+                                      }
                                       : {}),
                                   }}
                                 >
@@ -2517,22 +2520,36 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                               <span>
                                 Entregable:{" "}
                                 {keyArchivo ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => VerDocumento(keyArchivo)}
-                                    style={{
-                                      background: "none",
-                                      border: "none",
-                                      padding: 0,
-                                      color: "#2B8FCC",
-                                      textDecoration: "underline",
-                                      cursor: "pointer",
-                                      fontSize: "12px",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    ver
-                                  </button>
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => VerDocumento(keyArchivo)}
+                                      style={{
+                                        background: "none",
+                                        border: "none",
+                                        padding: 0,
+                                        color: "#2B8FCC",
+                                        textDecoration: "underline",
+                                        cursor: "pointer",
+                                        fontSize: "12px",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      ver
+                                    </button>
+                                    <BotonEliminarArchivo
+                                      title={`Eliminar entregable de ${ent.v_Nombre}`}
+                                      onClick={() =>
+                                        setTargetEliminarArchivo({
+                                          dto: {
+                                            v_Tipo: "entregable",
+                                            i_CveAgendaEntregables: ent.i_CveAgendaEntregables,
+                                          },
+                                          nombreElemento: ent.v_Nombre,
+                                        })
+                                      }
+                                    />
+                                  </span>
                                 ) : (
                                   "sin archivo"
                                 )}
@@ -2553,22 +2570,36 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                               <span>
                                 Carta de entrega:{" "}
                                 {keyCarta ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => VerDocumento(keyCarta)}
-                                    style={{
-                                      background: "none",
-                                      border: "none",
-                                      padding: 0,
-                                      color: "#2B8FCC",
-                                      textDecoration: "underline",
-                                      cursor: "pointer",
-                                      fontSize: "12px",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    ver
-                                  </button>
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => VerDocumento(keyCarta)}
+                                      style={{
+                                        background: "none",
+                                        border: "none",
+                                        padding: 0,
+                                        color: "#2B8FCC",
+                                        textDecoration: "underline",
+                                        cursor: "pointer",
+                                        fontSize: "12px",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      ver
+                                    </button>
+                                    <BotonEliminarArchivo
+                                      title={`Eliminar carta de entrega de ${ent.v_Nombre}`}
+                                      onClick={() =>
+                                        setTargetEliminarArchivo({
+                                          dto: {
+                                            v_Tipo: "carta_entrega",
+                                            i_CveAgendaEntregables: ent.i_CveAgendaEntregables,
+                                          },
+                                          nombreElemento: ent.v_Nombre,
+                                        })
+                                      }
+                                    />
+                                  </span>
                                 ) : (
                                   "sin archivo"
                                 )}
@@ -2988,28 +3019,42 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
                     </div>
 
                     {cabecera.v_KeyVoBo && (
-                      <button
-                        type="button"
-                        className="btn-icon"
-                        style={{
-                          padding: "4px 8px",
-                          color: "#2B8FCC",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "12px",
-                          fontWeight: 500,
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          textDecoration: "underline",
-                        }}
-                        onClick={() => VerDocumento(cabecera.v_KeyVoBo!)}
-                        title="Ver visto bueno de la autoridad"
-                      >
-                        <Paperclip size={14} />
-                        <span>Ver archivo</span>
-                      </button>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          style={{
+                            padding: "4px 8px",
+                            color: "#2B8FCC",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                          }}
+                          onClick={() => VerDocumento(cabecera.v_KeyVoBo!)}
+                          title="Ver visto bueno de la autoridad"
+                        >
+                          <Paperclip size={14} />
+                          <span>Ver archivo</span>
+                        </button>
+                        <BotonEliminarArchivo
+                          title="Eliminar visto bueno de la autoridad"
+                          onClick={() =>
+                            setTargetEliminarArchivo({
+                              dto: {
+                                v_Tipo: "vobo_autoridad",
+                                i_CveServAgendaDet: cabecera.i_CveServAgendaDet,
+                              },
+                              nombreElemento: cabecera.v_Servicio,
+                            })
+                          }
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -3091,6 +3136,16 @@ export const ModalDetalleServicioConsultor: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      <ModalConfirmarEliminarArchivo
+        target={targetEliminarArchivo}
+        modo="consultor"
+        onCerrar={() => setTargetEliminarArchivo(null)}
+        onEliminado={async () => {
+          await cargarDetalle();
+          onGuardadoExitoso?.();
+        }}
+      />
     </div>
   );
 };

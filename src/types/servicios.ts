@@ -179,6 +179,8 @@ export interface AgendaDetalleGetDto {
   i_CveTipoServicio?: number | null;
   d_FechaVoBo?: string | null;
   v_KeyVoBo?: string | null;
+  v_KeyCotizacion?: string | null;
+  v_KeyOC?: string | null;
   v_Notas?: string | null;
   d_FechaConfirmacionTermino?: string | null;
   v_ConfirmadoPor?: string | null;
