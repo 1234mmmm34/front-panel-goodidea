@@ -92,7 +92,6 @@ export interface FiltrosGastosState {
   estado: string;
   fechaInicio: string;
   fechaFin: string;
-  i_CveProveedor: number;
   searchTerm: string;
 }
 

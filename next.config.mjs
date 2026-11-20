@@ -1,3 +1,5 @@
+import { withSerwist } from "@serwist/turbopack";
+
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 /** @type {import('next').NextConfig} */
@@ -13,4 +15,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

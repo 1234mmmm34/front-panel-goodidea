@@ -22,7 +22,8 @@ export const AuthGuard: React.FC<Props> = ({ children }) => {
     const esRutaPublica =
       esRutaLogin ||
       pathname.startsWith("/contrasenia") ||
-      pathname.startsWith("/confirmar-termino");
+      pathname.startsWith("/confirmar-termino") ||
+      pathname.startsWith("/offline");
 
     if (!sesion && !esRutaPublica) {
       router.replace("/login");
@@ -44,8 +45,12 @@ export const AuthGuard: React.FC<Props> = ({ children }) => {
     );
   }
 
-  // Página pública de confirmación de término: sin MenuProvider
-  if (pathname.startsWith("/confirmar-termino")) {
+  // Rutas sin MenuProvider (públicas o módulo offline sin sidebar)
+  if (
+    pathname.startsWith("/confirmar-termino") ||
+    pathname.startsWith("/asistencia") ||
+    pathname.startsWith("/offline")
+  ) {
     return <ToastProvider>{children}</ToastProvider>;
   }
 

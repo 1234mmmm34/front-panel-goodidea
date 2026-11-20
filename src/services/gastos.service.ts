@@ -9,7 +9,7 @@ import {
   ResultadoRespuestaApi,
   ResultadoAplicarDescuentoApi,
 } from "@/types/gastos";
-import { PaginadoResponse } from "@/types/servicios";
+import { AgendaEmpresaFiltroDto, PaginadoResponse } from "@/types/servicios";
 
 function extraerMensajeError(error: any, defaultMsg: string): string {
   if (!error?.response?.data) {
@@ -39,14 +39,15 @@ function extraerMensajeError(error: any, defaultMsg: string): string {
 export const GastosService = {
   /**
    * 1. Listado paginado de gastos
-   * GET facturasProveedor?searchTerm={texto}&fechaInicio={yyyy-MM-dd}&fechaFin={yyyy-MM-dd}&i_CveProveedor={n}&estado={texto}&pagina={n}&tamano={n}
+   * GET facturasProveedor?searchTerm={texto}&fechaInicio={yyyy-MM-dd}&fechaFin={yyyy-MM-dd}&proveedores={ids}&ordenProveedor={ASC|DESC}&estado={texto}&pagina={n}&tamano={n}
    */
   async getGastos(params: {
     estado?: string;
     fechaInicio?: string | null;
     fechaFin?: string | null;
     searchTerm?: string;
-    i_CveProveedor?: number;
+    proveedores?: number[] | null;
+    ordenProveedor?: "ASC" | "DESC" | null;
     pagina: number;
     tamano: number;
   }): Promise<PaginadoResponse<FacturaProv>> {
@@ -54,7 +55,6 @@ export const GastosService = {
       async () => {
         const queryParams: Record<string, string | number> = {
           searchTerm: params.searchTerm ?? "",
-          i_CveProveedor: params.i_CveProveedor ?? 0,
           estado: params.estado ?? "",
           pagina: params.pagina,
           tamano: params.tamano,
@@ -65,6 +65,14 @@ export const GastosService = {
 
         if (inicio.length > 0) queryParams.fechaInicio = inicio;
         if (fin.length > 0) queryParams.fechaFin = fin;
+
+        if (Array.isArray(params.proveedores)) {
+          queryParams.proveedores =
+            params.proveedores.length > 0 ? params.proveedores.join(",") : "0";
+        }
+        if (params.ordenProveedor) {
+          queryParams.ordenProveedor = params.ordenProveedor;
+        }
 
         const resp = await apiClient.get<any>("facturasProveedor", { params: queryParams });
         let rawDatos: FacturaProv[] = [];
@@ -117,14 +125,14 @@ export const GastosService = {
 
   /**
    * 2. Tarjetas de resumen
-   * GET facturasProveedor/Resumen?searchTerm={texto}&fechaInicio={yyyy-MM-dd}&fechaFin={yyyy-MM-dd}&i_CveProveedor={n}&estado={texto}
+   * GET facturasProveedor/Resumen?searchTerm={texto}&fechaInicio={yyyy-MM-dd}&fechaFin={yyyy-MM-dd}&proveedores={ids}&estado={texto}
    */
   async getGastosResumen(params: {
     estado?: string;
     fechaInicio?: string | null;
     fechaFin?: string | null;
     searchTerm?: string;
-    i_CveProveedor?: number;
+    proveedores?: number[] | null;
   }): Promise<FacturasProvResumen> {
     return httpDefensivo(
       async () => {
@@ -135,15 +143,17 @@ export const GastosService = {
         if (params.searchTerm && params.searchTerm.trim().length > 0) {
           queryParams.searchTerm = params.searchTerm.trim();
         }
-        if (params.i_CveProveedor && params.i_CveProveedor > 0) {
-          queryParams.i_CveProveedor = params.i_CveProveedor;
-        }
 
         const inicio = (params.fechaInicio || "").trim();
         const fin = (params.fechaFin || "").trim();
 
         if (inicio.length > 0) queryParams.fechaInicio = inicio;
         if (fin.length > 0) queryParams.fechaFin = fin;
+
+        if (Array.isArray(params.proveedores)) {
+          queryParams.proveedores =
+            params.proveedores.length > 0 ? params.proveedores.join(",") : "0";
+        }
 
         const resp = await apiClient.get<any>("facturasProveedor/Resumen", {
           params: queryParams,
@@ -164,6 +174,57 @@ export const GastosService = {
         i_TotalFacturas: 0,
       }
     );
+  },
+
+  /**
+   * 2.1 Catálogo de proveedores para filtro de columna (Checklist)
+   * GET facturasProveedor/GetProveedoresFiltro?searchTerm={texto}&fechaInicio={yyyy-MM-dd}&fechaFin={yyyy-MM-dd}&estado={texto}
+   */
+  async getProveedoresFiltro(params: {
+    searchTerm?: string;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
+    estado?: string;
+  }): Promise<AgendaEmpresaFiltroDto[]> {
+    try {
+      const queryParams: Record<string, string> = {};
+      if (params.searchTerm && params.searchTerm.trim().length > 0) {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+      if (params.fechaInicio && params.fechaInicio.trim().length > 0) {
+        queryParams.fechaInicio = params.fechaInicio.trim();
+      }
+      if (params.fechaFin && params.fechaFin.trim().length > 0) {
+        queryParams.fechaFin = params.fechaFin.trim();
+      }
+      if (params.estado && params.estado.trim().length > 0) {
+        queryParams.estado = params.estado.trim();
+      }
+
+      const resp = await apiClient.get<any>("facturasProveedor/GetProveedoresFiltro", {
+        params: queryParams,
+      });
+      const data = resp.data;
+      const raw = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.datos)
+        ? data.datos
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.Datos)
+        ? data.Datos
+        : [];
+
+      return raw.map((item: any) => ({
+        i_CveEmpresa: Number(
+          item.i_CveEmpresa ?? item.i_CveProveedor ?? item.iCveProveedor ?? item.iCveEmpresa ?? 0
+        ),
+        v_Empresa:
+          item.v_Empresa ?? item.v_Proveedor ?? item.vProveedor ?? item.vEmpresa ?? "",
+      }));
+    } catch {
+      return [];
+    }
   },
 
   /**

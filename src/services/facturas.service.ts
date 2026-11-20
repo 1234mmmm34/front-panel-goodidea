@@ -13,7 +13,7 @@ import {
   CrearVentaFacturasResponse,
   SubirArchivosFacturaResponse,
 } from "@/types/facturas";
-import { PaginadoResponse, TerminoServicioDto } from "@/types/servicios";
+import { AgendaEmpresaFiltroDto, PaginadoResponse, TerminoServicioDto } from "@/types/servicios";
 
 function extraerMensajeError(error: any, defaultMsg: string): string {
   if (!error?.response?.data) {
@@ -53,6 +53,8 @@ export const FacturasService = {
     fechaFin?: string | null;
     searchTerm?: string;
     empresa?: string;
+    empresas?: number[] | null;
+    ordenCliente?: "ASC" | "DESC" | null;
     pagina: number;
     tamano: number;
     signal?: AbortSignal;
@@ -73,6 +75,13 @@ export const FacturasService = {
     }
     if (fin.length > 0) {
       queryParams.fechaFin = fin;
+    }
+    if (Array.isArray(params.empresas)) {
+      queryParams.empresas =
+        params.empresas.length > 0 ? params.empresas.join(",") : "0";
+    }
+    if (params.ordenCliente) {
+      queryParams.ordenCliente = params.ordenCliente;
     }
 
     let resp = await apiClient.get<any>("facturas", {
@@ -160,6 +169,7 @@ export const FacturasService = {
     fechaFin?: string | null;
     searchTerm?: string;
     empresa?: string;
+    empresas?: number[] | null;
     signal?: AbortSignal;
   }): Promise<FacturasResumenDto> {
     const queryParams: Record<string, string> = {
@@ -176,6 +186,10 @@ export const FacturasService = {
     }
     if (fin.length > 0) {
       queryParams.fechaFin = fin;
+    }
+    if (Array.isArray(params.empresas)) {
+      queryParams.empresas =
+        params.empresas.length > 0 ? params.empresas.join(",") : "0";
     }
 
     let resp = await apiClient.get<any>("facturas/Resumen", {
@@ -209,6 +223,54 @@ export const FacturasService = {
       i_TotalFacturas: Number(data?.i_TotalFacturas ?? data?.TotalFacturas ?? 0),
       d_PendientePorPagar: Number(data?.d_PendientePorPagar ?? data?.PendientePorPagar ?? 0),
     };
+  },
+
+  /**
+   * 1.2 Catálogo de empresas para filtro de columna (Checklist)
+   * GET facturas/GetEmpresasFiltro?searchTerm={texto}&fechaInicio={yyyy-MM-dd}&fechaFin={yyyy-MM-dd}&estado={texto}
+   */
+  async getEmpresasFiltro(params: {
+    searchTerm?: string;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
+    estado?: string;
+  }): Promise<AgendaEmpresaFiltroDto[]> {
+    try {
+      const queryParams: Record<string, string> = {};
+      if (params.searchTerm && params.searchTerm.trim().length > 0) {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+      if (params.fechaInicio && params.fechaInicio.trim().length > 0) {
+        queryParams.fechaInicio = params.fechaInicio.trim();
+      }
+      if (params.fechaFin && params.fechaFin.trim().length > 0) {
+        queryParams.fechaFin = params.fechaFin.trim();
+      }
+      if (params.estado && params.estado.trim().length > 0) {
+        queryParams.estado = params.estado.trim();
+      }
+
+      const resp = await apiClient.get<any>("facturas/GetEmpresasFiltro", {
+        params: queryParams,
+      });
+      const data = resp.data;
+      const raw = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.datos)
+        ? data.datos
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.Datos)
+        ? data.Datos
+        : [];
+
+      return raw.map((item: any) => ({
+        i_CveEmpresa: Number(item.i_CveEmpresa ?? item.iCveEmpresa ?? 0),
+        v_Empresa: item.v_Empresa ?? item.vEmpresa ?? "",
+      }));
+    } catch {
+      return [];
+    }
   },
 
   // --- 2. Endpoints para los 4 modales ---

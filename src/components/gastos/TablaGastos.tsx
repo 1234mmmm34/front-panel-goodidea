@@ -5,6 +5,20 @@ import { FacturaProv } from "@/types/gastos";
 import { PaginadoResponse } from "@/types/servicios";
 import { PaginadorCustom } from "@/components/ui/PaginadorCustom";
 import { formatearFechaTexto } from "@/lib/date-utils";
+import {
+  FiltroColumnaChecklist,
+  OpcionFiltro,
+} from "@/components/ui/FiltroColumnaChecklist";
+
+export interface FiltroColumnaProp {
+  cargarOpciones: () => Promise<OpcionFiltro[]>;
+  seleccionados: number[] | null;
+  orden: "ASC" | "DESC" | null;
+  onAplicar: (
+    seleccionados: number[] | null,
+    orden: "ASC" | "DESC" | null
+  ) => void;
+}
 
 interface Props {
   datosPaginados: PaginadoResponse<FacturaProv> | null;
@@ -16,6 +30,7 @@ interface Props {
   onCancelarGasto: (gasto: FacturaProv) => void;
   onCambioPagina: (pagina: number) => void;
   onCambioTamano: (tamano: number) => void;
+  filtroColumna: FiltroColumnaProp;
 }
 
 export const TablaGastos: React.FC<Props> = ({
@@ -28,6 +43,7 @@ export const TablaGastos: React.FC<Props> = ({
   onCancelarGasto,
   onCambioPagina,
   onCambioTamano,
+  filtroColumna,
 }) => {
   const formatearMonto = (monto: number): string => {
     const val = isNaN(monto) ? 0 : monto;
@@ -174,7 +190,15 @@ export const TablaGastos: React.FC<Props> = ({
       <table className="alegra-table">
         <thead>
           <tr>
-            <th>Proveedor</th>
+            <th>
+              <FiltroColumnaChecklist
+                titulo="Proveedor"
+                cargarOpciones={filtroColumna.cargarOpciones}
+                seleccionados={filtroColumna.seleccionados}
+                orden={filtroColumna.orden}
+                onAplicar={filtroColumna.onAplicar}
+              />
+            </th>
             <th>OC prov.</th>
             <th>Cotización prov.</th>
             <th>Concepto</th>

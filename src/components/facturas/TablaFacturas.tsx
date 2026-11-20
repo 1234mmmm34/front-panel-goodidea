@@ -5,6 +5,20 @@ import { Eye, FileCheck, Ban, Search } from "lucide-react";
 import { FacturaGetDto, getEstadoFactura } from "@/types/facturas";
 import { PaginadorCustom } from "@/components/ui/PaginadorCustom";
 import { formatearFechaTexto } from "@/lib/date-utils";
+import {
+  FiltroColumnaChecklist,
+  OpcionFiltro,
+} from "@/components/ui/FiltroColumnaChecklist";
+
+export interface FiltroColumnaProp {
+  cargarOpciones: () => Promise<OpcionFiltro[]>;
+  seleccionados: number[] | null;
+  orden: "ASC" | "DESC" | null;
+  onAplicar: (
+    seleccionados: number[] | null,
+    orden: "ASC" | "DESC" | null
+  ) => void;
+}
 
 interface Props {
   datos: FacturaGetDto[];
@@ -18,6 +32,7 @@ interface Props {
   onVerDetalle: (item: FacturaGetDto) => void;
   onTimbrar: (item: FacturaGetDto) => void;
   onCancelar: (item: FacturaGetDto) => void;
+  filtroColumna: FiltroColumnaProp;
 }
 
 export const TablaFacturas: React.FC<Props> = ({
@@ -32,6 +47,7 @@ export const TablaFacturas: React.FC<Props> = ({
   onVerDetalle,
   onTimbrar,
   onCancelar,
+  filtroColumna,
 }) => {
   const hoyStr = new Date().toISOString().split("T")[0];
 
@@ -169,7 +185,15 @@ export const TablaFacturas: React.FC<Props> = ({
       <table className="alegra-table">
         <thead>
           <tr>
-            <th>Cliente</th>
+            <th>
+              <FiltroColumnaChecklist
+                titulo="Empresa / Cliente"
+                cargarOpciones={filtroColumna.cargarOpciones}
+                seleccionados={filtroColumna.seleccionados}
+                orden={filtroColumna.orden}
+                onAplicar={filtroColumna.onAplicar}
+              />
+            </th>
             <th>Factura</th>
             <th>Fecha de facturación</th>
             <th>Próximo pago</th>

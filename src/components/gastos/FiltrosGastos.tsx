@@ -2,19 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import { FiltrosGastosState } from "@/types/gastos";
-import { ProveedorGetDto } from "@/types/servicios";
 import DateRangePickerPopover from "@/components/ui/DateRangePickerPopover";
 
 interface Props {
   filtros: FiltrosGastosState;
-  proveedores: ProveedorGetDto[];
   onCambiarFiltros: (nuevosFiltros: FiltrosGastosState) => void;
   onBuscar: () => void;
 }
 
 export const FiltrosGastos: React.FC<Props> = ({
   filtros,
-  proveedores,
   onCambiarFiltros,
   onBuscar,
 }) => {
@@ -29,14 +26,6 @@ export const FiltrosGastos: React.FC<Props> = ({
     onCambiarFiltros({
       ...filtros,
       estado: nuevoEstado,
-    });
-  };
-
-  const handleProveedorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const idProv = Number(e.target.value) || 0;
-    onCambiarFiltros({
-      ...filtros,
-      i_CveProveedor: idProv,
     });
   };
 
@@ -137,49 +126,7 @@ export const FiltrosGastos: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* 2. Proveedor */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "3px",
-              width: "220px",
-              maxWidth: "240px",
-            }}
-          >
-            <label
-              className="form-label"
-              style={{
-                marginBottom: 0,
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "#475569",
-              }}
-            >
-              Proveedor
-            </label>
-            <select
-              className="form-select text-xs py-1.5"
-              style={{
-                borderRadius: "20px",
-                height: "34px",
-                width: "100%",
-                border: "1px solid #cbd5e1",
-                outline: "none",
-              }}
-              value={filtros.i_CveProveedor}
-              onChange={handleProveedorChange}
-            >
-              <option value={0}>Todos los proveedores</option>
-              {proveedores.map((prov) => (
-                <option key={prov.i_CveProveedor} value={prov.i_CveProveedor}>
-                  {prov.v_Nombre || prov.v_RazonSocial || `Proveedor #${prov.i_CveProveedor}`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 3. Rango de fechas */}
+          {/* 2. Rango de fechas */}
           <div
             style={{
               display: "flex",
