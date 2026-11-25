@@ -53,6 +53,46 @@ function ProgramacionContent() {
     return val === "ASC" || val === "DESC" ? val : null;
   };
 
+  const parseFiltroColumnaParam = (val: string | null): string[] | null => {
+    if (val === null || val.trim() === "") return null;
+    if (val.trim() === "~") return [];
+    return val.split("|").filter((s) => s.length > 0);
+  };
+
+  type FiltrosColumnaSesionesState = {
+    estatus: string[] | null;
+    servicio: string[] | null;
+    tipo: string[] | null;
+    titular: string[] | null;
+  };
+
+  type FiltrosColumnaServiciosState = {
+    servicio: string[] | null;
+    tipo: string[] | null;
+    estatus: string[] | null;
+    titular: string[] | null;
+    cotizacion: string[] | null;
+    oc: string[] | null;
+    factura: string[] | null;
+  };
+
+  const filtrosColumnaSesionesVacios: FiltrosColumnaSesionesState = {
+    estatus: null,
+    servicio: null,
+    tipo: null,
+    titular: null,
+  };
+
+  const filtrosColumnaServiciosVacios: FiltrosColumnaServiciosState = {
+    servicio: null,
+    tipo: null,
+    estatus: null,
+    titular: null,
+    cotizacion: null,
+    oc: null,
+    factura: null,
+  };
+
   const hoy = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   // Selector "Visualizar" (default: "sesiones")
@@ -88,6 +128,17 @@ function ProgramacionContent() {
   const [ordenClienteSesiones, setOrdenClienteSesiones] = useState<OrdenCliente>(() =>
     paramVista !== "servicios" ? parseOrdenParam(paramOrd) : null
   );
+  const [filtrosColumnaSesiones, setFiltrosColumnaSesiones] =
+    useState<FiltrosColumnaSesionesState>(() =>
+      paramVista !== "servicios"
+        ? {
+            estatus: parseFiltroColumnaParam(searchParams.get("f_estatus")),
+            servicio: parseFiltroColumnaParam(searchParams.get("f_servicio")),
+            tipo: parseFiltroColumnaParam(searchParams.get("f_tipo")),
+            titular: parseFiltroColumnaParam(searchParams.get("f_titular")),
+          }
+        : filtrosColumnaSesionesVacios
+    );
 
   // --- ESTADO VISTA SERVICIOS ---
   const [datosServicios, setDatosServicios] = useState<AgendaServicioGetDto[]>([]);
@@ -105,6 +156,20 @@ function ProgramacionContent() {
   const [ordenClienteServicios, setOrdenClienteServicios] = useState<OrdenCliente>(() =>
     paramVista === "servicios" ? parseOrdenParam(paramOrd) : null
   );
+  const [filtrosColumnaServicios, setFiltrosColumnaServicios] =
+    useState<FiltrosColumnaServiciosState>(() =>
+      paramVista === "servicios"
+        ? {
+            servicio: parseFiltroColumnaParam(searchParams.get("f_servicio")),
+            tipo: parseFiltroColumnaParam(searchParams.get("f_tipo")),
+            estatus: parseFiltroColumnaParam(searchParams.get("f_estatus")),
+            titular: parseFiltroColumnaParam(searchParams.get("f_titular")),
+            cotizacion: parseFiltroColumnaParam(searchParams.get("f_cotizacion")),
+            oc: parseFiltroColumnaParam(searchParams.get("f_oc")),
+            factura: parseFiltroColumnaParam(searchParams.get("f_factura")),
+          }
+        : filtrosColumnaServiciosVacios
+    );
   const [modalFormAbierto, setModalFormAbierto] = useState<boolean>(false);
   const [modalAgendaAbierto, setModalAgendaAbierto] = useState<boolean>(false);
   const [itemEliminar, setItemEliminar] = useState<AgendaServicioGetDto | null>(null);
@@ -121,6 +186,8 @@ function ProgramacionContent() {
       detalleId?: number | null;
       nuevasEmpresas?: number[] | null;
       nuevoOrdenCliente?: OrdenCliente;
+      nuevosFiltrosColumnaSesiones?: FiltrosColumnaSesionesState;
+      nuevosFiltrosColumnaServicios?: FiltrosColumnaServiciosState;
     }) => {
       const targetVista = cambios.nuevaVista ?? vista;
       const targetPagina = cambios.nuevaPagina ?? paginaActual;
@@ -151,11 +218,25 @@ function ProgramacionContent() {
         if (fs.fechaInicio) params.set("desde", fs.fechaInicio);
         if (fs.usarRango && fs.fechaFin) params.set("hasta", fs.fechaFin);
         if (fs.searchTerm && fs.searchTerm.trim() !== "") params.set("q", fs.searchTerm.trim());
+
+        const fCol = cambios.nuevosFiltrosColumnaServicios ?? filtrosColumnaServicios;
+        for (const [col, val] of Object.entries(fCol)) {
+          if (Array.isArray(val)) {
+            params.set(`f_${col}`, val.length > 0 ? val.join("|") : "~");
+          }
+        }
       } else {
         const fses = cambios.nuevosFiltrosSesiones ?? filtrosSesiones;
         if (fses.fechaInicio) params.set("desde", fses.fechaInicio);
         if (fses.usarRango && fses.fechaFin) params.set("hasta", fses.fechaFin);
         if (fses.searchTerm && fses.searchTerm.trim() !== "") params.set("q", fses.searchTerm.trim());
+
+        const fCol = cambios.nuevosFiltrosColumnaSesiones ?? filtrosColumnaSesiones;
+        for (const [col, val] of Object.entries(fCol)) {
+          if (Array.isArray(val)) {
+            params.set(`f_${col}`, val.length > 0 ? val.join("|") : "~");
+          }
+        }
       }
 
       if (Array.isArray(targetEmp)) {
@@ -185,8 +266,10 @@ function ProgramacionContent() {
       filtrosSesiones,
       empresasServicios,
       ordenClienteServicios,
+      filtrosColumnaServicios,
       empresasSesiones,
       ordenClienteSesiones,
+      filtrosColumnaSesiones,
       router,
     ]
   );
@@ -213,13 +296,17 @@ function ProgramacionContent() {
       searchTerm: filtrosSesiones.searchTerm || undefined,
       empresas: empresasSesiones,
       ordenCliente: ordenClienteSesiones,
+      estatus: filtrosColumnaSesiones.estatus,
+      servicios: filtrosColumnaSesiones.servicio,
+      tiposServicio: filtrosColumnaSesiones.tipo,
+      titulares: filtrosColumnaSesiones.titular,
     });
 
     setDatosSesiones(res.datos);
     setTotalRegistros(res.total);
     setTotalPaginas(res.totalPaginas);
     setCargando(false);
-  }, [filtrosSesiones, paginaActual, tamanoPagina, empresasSesiones, ordenClienteSesiones]);
+  }, [filtrosSesiones, paginaActual, tamanoPagina, empresasSesiones, ordenClienteSesiones, filtrosColumnaSesiones]);
 
   // --- Cargar datos de Servicios ---
   const cargarServicios = useCallback(async () => {
@@ -242,13 +329,20 @@ function ProgramacionContent() {
       facturado: facturadoVal,
       empresas: empresasServicios,
       ordenCliente: ordenClienteServicios,
+      servicios: filtrosColumnaServicios.servicio,
+      tiposServicio: filtrosColumnaServicios.tipo,
+      estatus: filtrosColumnaServicios.estatus,
+      titulares: filtrosColumnaServicios.titular,
+      cotizaciones: filtrosColumnaServicios.cotizacion,
+      ocs: filtrosColumnaServicios.oc,
+      facturas: filtrosColumnaServicios.factura,
     });
 
     setDatosServicios(res.datos);
     setTotalRegistros(res.total);
     setTotalPaginas(res.totalPaginas);
     setCargando(false);
-  }, [filtrosServicios, paginaActual, tamanoPagina, empresasServicios, ordenClienteServicios]);
+  }, [filtrosServicios, paginaActual, tamanoPagina, empresasServicios, ordenClienteServicios, filtrosColumnaServicios]);
 
   // --- Cargar opciones de empresas para filtro de columna Cliente ---
   const cargarOpcionesEmpresasSesiones = useCallback(async () => {
@@ -293,6 +387,83 @@ function ProgramacionContent() {
       etiqueta: e.v_Empresa,
     }));
   }, [filtrosServicios]);
+
+  // --- Cargar opciones de filtros de columna (Sesiones y Servicios) ---
+  const cargarOpciones = useCallback(
+    async (targetVista: "sesiones" | "servicios", columna: string) => {
+      if (targetVista === "sesiones") {
+        const lista = await AgendaService.getValoresFiltro({
+          vista: "sesiones",
+          columna,
+          fechaInicio: filtrosSesiones.fechaInicio,
+          fechaFin:
+            filtrosSesiones.usarRango && filtrosSesiones.fechaFin
+              ? filtrosSesiones.fechaFin
+              : undefined,
+          searchTerm: filtrosSesiones.searchTerm || undefined,
+        });
+        return lista.map((item) => ({
+          valor: item.v_Valor,
+          etiqueta: item.v_Texto,
+        }));
+      }
+
+      let facturadoVal: number | undefined;
+      if (filtrosServicios.facturacion === "facturado") facturadoVal = 1;
+      if (filtrosServicios.facturacion === "pendiente") facturadoVal = 0;
+
+      const lista = await AgendaService.getValoresFiltro({
+        vista: "servicios",
+        columna,
+        soloSinProgramar: filtrosServicios.programacion === "pendientes",
+        fechaInicio:
+          filtrosServicios.programacion === "programados"
+            ? filtrosServicios.fechaInicio
+            : undefined,
+        fechaFin:
+          filtrosServicios.programacion === "programados" &&
+          filtrosServicios.usarRango &&
+          filtrosServicios.fechaFin
+            ? filtrosServicios.fechaFin
+            : undefined,
+        searchTerm: filtrosServicios.searchTerm || undefined,
+        facturado: facturadoVal,
+      });
+      return lista.map((item) => ({
+        valor: item.v_Valor,
+        etiqueta: item.v_Texto,
+      }));
+    },
+    [filtrosSesiones, filtrosServicios]
+  );
+
+  const crearConfigFiltroSesiones = (col: keyof FiltrosColumnaSesionesState) => ({
+    cargarOpciones: () => cargarOpciones("sesiones", col),
+    seleccionados: filtrosColumnaSesiones[col],
+    onAplicar: (seleccionados: string[] | null) => {
+      const nuevos = { ...filtrosColumnaSesiones, [col]: seleccionados };
+      setFiltrosColumnaSesiones(nuevos);
+      setPaginaActual(1);
+      actualizarUrl({
+        nuevaPagina: 1,
+        nuevosFiltrosColumnaSesiones: nuevos,
+      });
+    },
+  });
+
+  const crearConfigFiltroServicios = (col: keyof FiltrosColumnaServiciosState) => ({
+    cargarOpciones: () => cargarOpciones("servicios", col),
+    seleccionados: filtrosColumnaServicios[col],
+    onAplicar: (seleccionados: string[] | null) => {
+      const nuevos = { ...filtrosColumnaServicios, [col]: seleccionados };
+      setFiltrosColumnaServicios(nuevos);
+      setPaginaActual(1);
+      actualizarUrl({
+        nuevaPagina: 1,
+        nuevosFiltrosColumnaServicios: nuevos,
+      });
+    },
+  });
 
   // Trigger de carga al cambiar vista o parámetros
   useEffect(() => {
@@ -342,6 +513,8 @@ function ProgramacionContent() {
   const handleCambiarVisualizar = (nuevaVista: "sesiones" | "servicios") => {
     setVista(nuevaVista);
     setPaginaActual(1);
+    setFiltrosColumnaSesiones(filtrosColumnaSesionesVacios);
+    setFiltrosColumnaServicios(filtrosColumnaServiciosVacios);
 
     const hoyStr = new Date().toISOString().split("T")[0];
     if (nuevaVista === "sesiones") {
@@ -361,6 +534,7 @@ function ProgramacionContent() {
         nuevaPagina: 1,
         nuevasEmpresas: null,
         nuevoOrdenCliente: null,
+        nuevosFiltrosColumnaSesiones: filtrosColumnaSesionesVacios,
       });
     } else {
       const nf: FiltrosServiciosState = {
@@ -380,6 +554,7 @@ function ProgramacionContent() {
         nuevaPagina: 1,
         nuevasEmpresas: null,
         nuevoOrdenCliente: null,
+        nuevosFiltrosColumnaServicios: filtrosColumnaServiciosVacios,
       });
     }
   };
@@ -469,6 +644,12 @@ function ProgramacionContent() {
                 });
               },
             }}
+            filtrosColumna={{
+              estatus: crearConfigFiltroSesiones("estatus"),
+              servicio: crearConfigFiltroSesiones("servicio"),
+              tipo: crearConfigFiltroSesiones("tipo"),
+              titular: crearConfigFiltroSesiones("titular"),
+            }}
           />
         </>
       ) : (
@@ -507,6 +688,15 @@ function ProgramacionContent() {
                   nuevoOrdenCliente: orden,
                 });
               },
+            }}
+            filtrosColumna={{
+              servicio: crearConfigFiltroServicios("servicio"),
+              tipo: crearConfigFiltroServicios("tipo"),
+              estatus: crearConfigFiltroServicios("estatus"),
+              titular: crearConfigFiltroServicios("titular"),
+              cotizacion: crearConfigFiltroServicios("cotizacion"),
+              oc: crearConfigFiltroServicios("oc"),
+              factura: crearConfigFiltroServicios("factura"),
             }}
           />
         </>

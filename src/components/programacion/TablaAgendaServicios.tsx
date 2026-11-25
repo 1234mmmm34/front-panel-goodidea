@@ -14,6 +14,12 @@ import { redondear2 } from "@/lib/montos";
 import { VerDocumento } from "@/services/archivos.service";
 import { CeldaEstatusPipc, CeldaEstatusPipcBadge } from "@/components/pipc/CeldaEstatusPipc";
 
+export interface FiltroColumnaServicioConfig {
+  cargarOpciones: () => Promise<OpcionFiltro<string>[]>;
+  seleccionados: string[] | null;
+  onAplicar: (seleccionados: string[] | null) => void;
+}
+
 interface Props {
   datos: AgendaServicioGetDto[];
   cargando: boolean;
@@ -25,6 +31,15 @@ interface Props {
     orden: OrdenCliente;
     onAplicar: (seleccionados: number[] | null, orden: OrdenCliente) => void;
   };
+  filtrosColumna: {
+    servicio: FiltroColumnaServicioConfig;
+    tipo: FiltroColumnaServicioConfig;
+    estatus: FiltroColumnaServicioConfig;
+    titular: FiltroColumnaServicioConfig;
+    cotizacion: FiltroColumnaServicioConfig;
+    oc: FiltroColumnaServicioConfig;
+    factura: FiltroColumnaServicioConfig;
+  };
 }
 
 export const TablaAgendaServicios: React.FC<Props> = ({
@@ -33,6 +48,7 @@ export const TablaAgendaServicios: React.FC<Props> = ({
   onVerDetalle,
   onEliminar,
   filtroCliente,
+  filtrosColumna,
 }) => {
   const renderEstatusBadge = (estatus: number | null, sinProgramar: boolean) => {
     if (sinProgramar) {
@@ -74,21 +90,78 @@ export const TablaAgendaServicios: React.FC<Props> = ({
             <th>
               <FiltroColumnaChecklist
                 titulo="Cliente"
+                textoSinOpciones="Sin empresas"
                 cargarOpciones={filtroCliente.cargarOpciones}
                 seleccionados={filtroCliente.seleccionados}
                 orden={filtroCliente.orden}
                 onAplicar={filtroCliente.onAplicar}
               />
             </th>
-            <th>Servicio</th>
-            <th>Tipo</th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Servicio"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.servicio.cargarOpciones}
+                seleccionados={filtrosColumna.servicio.seleccionados}
+                onAplicar={(sel) => filtrosColumna.servicio.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Tipo"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.tipo.cargarOpciones}
+                seleccionados={filtrosColumna.tipo.seleccionados}
+                onAplicar={(sel) => filtrosColumna.tipo.onAplicar(sel)}
+              />
+            </th>
             <th>Fechas</th>
-            <th style={{ minWidth: "135px" }}>Estatus</th>
-            <th>Titular / Apoyo</th>
+            <th style={{ minWidth: "135px" }}>
+              <FiltroColumnaChecklist<string>
+                titulo="Estatus"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.estatus.cargarOpciones}
+                seleccionados={filtrosColumna.estatus.seleccionados}
+                onAplicar={(sel) => filtrosColumna.estatus.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Titular / Apoyo"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.titular.cargarOpciones}
+                seleccionados={filtrosColumna.titular.seleccionados}
+                onAplicar={(sel) => filtrosColumna.titular.onAplicar(sel)}
+              />
+            </th>
             <th>Entregables</th>
-            <th>Cot. GI</th>
-            <th>OC cliente</th>
-            <th>Facturas</th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Cot. GI"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.cotizacion.cargarOpciones}
+                seleccionados={filtrosColumna.cotizacion.seleccionados}
+                onAplicar={(sel) => filtrosColumna.cotizacion.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="OC cliente"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.oc.cargarOpciones}
+                seleccionados={filtrosColumna.oc.seleccionados}
+                onAplicar={(sel) => filtrosColumna.oc.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Facturas"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.factura.cargarOpciones}
+                seleccionados={filtrosColumna.factura.seleccionados}
+                onAplicar={(sel) => filtrosColumna.factura.onAplicar(sel)}
+              />
+            </th>
             <th className="text-center whitespace-nowrap" style={{ width: "90px", minWidth: "90px" }}>Acciones</th>
           </tr>
         </thead>

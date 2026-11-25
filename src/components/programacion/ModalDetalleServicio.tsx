@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   X,
   Calendar,
@@ -13,6 +13,7 @@ import {
   Edit2,
   Check,
   FileSpreadsheet,
+  Award,
   Paperclip,
   ChevronDown,
   ChevronUp,
@@ -228,6 +229,9 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [errorAlumnos, setErrorAlumnos] = useState<string | null>(null);
   const [descargandoNomina, setDescargandoNomina] = useState<boolean>(false);
   const [copiadoAlumnos, setCopiadoAlumnos] = useState<boolean>(false);
+  const [alumnosSeleccionados, setAlumnosSeleccionados] = useState<Set<number>>(new Set());
+  const [descargandoDiplomas, setDescargandoDiplomas] = useState<boolean>(false);
+  const selectAllDiplomasRef = useRef<HTMLInputElement | null>(null);
 
   // Estados para panel de Agregar Entregables
   const [panelAgregarAbierto, setPanelAgregarAbierto] = useState<boolean>(false);
@@ -654,6 +658,7 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const cargarAlumnosInscritos = async (idServAgendaDet: number) => {
     setCargandoAlumnos(true);
     setErrorAlumnos(null);
+    setAlumnosSeleccionados(new Set());
     try {
       const data = await AlumnosService.getAlumnosInscritos(idServAgendaDet);
       setAlumnosInscritos(data);
@@ -903,6 +908,8 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       setCargandoAlumnos(false);
       setDescargandoNomina(false);
       setCopiadoAlumnos(false);
+      setAlumnosSeleccionados(new Set());
+      setDescargandoDiplomas(false);
       setPanelAgregarAbierto(false);
       setBusquedaEntregable("");
       setSeleccionadosIds(new Set());
@@ -1185,6 +1192,22 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     setModalEditarMontosAbierto(true);
   };
 
+  const aprobados = useMemo(
+    () => alumnosInscritos.filter((a) => a.v_EvFinal === "APROBADO"),
+    [alumnosInscritos]
+  );
+
+  const todosAprobadosMarcados =
+    aprobados.length > 0 && aprobados.every((a) => alumnosSeleccionados.has(a.i_CveAlumnoAgenda));
+  const algunosAprobadosMarcados =
+    aprobados.some((a) => alumnosSeleccionados.has(a.i_CveAlumnoAgenda)) && !todosAprobadosMarcados;
+
+  useEffect(() => {
+    if (selectAllDiplomasRef.current) {
+      selectAllDiplomasRef.current.indeterminate = algunosAprobadosMarcados;
+    }
+  }, [algunosAprobadosMarcados, alumnosInscritos, acordeonAlumnos]);
+
   if (!abierto) return null;
 
   // Lógica de Cupos y Alumnos (2 = Capacitación)
@@ -1208,6 +1231,41 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const cupos = detalle?.i_NumAlumnos ?? 0;
   const inscritos = alumnosInscritos.length;
   const sinLimite = cupos === 0;
+
+  const handleToggleTodosAprobados = () => {
+    if (todosAprobadosMarcados) {
+      setAlumnosSeleccionados(new Set());
+    } else {
+      setAlumnosSeleccionados(new Set(aprobados.map((a) => a.i_CveAlumnoAgenda)));
+    }
+  };
+
+  const handleToggleAlumnoDiploma = (id: number) => {
+    setAlumnosSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDescargarDiplomas = async () => {
+    if (!detalle || descargandoDiplomas || alumnosSeleccionados.size === 0) return;
+    setDescargandoDiplomas(true);
+    try {
+      const errorMsg = await AlumnosService.descargarDiplomas(
+        detalle.i_CveServAgendaDet,
+        Array.from(alumnosSeleccionados)
+      );
+      if (errorMsg) {
+        toast.error(errorMsg);
+      }
+    } catch {
+      toast.error("Ocurrió un problema al generar los diplomas.");
+    } finally {
+      setDescargandoDiplomas(false);
+    }
+  };
 
   const getBadgeColorAlumnos = () => {
     if (!sinLimite && inscritos >= cupos) return "bg-rose-50 text-rose-700 border-rose-200";
@@ -2323,6 +2381,31 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                         <button
                           type="button"
                           className="btn-icon"
+                          style={{
+                            padding: "4px",
+                            color: descargandoDiplomas ? "#2B8FCC" : "#64748b",
+                            cursor: descargandoDiplomas || alumnosSeleccionados.size === 0 ? "not-allowed" : "pointer",
+                          }}
+                          onClick={handleDescargarDiplomas}
+                          disabled={alumnosSeleccionados.size === 0 || descargandoDiplomas}
+                          title={
+                            descargandoDiplomas
+                              ? "Generando diplomas..."
+                              : alumnosSeleccionados.size === 0
+                                ? "Selecciona alumnos aprobados para descargar sus diplomas"
+                                : `Descargar diplomas (${alumnosSeleccionados.size} seleccionados)`
+                          }
+                        >
+                          {descargandoDiplomas ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Award size={16} />
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-icon"
                           style={{ padding: "4px", color: "#94a3b8", cursor: "pointer" }}
                           onClick={() => setAcordeonAlumnos(!acordeonAlumnos)}
                         >
@@ -2370,17 +2453,37 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                             <table className="alegra-table alegra-table-compact" style={{ width: "100%", tableLayout: "fixed" }}>
                               <thead style={{ position: "sticky", top: 0, zIndex: 2, backgroundColor: "#f8fafc" }}>
                                 <tr>
-                                  <th style={{ width: "18%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                  <th
+                                    className="text-center"
+                                    style={{ width: "32px", minWidth: "32px", padding: "6px 6px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}
+                                  >
+                                    <input
+                                      ref={selectAllDiplomasRef}
+                                      type="checkbox"
+                                      checked={todosAprobadosMarcados}
+                                      onChange={handleToggleTodosAprobados}
+                                      disabled={aprobados.length === 0}
+                                      title={aprobados.length === 0 ? "No hay alumnos aprobados" : "Seleccionar todos los aprobados"}
+                                      style={{
+                                        accentColor: "#2B8FCC",
+                                        cursor: aprobados.length === 0 ? "not-allowed" : "pointer",
+                                      }}
+                                    />
+                                  </th>
+                                  <th style={{ width: "14%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
                                     Nómina
                                   </th>
-                                  <th style={{ width: "36%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                  <th style={{ width: "30%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
                                     Nombre
                                   </th>
-                                  <th style={{ width: "23%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                  <th style={{ width: "22%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
                                     CURP
                                   </th>
-                                  <th style={{ width: "23%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                  <th style={{ width: "18%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
                                     Puesto
+                                  </th>
+                                  <th style={{ width: "16%", padding: "6px 10px", fontSize: "12px", backgroundColor: "#f8fafc", position: "sticky", top: 0, boxShadow: "0 1px 0 #e2e8f0" }}>
+                                    EV final
                                   </th>
                                   <th
                                     className="text-center"
@@ -2393,12 +2496,34 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                               <tbody>
                                 {alumnosInscritos.map((alumno) => {
                                   const tieneRegistro = alumno.i_CveAlumno !== null && alumno.i_CveAlumno !== undefined;
+                                  const esAprobado = alumno.v_EvFinal === "APROBADO";
                                   return (
                                     <tr
                                       key={`inscrito-${alumno.i_CveAlumnoAgenda}`}
                                       className="hover:bg-slate-50/60 transition-colors"
                                       style={{ height: "30px" }}
                                     >
+                                      <td
+                                        className="text-center"
+                                        style={{
+                                          width: "32px",
+                                          minWidth: "32px",
+                                          padding: "4px 6px",
+                                          verticalAlign: "middle",
+                                        }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={alumnosSeleccionados.has(alumno.i_CveAlumnoAgenda)}
+                                          disabled={!esAprobado}
+                                          onChange={() => handleToggleAlumnoDiploma(alumno.i_CveAlumnoAgenda)}
+                                          title={!esAprobado ? "Solo los alumnos aprobados pueden recibir diploma" : "Seleccionar para diploma"}
+                                          style={{
+                                            accentColor: "#2B8FCC",
+                                            cursor: !esAprobado ? "not-allowed" : "pointer",
+                                          }}
+                                        />
+                                      </td>
                                       <td
                                         style={{
                                           padding: "4px 10px",
@@ -2467,6 +2592,46 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                                       >
                                         {tieneRegistro && alumno.v_Puesto ? (
                                           alumno.v_Puesto
+                                        ) : (
+                                          <span style={{ color: "#cbd5e1" }}>—</span>
+                                        )}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "4px 10px",
+                                          fontSize: "12px",
+                                          whiteSpace: "nowrap",
+                                          verticalAlign: "middle",
+                                        }}
+                                      >
+                                        {alumno.v_EvFinal === "APROBADO" ? (
+                                          <span
+                                            style={{
+                                              display: "inline-block",
+                                              padding: "2px 8px",
+                                              borderRadius: "12px",
+                                              fontSize: "11px",
+                                              fontWeight: 600,
+                                              backgroundColor: "#dcfce7",
+                                              color: "#166534",
+                                            }}
+                                          >
+                                            Aprobado
+                                          </span>
+                                        ) : alumno.v_EvFinal === "NO APROBADO" ? (
+                                          <span
+                                            style={{
+                                              display: "inline-block",
+                                              padding: "2px 8px",
+                                              borderRadius: "12px",
+                                              fontSize: "11px",
+                                              fontWeight: 600,
+                                              backgroundColor: "#fee2e2",
+                                              color: "#991b1b",
+                                            }}
+                                          >
+                                            No aprobado
+                                          </span>
                                         ) : (
                                           <span style={{ color: "#cbd5e1" }}>—</span>
                                         )}

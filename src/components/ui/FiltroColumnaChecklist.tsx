@@ -4,39 +4,45 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from "react-dom";
 import { ListFilter, ArrowDownAZ, ArrowUpZA, Search } from "lucide-react";
 
-export interface OpcionFiltro {
-  valor: number;
+export interface OpcionFiltro<T extends string | number = number> {
+  valor: T;
   etiqueta: string;
 }
 
-export interface FiltroColumnaChecklistProps {
+export interface FiltroColumnaChecklistProps<T extends string | number = number> {
   titulo: string;
-  cargarOpciones: () => Promise<OpcionFiltro[]>;
-  seleccionados: number[] | null; // null = todos
-  orden: "ASC" | "DESC" | null;
+  cargarOpciones: () => Promise<OpcionFiltro<T>[]>;
+  seleccionados: T[] | null; // null = todos
+  orden?: "ASC" | "DESC" | null;
   onAplicar: (
-    seleccionados: number[] | null,
+    seleccionados: T[] | null,
     orden: "ASC" | "DESC" | null
   ) => void;
+  permitirOrden?: boolean;
+  textoSinOpciones?: string;
   etiquetaOrdenAsc?: string;
   etiquetaOrdenDesc?: string;
 }
 
-export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
+export function FiltroColumnaChecklist<T extends string | number = number>({
   titulo,
   cargarOpciones,
   seleccionados,
-  orden,
+  orden = null,
   onAplicar,
+  permitirOrden = true,
+  textoSinOpciones = "Sin opciones",
   etiquetaOrdenAsc = "Ordenar A → Z",
   etiquetaOrdenDesc = "Ordenar Z → A",
-}) => {
+}: FiltroColumnaChecklistProps<T>) {
   const [abierto, setAbierto] = useState(false);
   const [cargando, setCargando] = useState(false);
-  const [opciones, setOpciones] = useState<OpcionFiltro[]>([]);
+  const [opciones, setOpciones] = useState<OpcionFiltro<T>[]>([]);
   const [busqueda, setBusqueda] = useState("");
-  const [draftSet, setDraftSet] = useState<Set<number>>(new Set());
-  const [draftOrden, setDraftOrden] = useState<"ASC" | "DESC" | null>(orden);
+  const [draftSet, setDraftSet] = useState<Set<T>>(new Set());
+  const [draftOrden, setDraftOrden] = useState<"ASC" | "DESC" | null>(
+    permitirOrden ? orden : null
+  );
   const [pos, setPos] = useState<{ top: number; left: number }>({
     top: 0,
     left: 0,
@@ -46,7 +52,7 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
-  const activo = seleccionados !== null || orden !== null;
+  const activo = seleccionados !== null || (permitirOrden && orden !== null);
 
   const opcionesVisibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -147,7 +153,7 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
     }
 
     setBusqueda("");
-    setDraftOrden(orden);
+    setDraftOrden(permitirOrden ? orden : null);
     setAbierto(true);
     setCargando(true);
 
@@ -179,7 +185,7 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
     });
   };
 
-  const handleToggleItem = (valor: number) => {
+  const handleToggleItem = (valor: T) => {
     setDraftSet((prev) => {
       const next = new Set(prev);
       if (next.has(valor)) next.delete(valor);
@@ -196,7 +202,7 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
   };
 
   const handleAplicar = () => {
-    let nuevaSeleccion: number[] | null;
+    let nuevaSeleccion: T[] | null;
     if (
       opciones.length > 0 &&
       opciones.every((o) => draftSet.has(o.valor))
@@ -207,7 +213,7 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
     } else {
       nuevaSeleccion = Array.from(draftSet);
     }
-    onAplicar(nuevaSeleccion, draftOrden);
+    onAplicar(nuevaSeleccion, permitirOrden ? draftOrden : null);
     setAbierto(false);
   };
 
@@ -225,8 +231,8 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
         ref={triggerRef}
         type="button"
         onClick={handleToggleAbrir}
-        title={`Filtrar y ordenar ${titulo}`}
-        aria-label={`Filtrar y ordenar ${titulo}`}
+        title={permitirOrden ? `Filtrar y ordenar ${titulo}` : `Filtrar ${titulo}`}
+        aria-label={permitirOrden ? `Filtrar y ordenar ${titulo}` : `Filtrar ${titulo}`}
         style={{
           position: "relative",
           display: "inline-flex",
@@ -289,73 +295,77 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
             {/* Parte superior fija: Ordenar, Buscar, Seleccionar todo */}
             <div style={{ flexShrink: 0 }}>
               {/* 1. Ordenar A -> Z / Z -> A */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDraftOrden((prev) => (prev === "ASC" ? null : "ASC"))
-                  }
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "7px 10px",
-                    borderRadius: "7px",
-                    border:
-                      draftOrden === "ASC"
-                        ? "1px solid #2B8FCC"
-                        : "1px solid transparent",
-                    backgroundColor:
-                      draftOrden === "ASC" ? "#eef6fd" : "transparent",
-                    color: draftOrden === "ASC" ? "#1d4ed8" : "#334155",
-                    fontSize: "12.5px",
-                    fontWeight: draftOrden === "ASC" ? 600 : 500,
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <ArrowDownAZ size={15} />
-                  <span>{etiquetaOrdenAsc}</span>
-                </button>
+              {permitirOrden && (
+                <>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDraftOrden((prev) => (prev === "ASC" ? null : "ASC"))
+                      }
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        padding: "7px 10px",
+                        borderRadius: "7px",
+                        border:
+                          draftOrden === "ASC"
+                            ? "1px solid #2B8FCC"
+                            : "1px solid transparent",
+                        backgroundColor:
+                          draftOrden === "ASC" ? "#eef6fd" : "transparent",
+                        color: draftOrden === "ASC" ? "#1d4ed8" : "#334155",
+                        fontSize: "12.5px",
+                        fontWeight: draftOrden === "ASC" ? 600 : 500,
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <ArrowDownAZ size={15} />
+                      <span>{etiquetaOrdenAsc}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDraftOrden((prev) => (prev === "DESC" ? null : "DESC"))
-                  }
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "7px 10px",
-                    borderRadius: "7px",
-                    border:
-                      draftOrden === "DESC"
-                        ? "1px solid #2B8FCC"
-                        : "1px solid transparent",
-                    backgroundColor:
-                      draftOrden === "DESC" ? "#eef6fd" : "transparent",
-                    color: draftOrden === "DESC" ? "#1d4ed8" : "#334155",
-                    fontSize: "12.5px",
-                    fontWeight: draftOrden === "DESC" ? 600 : 500,
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <ArrowUpZA size={15} />
-                  <span>{etiquetaOrdenDesc}</span>
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDraftOrden((prev) => (prev === "DESC" ? null : "DESC"))
+                      }
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        padding: "7px 10px",
+                        borderRadius: "7px",
+                        border:
+                          draftOrden === "DESC"
+                            ? "1px solid #2B8FCC"
+                            : "1px solid transparent",
+                        backgroundColor:
+                          draftOrden === "DESC" ? "#eef6fd" : "transparent",
+                        color: draftOrden === "DESC" ? "#1d4ed8" : "#334155",
+                        fontSize: "12.5px",
+                        fontWeight: draftOrden === "DESC" ? 600 : 500,
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <ArrowUpZA size={15} />
+                      <span>{etiquetaOrdenDesc}</span>
+                    </button>
+                  </div>
 
-              <div
-                style={{
-                  height: "1px",
-                  backgroundColor: "#f1f5f9",
-                  margin: "8px 0",
-                }}
-              />
+                  <div
+                    style={{
+                      height: "1px",
+                      backgroundColor: "#f1f5f9",
+                      margin: "8px 0",
+                    }}
+                  />
+                </>
+              )}
 
               {/* 2. Buscar */}
               <div style={{ position: "relative", marginBottom: "8px" }}>
@@ -467,7 +477,7 @@ export const FiltroColumnaChecklist: React.FC<FiltroColumnaChecklistProps> = ({
                     color: "#94a3b8",
                   }}
                 >
-                  Sin empresas
+                  {textoSinOpciones}
                 </div>
               ) : opcionesVisibles.length === 0 ? (
                 <div

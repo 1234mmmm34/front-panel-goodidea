@@ -10,6 +10,11 @@ export interface AgendaEmpresaFiltroDto {
   v_Empresa: string;
 }
 
+export interface AgendaValorFiltroDto {
+  v_Valor: string;
+  v_Texto: string;
+}
+
 export type OrdenCliente = "ASC" | "DESC" | null;
 
 export interface AgendaServicioGetDto {
@@ -127,6 +132,7 @@ export interface AlumnoInscrito {
   v_Nombre: string | null;
   v_CURP: string | null;
   v_Puesto: string | null;
+  v_EvFinal: string | null;
 }
 
 export interface FacturaDetalleDto {

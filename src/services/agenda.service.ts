@@ -25,8 +25,28 @@ import {
   AbonoAsociado,
   ServicioFactura,
   AgendaEmpresaFiltroDto,
+  AgendaValorFiltroDto,
   OrdenCliente,
 } from "@/types/servicios";
+
+const serializarFiltroColumna = (
+  valores: string[] | null | undefined
+): string | undefined => {
+  if (!Array.isArray(valores)) return undefined;
+  return valores.length > 0 ? valores.join("|") : "~";
+};
+
+const agregarFiltrosColumna = (
+  queryParams: Record<string, unknown>,
+  filtros: Record<string, string[] | null | undefined>
+) => {
+  for (const [clave, valores] of Object.entries(filtros)) {
+    const serializado = serializarFiltroColumna(valores);
+    if (serializado !== undefined) {
+      queryParams[clave] = serializado;
+    }
+  }
+};
 
 export const AgendaService = {
   /**
@@ -82,6 +102,10 @@ export const AgendaService = {
     searchTerm?: string;
     empresas?: number[] | null;
     ordenCliente?: OrdenCliente;
+    estatus?: string[] | null;
+    servicios?: string[] | null;
+    tiposServicio?: string[] | null;
+    titulares?: string[] | null;
   }): Promise<PaginadoResponse<AgendaGetDto>> {
     return httpDefensivo(async () => {
       const queryParams: Record<string, unknown> = {
@@ -105,6 +129,12 @@ export const AgendaService = {
       if (params.ordenCliente) {
         queryParams.ordenCliente = params.ordenCliente;
       }
+      agregarFiltrosColumna(queryParams, {
+        estatus: params.estatus,
+        servicios: params.servicios,
+        tiposServicio: params.tiposServicio,
+        titulares: params.titulares,
+      });
 
       const resp = await apiClient.get<any>("agenda/GetAgenda", {
         params: queryParams,
@@ -180,6 +210,13 @@ export const AgendaService = {
     facturado?: number;
     empresas?: number[] | null;
     ordenCliente?: OrdenCliente;
+    servicios?: string[] | null;
+    tiposServicio?: string[] | null;
+    estatus?: string[] | null;
+    titulares?: string[] | null;
+    cotizaciones?: string[] | null;
+    ocs?: string[] | null;
+    facturas?: string[] | null;
   }): Promise<PaginadoResponse<AgendaServicioGetDto>> {
     return httpDefensivo(async () => {
       const queryParams: Record<string, unknown> = {
@@ -209,6 +246,15 @@ export const AgendaService = {
       if (params.ordenCliente) {
         queryParams.ordenCliente = params.ordenCliente;
       }
+      agregarFiltrosColumna(queryParams, {
+        servicios: params.servicios,
+        tiposServicio: params.tiposServicio,
+        estatus: params.estatus,
+        titulares: params.titulares,
+        cotizaciones: params.cotizaciones,
+        ocs: params.ocs,
+        facturas: params.facturas,
+      });
 
       const resp = await apiClient.get<AgendaServicioGetDto[] | PaginadoResponse<AgendaServicioGetDto>>(
         "agenda/GetAgendaServicios",
@@ -304,6 +350,48 @@ export const AgendaService = {
 
       const resp = await apiClient.get<AgendaEmpresaFiltroDto[]>(
         "agenda/GetEmpresasFiltro",
+        { params: queryParams }
+      );
+      return Array.isArray(resp.data) ? resp.data : [];
+    }, []);
+  },
+
+  /**
+   * GET agenda/GetValoresFiltro
+   * Opciones de filtro para columnas de Sesiones y Servicios (según los filtros actuales de la vista)
+   */
+  async getValoresFiltro(params: {
+    vista: "sesiones" | "servicios";
+    columna: string;
+    fechaInicio?: string;
+    fechaFin?: string;
+    searchTerm?: string;
+    soloSinProgramar?: boolean;
+    facturado?: number;
+  }): Promise<AgendaValorFiltroDto[]> {
+    return httpDefensivo(async () => {
+      const queryParams: Record<string, unknown> = {
+        vista: params.vista,
+        columna: params.columna,
+      };
+      if (params.fechaInicio) {
+        queryParams.fechaInicio = params.fechaInicio;
+      }
+      if (params.fechaFin) {
+        queryParams.fechaFin = params.fechaFin;
+      }
+      if (params.searchTerm && params.searchTerm.trim().length > 0) {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+      if (params.soloSinProgramar !== undefined) {
+        queryParams.soloSinProgramar = params.soloSinProgramar;
+      }
+      if (params.facturado !== undefined && params.facturado !== null) {
+        queryParams.facturado = params.facturado;
+      }
+
+      const resp = await apiClient.get<AgendaValorFiltroDto[]>(
+        "agenda/GetValoresFiltro",
         { params: queryParams }
       );
       return Array.isArray(resp.data) ? resp.data : [];

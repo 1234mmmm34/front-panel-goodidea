@@ -22,6 +22,7 @@ export const AlumnosService = {
       v_Nombre: item.v_Nombre ?? item.vNombre ?? null,
       v_CURP: item.v_CURP ?? item.vCurp ?? item.curp ?? null,
       v_Puesto: item.v_Puesto ?? item.vPuesto ?? item.puesto ?? null,
+      v_EvFinal: item.v_EvFinal ?? item.vEvFinal ?? null,
     }));
   },
 
@@ -46,6 +47,42 @@ export const AlumnosService = {
       window.URL.revokeObjectURL(url);
       return true;
     }, false);
+  },
+
+  /**
+   * Descarga los diplomas de los alumnos aprobados seleccionados en formato PowerPoint (.pptx).
+   * Endpoint: GET alumnos/Diplomas/descargar/{idServAgendaDet}?alumnos=12,15,18
+   */
+  async descargarDiplomas(idServAgendaDet: number, alumnos: number[]): Promise<string | null> {
+    if (!idServAgendaDet || alumnos.length === 0) {
+      return "Selecciona alumnos aprobados para descargar sus diplomas.";
+    }
+    try {
+      const resp = await apiClient.get(`alumnos/Diplomas/descargar/${idServAgendaDet}`, {
+        params: { alumnos: alumnos.join(",") },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([resp.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Diplomas_Servicio_${idServAgendaDet}.pptx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      return null;
+    } catch (error: any) {
+      if (error?.response?.status === 400 && error?.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          if (text && text.trim()) return text.trim();
+        } catch {
+          // fallback al mensaje genérico
+        }
+      }
+      return "Ocurrió un problema al generar los diplomas.";
+    }
   },
 };
 

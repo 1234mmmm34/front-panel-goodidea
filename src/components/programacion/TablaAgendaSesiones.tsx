@@ -13,6 +13,12 @@ import { isToday, isSameDay, addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { limpiarDecimales } from "@/lib/date-utils";
 
+export interface FiltroColumnaStringConfig {
+  cargarOpciones: () => Promise<OpcionFiltro<string>[]>;
+  seleccionados: string[] | null;
+  onAplicar: (seleccionados: string[] | null) => void;
+}
+
 interface Props {
   datos: AgendaGetDto[];
   cargando: boolean;
@@ -24,6 +30,12 @@ interface Props {
     seleccionados: number[] | null;
     orden: OrdenCliente;
     onAplicar: (seleccionados: number[] | null, orden: OrdenCliente) => void;
+  };
+  filtrosColumna: {
+    estatus: FiltroColumnaStringConfig;
+    servicio: FiltroColumnaStringConfig;
+    tipo: FiltroColumnaStringConfig;
+    titular: FiltroColumnaStringConfig;
   };
 }
 
@@ -102,6 +114,7 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
   onCancelar,
   onVerHistorial,
   filtroCliente,
+  filtrosColumna,
 }) => {
   return (
     <div className="alegra-table-container">
@@ -114,16 +127,49 @@ export const TablaAgendaSesiones: React.FC<Props> = ({
             <th>
               <FiltroColumnaChecklist
                 titulo="Cliente"
+                textoSinOpciones="Sin empresas"
                 cargarOpciones={filtroCliente.cargarOpciones}
                 seleccionados={filtroCliente.seleccionados}
                 orden={filtroCliente.orden}
                 onAplicar={filtroCliente.onAplicar}
               />
             </th>
-            <th>Estatus</th>
-            <th>Tema</th>
-            <th>Tipo</th>
-            <th>Titular / Apoyo</th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Estatus"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.estatus.cargarOpciones}
+                seleccionados={filtrosColumna.estatus.seleccionados}
+                onAplicar={(sel) => filtrosColumna.estatus.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Tema"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.servicio.cargarOpciones}
+                seleccionados={filtrosColumna.servicio.seleccionados}
+                onAplicar={(sel) => filtrosColumna.servicio.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Tipo"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.tipo.cargarOpciones}
+                seleccionados={filtrosColumna.tipo.seleccionados}
+                onAplicar={(sel) => filtrosColumna.tipo.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Titular / Apoyo"
+                permitirOrden={false}
+                cargarOpciones={filtrosColumna.titular.cargarOpciones}
+                seleccionados={filtrosColumna.titular.seleccionados}
+                onAplicar={(sel) => filtrosColumna.titular.onAplicar(sel)}
+              />
+            </th>
             <th>Total</th>
             <th className="text-center">Acciones</th>
           </tr>
