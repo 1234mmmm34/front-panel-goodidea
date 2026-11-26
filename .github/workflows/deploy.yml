@@ -20,26 +20,22 @@ jobs:
           cache: 'npm'
 
       - name: Instalar dependencias
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --no-audit
 
-      - name: Compilar Next.js con limite de RAM y Webpack
+      - name: Compilar Next.js
         env:
           NODE_OPTIONS: "--max-old-space-size=3072"
           NEXT_TELEMETRY_DISABLED: "1"
-          NODE_TLS_REJECT_UNAUTHORIZED: "1"
         run: npx next build --webpack
 
-      - name: Preparar artefacto de despliegue
+      - name: Quitar devDependencies
+        run: npm prune --omit=dev
+
+      - name: Armar carpeta de deploy
         run: |
-          rm -rf ./deploy_package
-          mkdir -p ./deploy_package
-          cp -r .next ./deploy_package/.next
-          cp -r public ./deploy_package/public
-          cp package.json ./deploy_package/package.json
-          cp package-lock.json ./deploy_package/package-lock.json
-          for f in next.config.ts next.config.mjs next.config.js; do
-            if [ -f "$f" ]; then cp "$f" ./deploy_package/; fi
-          done
+          mkdir deploy
+          cp -r .next public node_modules package.json next.config.mjs server.js web.config deploy/
+          rm -rf deploy/.next/cache
 
       - name: Subir por FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
@@ -47,6 +43,6 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./deploy_package/
+          local-dir: ./deploy/
           server-dir: /
           dangerous-clean-slate: false
