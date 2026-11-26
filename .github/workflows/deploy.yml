@@ -22,15 +22,32 @@ jobs:
       - name: Instalar dependencias
         run: npm ci --prefer-offline --no-audit
 
+      - name: Bypass next/font/google loader during CI build
+        run: |
+          node -e '
+            const fs = require("fs");
+            const loaderPath = "node_modules/next/dist/compiled/@next/font/dist/google/loader.js";
+            if (fs.existsSync(loaderPath)) {
+              const stub = `module.exports = async function nextFontGoogleFontLoader(opts) {
+                return {
+                  fontFamily: opts.fontFamily,
+                  weight: opts.weight || ["400"],
+                  style: opts.style || ["normal"],
+                  css: "",
+                  fontFace: "",
+                  fallbackFonts: opts.fallback || [],
+                  adjustFontFallback: false,
+                  variable: opts.variable
+                };
+              };`;
+              fs.writeFileSync(loaderPath, stub, "utf8");
+            }
+          '
+
       - name: Compilar Next.js con limite de RAM y Webpack
         env:
           NODE_OPTIONS: "--max-old-space-size=3072"
           NEXT_TELEMETRY_DISABLED: "1"
-          NODE_TLS_REJECT_UNAUTHORIZED: "1"
-          HTTP_PROXY: ""
-          HTTPS_PROXY: ""
-          http_proxy: ""
-          https_proxy: ""
         run: npx next build --webpack
 
       - name: Subir todo el proyecto por FTP
