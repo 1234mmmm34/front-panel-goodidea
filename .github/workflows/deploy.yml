@@ -22,11 +22,11 @@ jobs:
       - name: Instalar dependencias
         run: npm ci --prefer-offline --no-audit
 
-      - name: Compilar Next.js con limite de RAM
+      - name: Compilar Next.js con limite de RAM y Webpack
         env:
           NODE_OPTIONS: "--max-old-space-size=3072"
           NEXT_TELEMETRY_DISABLED: "1"
-        run: npm run build
+        run: npx next build --webpack
 
       - name: Preparar artefacto de despliegue
         run: |
