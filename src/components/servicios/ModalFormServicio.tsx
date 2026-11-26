@@ -118,8 +118,8 @@ export const ModalFormServicio: React.FC<Props> = ({
 
   const licenciaGuardadaEnServicio = Boolean(
     servicioEditar &&
-      idEntregableLicencia !== null &&
-      (servicioEditar.entregables || []).includes(idEntregableLicencia)
+    idEntregableLicencia !== null &&
+    (servicioEditar.entregables || []).includes(idEntregableLicencia)
   );
 
   useEffect(() => {
