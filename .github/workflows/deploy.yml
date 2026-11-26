@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir deploy
           cp -r .next public node_modules package.json next.config.mjs server.js web.config deploy/
-          rm -rf deploy/.next/cache
+          rm -rf deploy/.next/cache deploy/.next/types deploy/.next/trace deploy/.next/trace-build
 
       - name: Subir por FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
@@ -44,5 +44,5 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./deploy/
-          server-dir: /
+          server-dir: /site1/
           dangerous-clean-slate: false
