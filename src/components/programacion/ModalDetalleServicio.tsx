@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Calendar,
@@ -13,7 +14,7 @@ import {
   Edit2,
   Check,
   FileSpreadsheet,
-  Award,
+  Download,
   Paperclip,
   ChevronDown,
   ChevronUp,
@@ -82,6 +83,39 @@ interface Props {
 }
 
 const IVA = 0.16;
+
+interface EntregableDescargableConfig {
+  clave: string;
+  etiqueta: string;
+  descargar?: (idServAgendaDet: number, alumnos: number[]) => Promise<string | null>;
+}
+
+const ENTREGABLES_DESCARGABLES: Record<string, EntregableDescargableConfig> = {
+  DIPLOMA: {
+    clave: "DIPLOMA",
+    etiqueta: "Diploma",
+    descargar: (idServAgendaDet, alumnos) =>
+      AlumnosService.descargarDiplomas(idServAgendaDet, alumnos),
+  },
+  DC3: {
+    clave: "DC3",
+    etiqueta: "DC-3",
+    descargar: AlumnosService.descargarDC3,
+  },
+  LICENCIA: {
+    clave: "LICENCIA",
+    etiqueta: "Licencia",
+    descargar: AlumnosService.descargarLicencias,
+  },
+};
+
+function normalizarNombreEntregable(nombre: string): string {
+  return nombre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[\s\-_]+/g, "");
+}
 
 function obtenerFechasExtremosSesiones(sesiones?: Array<{
   d_FechaHoraInicio?: string | null;
@@ -230,8 +264,16 @@ export const ModalDetalleServicio: React.FC<Props> = ({
   const [descargandoNomina, setDescargandoNomina] = useState<boolean>(false);
   const [copiadoAlumnos, setCopiadoAlumnos] = useState<boolean>(false);
   const [alumnosSeleccionados, setAlumnosSeleccionados] = useState<Set<number>>(new Set());
-  const [descargandoDiplomas, setDescargandoDiplomas] = useState<boolean>(false);
+  const [descargandoEntregables, setDescargandoEntregables] = useState<boolean>(false);
+  const [popoverDescargasAbierto, setPopoverDescargasAbierto] = useState<boolean>(false);
+  const [entregablesADescargar, setEntregablesADescargar] = useState<Set<string>>(new Set());
+  const [popoverDescargasPos, setPopoverDescargasPos] = useState<{ top: number; right: number }>({
+    top: 0,
+    right: 0,
+  });
   const selectAllDiplomasRef = useRef<HTMLInputElement | null>(null);
+  const btnDescargasRef = useRef<HTMLButtonElement | null>(null);
+  const popoverDescargasRef = useRef<HTMLDivElement | null>(null);
 
   // Estados para panel de Agregar Entregables
   const [panelAgregarAbierto, setPanelAgregarAbierto] = useState<boolean>(false);
@@ -909,7 +951,9 @@ export const ModalDetalleServicio: React.FC<Props> = ({
       setDescargandoNomina(false);
       setCopiadoAlumnos(false);
       setAlumnosSeleccionados(new Set());
-      setDescargandoDiplomas(false);
+      setDescargandoEntregables(false);
+      setPopoverDescargasAbierto(false);
+      setEntregablesADescargar(new Set());
       setPanelAgregarAbierto(false);
       setBusquedaEntregable("");
       setSeleccionadosIds(new Set());
@@ -1208,6 +1252,63 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     }
   }, [algunosAprobadosMarcados, alumnosInscritos, acordeonAlumnos]);
 
+  const entregablesDescargablesDisponibles = useMemo(() => {
+    const vistos = new Set<string>();
+    const resultado: EntregableDescargableConfig[] = [];
+    for (const ent of entregables) {
+      const clave = normalizarNombreEntregable(ent.v_Nombre || "");
+      const config = ENTREGABLES_DESCARGABLES[clave];
+      if (config && !vistos.has(clave)) {
+        vistos.add(clave);
+        resultado.push(config);
+      }
+    }
+    return resultado;
+  }, [entregables]);
+
+  const recalcularPosicionPopoverDescargas = useCallback(() => {
+    const trigger = btnDescargasRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    setPopoverDescargasPos({
+      top: rect.bottom + 6,
+      right: Math.max(8, window.innerWidth - rect.right),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!popoverDescargasAbierto) return;
+    recalcularPosicionPopoverDescargas();
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        popoverDescargasRef.current?.contains(target) ||
+        btnDescargasRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setPopoverDescargasAbierto(false);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPopoverDescargasAbierto(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", recalcularPosicionPopoverDescargas, true);
+    window.addEventListener("resize", recalcularPosicionPopoverDescargas);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", recalcularPosicionPopoverDescargas, true);
+      window.removeEventListener("resize", recalcularPosicionPopoverDescargas);
+    };
+  }, [popoverDescargasAbierto, recalcularPosicionPopoverDescargas]);
+
   if (!abierto) return null;
 
   // Lógica de Cupos y Alumnos (2 = Capacitación)
@@ -1249,21 +1350,56 @@ export const ModalDetalleServicio: React.FC<Props> = ({
     });
   };
 
-  const handleDescargarDiplomas = async () => {
-    if (!detalle || descargandoDiplomas || alumnosSeleccionados.size === 0) return;
-    setDescargandoDiplomas(true);
+  const handleToggleEntregableDescarga = (clave: string) => {
+    setEntregablesADescargar((prev) => {
+      const next = new Set(prev);
+      if (next.has(clave)) next.delete(clave);
+      else next.add(clave);
+      return next;
+    });
+  };
+
+  const handleTogglePopoverDescargas = () => {
+    if (popoverDescargasAbierto) {
+      setPopoverDescargasAbierto(false);
+      return;
+    }
+    recalcularPosicionPopoverDescargas();
+    setPopoverDescargasAbierto(true);
+  };
+
+  const handleDescargarEntregables = async () => {
+    if (
+      !detalle ||
+      descargandoEntregables ||
+      alumnosSeleccionados.size === 0 ||
+      entregablesADescargar.size === 0
+    ) {
+      return;
+    }
+
+    const idsAlumnos = Array.from(alumnosSeleccionados);
+    const seleccionados = entregablesDescargablesDisponibles.filter(
+      (item) => entregablesADescargar.has(item.clave) && typeof item.descargar === "function"
+    );
+    if (seleccionados.length === 0) return;
+
+    setDescargandoEntregables(true);
     try {
-      const errorMsg = await AlumnosService.descargarDiplomas(
-        detalle.i_CveServAgendaDet,
-        Array.from(alumnosSeleccionados)
-      );
-      if (errorMsg) {
-        toast.error(errorMsg);
+      for (const item of seleccionados) {
+        try {
+          const errorMsg = await item.descargar!(detalle.i_CveServAgendaDet, idsAlumnos);
+          if (errorMsg) {
+            toast.error(`${item.etiqueta}: ${errorMsg}`);
+          }
+        } catch {
+          toast.error(`${item.etiqueta}: Ocurrió un problema al generar el archivo.`);
+        }
       }
-    } catch {
-      toast.error("Ocurrió un problema al generar los diplomas.");
     } finally {
-      setDescargandoDiplomas(false);
+      setDescargandoEntregables(false);
+      setPopoverDescargasAbierto(false);
+      setEntregablesADescargar(new Set());
     }
   };
 
@@ -2379,29 +2515,197 @@ export const ModalDetalleServicio: React.FC<Props> = ({
                         </button>
 
                         <button
+                          ref={btnDescargasRef}
                           type="button"
                           className="btn-icon"
                           style={{
                             padding: "4px",
-                            color: descargandoDiplomas ? "#2B8FCC" : "#64748b",
-                            cursor: descargandoDiplomas || alumnosSeleccionados.size === 0 ? "not-allowed" : "pointer",
+                            color:
+                              descargandoEntregables || popoverDescargasAbierto
+                                ? "#2B8FCC"
+                                : "#64748b",
+                            cursor: descargandoEntregables ? "wait" : "pointer",
                           }}
-                          onClick={handleDescargarDiplomas}
-                          disabled={alumnosSeleccionados.size === 0 || descargandoDiplomas}
-                          title={
-                            descargandoDiplomas
-                              ? "Generando diplomas..."
-                              : alumnosSeleccionados.size === 0
-                                ? "Selecciona alumnos aprobados para descargar sus diplomas"
-                                : `Descargar diplomas (${alumnosSeleccionados.size} seleccionados)`
-                          }
+                          onClick={handleTogglePopoverDescargas}
+                          disabled={descargandoEntregables}
+                          title="Descargar entregables"
                         >
-                          {descargandoDiplomas ? (
+                          {descargandoEntregables ? (
                             <Loader2 size={16} className="animate-spin" />
                           ) : (
-                            <Award size={16} />
+                            <Download size={16} />
                           )}
                         </button>
+
+                        {popoverDescargasAbierto &&
+                          typeof document !== "undefined" &&
+                          createPortal(
+                            <div
+                              ref={popoverDescargasRef}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                position: "fixed",
+                                top: `${popoverDescargasPos.top}px`,
+                                right: `${popoverDescargasPos.right}px`,
+                                width: "240px",
+                                backgroundColor: "#ffffff",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: "8px",
+                                boxShadow:
+                                  "0 10px 25px -5px rgba(15, 23, 42, 0.16), 0 4px 10px -2px rgba(15, 23, 42, 0.08)",
+                                zIndex: 1050,
+                                padding: "12px",
+                                fontFamily: "Roboto, sans-serif",
+                                color: "#1e293b",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "10px",
+                              }}
+                            >
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    color: "#1e293b",
+                                    marginBottom: "2px",
+                                  }}
+                                >
+                                  Descargar entregables
+                                </div>
+                                {alumnosSeleccionados.size > 0 ? (
+                                  <div style={{ fontSize: "11px", color: "#64748b" }}>
+                                    Para {alumnosSeleccionados.size} alumno(s) seleccionado(s)
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: "11px", color: "#b45309" }}>
+                                    Selecciona en la tabla a los alumnos aprobados.
+                                  </div>
+                                )}
+                              </div>
+
+                              {entregablesDescargablesDisponibles.length === 0 ? (
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#94a3b8",
+                                    padding: "4px 0",
+                                  }}
+                                >
+                                  Este servicio no tiene entregables descargables.
+                                </div>
+                              ) : (
+                                <>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "6px",
+                                    }}
+                                  >
+                                    {entregablesDescargablesDisponibles.map((item) => {
+                                      const tieneDescarga =
+                                        typeof item.descargar === "function";
+                                      const deshabilitado =
+                                        !tieneDescarga ||
+                                        alumnosSeleccionados.size === 0 ||
+                                        descargandoEntregables;
+                                      return (
+                                        <label
+                                          key={item.clave}
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                            fontSize: "12.5px",
+                                            color: deshabilitado ? "#94a3b8" : "#334155",
+                                            cursor: deshabilitado ? "not-allowed" : "pointer",
+                                            padding: "2px 0",
+                                          }}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={entregablesADescargar.has(item.clave)}
+                                            disabled={deshabilitado}
+                                            onChange={() =>
+                                              handleToggleEntregableDescarga(item.clave)
+                                            }
+                                            style={{
+                                              accentColor: "#2B8FCC",
+                                              cursor: deshabilitado
+                                                ? "not-allowed"
+                                                : "pointer",
+                                              flexShrink: 0,
+                                            }}
+                                          />
+                                          <span>{item.etiqueta}</span>
+                                          {!tieneDescarga && (
+                                            <span
+                                              style={{
+                                                fontSize: "11px",
+                                                color: "#94a3b8",
+                                                marginLeft: "auto",
+                                              }}
+                                            >
+                                              Próximamente
+                                            </span>
+                                          )}
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      alumnosSeleccionados.size === 0 ||
+                                      entregablesADescargar.size === 0 ||
+                                      descargandoEntregables
+                                    }
+                                    onClick={handleDescargarEntregables}
+                                    style={{
+                                      width: "100%",
+                                      height: "30px",
+                                      borderRadius: "6px",
+                                      border: "none",
+                                      backgroundColor:
+                                        alumnosSeleccionados.size === 0 ||
+                                        entregablesADescargar.size === 0
+                                          ? "#e2e8f0"
+                                          : "#2B8FCC",
+                                      color:
+                                        alumnosSeleccionados.size === 0 ||
+                                        entregablesADescargar.size === 0
+                                          ? "#94a3b8"
+                                          : "#ffffff",
+                                      fontSize: "12px",
+                                      fontWeight: 600,
+                                      cursor:
+                                        alumnosSeleccionados.size === 0 ||
+                                        entregablesADescargar.size === 0 ||
+                                        descargandoEntregables
+                                          ? "not-allowed"
+                                          : "pointer",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "6px",
+                                    }}
+                                  >
+                                    {descargandoEntregables ? (
+                                      <>
+                                        <Loader2 size={13} className="animate-spin" />
+                                        <span>Generando…</span>
+                                      </>
+                                    ) : (
+                                      <span>Descargar ({entregablesADescargar.size})</span>
+                                    )}
+                                  </button>
+                                </>
+                              )}
+                            </div>,
+                            document.body
+                          )}
 
                         <button
                           type="button"

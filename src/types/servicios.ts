@@ -15,6 +15,22 @@ export interface AgendaValorFiltroDto {
   v_Texto: string;
 }
 
+export interface PlantillaLicenciaInfoDto {
+  i_CveServicio: number;
+  i_CveEmpresa: number | null;
+  v_NombreArchivo: string | null;
+  d_FechaCarga: string;
+  v_Url: string | null;
+}
+
+export interface CursoLicenciaDto {
+  i_CveServicio: number;
+  v_Servicio: string | null;
+  b_PlantillaGeneral: boolean;
+  v_NombreArchivoPersonalizada: string | null;
+  d_FechaCargaPersonalizada: string | null;
+}
+
 export type OrdenCliente = "ASC" | "DESC" | null;
 
 export interface AgendaServicioGetDto {

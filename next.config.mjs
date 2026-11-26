@@ -1,6 +1,6 @@
 import { withSerwist } from "@serwist/turbopack";
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "1";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

@@ -124,6 +124,12 @@ export const SeccionGenerales: React.FC<Props> = ({
         color: "#c0392b",
       };
     }
+    if (form.pc_titular_nombre && form.pc_titular_nombre !== entradaCat.titular) {
+      return {
+        texto: `Se conservan los datos guardados en el expediente. El catálogo actual indica: ${entradaCat.titular}.`,
+        color: "#64748b",
+      };
+    }
     return {
       texto: "Datos tomados del catálogo de directores de Nuevo León. Puedes editarlos.",
       color: "#64748b",
@@ -487,7 +493,7 @@ export const SeccionGenerales: React.FC<Props> = ({
       <div className="card p-4">
         <div style={{ borderLeft: "3px solid #2B8FCC", paddingLeft: "10px", marginBottom: "14px" }}>
           <h3 style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", margin: 0 }}>
-            Consultor externo (firma el Oficio responsiva)
+            Consultor externo (firma el Oficio y el Certificado de capacitación)
           </h3>
           <p style={{ fontSize: "11px", color: "#64748b", margin: 0 }}>
             Datos del consultor registrado ante Protección Civil que avala el programa.
@@ -515,7 +521,7 @@ export const SeccionGenerales: React.FC<Props> = ({
               value={form.consultor_externo_registro}
               disabled={soloLectura}
               onChange={(e) => setFormField("consultor_externo_registro", e.target.value)}
-              placeholder="Ej. DPCE-APF-146-2025"
+              placeholder="Ej. DPCE-APF-146-2026"
             />
           </div>
         </div>
@@ -535,7 +541,10 @@ export const SeccionGenerales: React.FC<Props> = ({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" }}>
           <div>
             <label className="form-label text-xs">
-              Fecha de elaboración <span style={{ color: "#dc2626" }}>*</span>
+              Fecha de elaboración <span style={{ color: "#dc2626" }}>*</span>{" "}
+              <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 400 }}>
+                (también se usa en el Oficio, el Acta y el Certificado de capacitación)
+              </span>
             </label>
             <input
               type="date"

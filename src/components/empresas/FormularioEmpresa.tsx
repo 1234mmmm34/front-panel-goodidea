@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,11 +23,21 @@ import {
   Copy,
   Mail,
   X,
+  Award,
+  Upload,
+  Image as ImageIcon,
+  Loader2,
+  Download,
+  AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 import { EmpresaGetDto, EmpresaPostPayload, PlantaGetDto, ContactoXEmpresa } from "@/types/empresas";
+import { CursoLicenciaDto } from "@/types/servicios";
 import { EmpresasService } from "@/services/empresas.service";
 import { obtenerSesionActual } from "@/lib/api-client";
 import { useToast } from "@/context/ToastContext";
+import { ModalConfirmarEliminar } from "@/components/ui/ModalConfirmarEliminar";
+import { formatearFechaTexto } from "@/lib/date-utils";
 
 interface Props {
   empresaEditar?: EmpresaGetDto | null;
@@ -86,6 +96,27 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
   // Búsqueda de CP
   const [buscandoCP, setBuscandoCP] = useState<boolean>(false);
 
+  // Datos para DC-3
+  const [repComisionEmpresa, setRepComisionEmpresa] = useState<string>("");
+  const [repComisionTrabajadores, setRepComisionTrabajadores] = useState<string>("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [cargandoLogo, setCargandoLogo] = useState<boolean>(false);
+  const [subiendoLogo, setSubiendoLogo] = useState<boolean>(false);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Plantillas de licencia personalizadas
+  const [cursosLicencia, setCursosLicencia] = useState<CursoLicenciaDto[]>([]);
+  const [cargandoCursosLicencia, setCargandoCursosLicencia] = useState<boolean>(false);
+  const [cursoLicenciaSeleccionadoId, setCursoLicenciaSeleccionadoId] = useState<number | null>(null);
+  const [busquedaCursoLicencia, setBusquedaCursoLicencia] = useState<string>("");
+  const [dropdownCursoAbierto, setDropdownCursoAbierto] = useState<boolean>(false);
+  const [subiendoPlantillaLicencia, setSubiendoPlantillaLicencia] = useState<boolean>(false);
+  const [cursoPlantillaEliminar, setCursoPlantillaEliminar] = useState<CursoLicenciaDto | null>(null);
+  const [eliminandoPlantillaLicencia, setEliminandoPlantillaLicencia] = useState<boolean>(false);
+  const [descargandoCursoId, setDescargandoCursoId] = useState<number | null>(null);
+  const plantillaLicenciaInputRef = useRef<HTMLInputElement | null>(null);
+  const dropdownCursoRef = useRef<HTMLDivElement | null>(null);
+
   // Validación y Envío
   const [showErrors, setShowErrors] = useState<boolean>(false);
   const [guardando, setGuardando] = useState<boolean>(false);
@@ -122,6 +153,24 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
     setContactos(res || []);
   };
 
+  const cargarPlantillasLicencia = async (idEmpresa: number) => {
+    setCargandoCursosLicencia(true);
+    const lista = await EmpresasService.getPlantillasLicencia(idEmpresa);
+    setCursosLicencia(lista);
+    setCargandoCursosLicencia(false);
+  };
+
+  useEffect(() => {
+    if (!dropdownCursoAbierto) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownCursoRef.current && !dropdownCursoRef.current.contains(e.target as Node)) {
+        setDropdownCursoAbierto(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropdownCursoAbierto]);
+
   useEffect(() => {
     if (empresaEditar && empresaEditar.iD_Empresa > 0) {
       setRazonSocial(empresaEditar.s_RazonSocial || "");
@@ -140,6 +189,14 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
       setNombreCalle(empresaEditar.v_NombreCalle || "");
       setNumeroInterior(empresaEditar.v_NumeroInterior || "");
       setNumeroExterior(empresaEditar.v_NumeroExterior || "");
+      setRepComisionEmpresa((empresaEditar.v_RepComisionEmpresa || "").toUpperCase());
+      setRepComisionTrabajadores((empresaEditar.v_RepComisionTrabajadores || "").toUpperCase());
+
+      // Cargar logo temporal de la empresa
+      setCargandoLogo(true);
+      EmpresasService.obtenerLogo(empresaEditar.iD_Empresa)
+        .then((url) => setLogoUrl(url))
+        .finally(() => setCargandoLogo(false));
 
       const tc = empresaEditar.i_TipoContacto;
       if (tc === 1) {
@@ -157,6 +214,9 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
 
       // 2.1 Cargar contactos de la empresa
       cargarContactos(empresaEditar.iD_Empresa);
+
+      // Cargar cursos con entregable Licencia
+      cargarPlantillasLicencia(empresaEditar.iD_Empresa);
     }
   }, [empresaEditar]);
 
@@ -187,6 +247,115 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
       toast.warning("No se encontró información para el Código Postal ingresado.");
     }
   };
+
+  const handleSeleccionarLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !empresaEditar?.iD_Empresa) return;
+
+    const tiposValidos = ["image/png", "image/jpeg"];
+    const nombreLower = file.name.toLowerCase();
+    const extensionValida =
+      nombreLower.endsWith(".png") || nombreLower.endsWith(".jpg") || nombreLower.endsWith(".jpeg");
+
+    if (!tiposValidos.includes(file.type) && !extensionValida) {
+      toast.error("Formato inválido. Solo se permiten imágenes PNG o JPG.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("El archivo supera el límite permitido de 2 MB.");
+      return;
+    }
+
+    setSubiendoLogo(true);
+    const res = await EmpresasService.subirLogo(empresaEditar.iD_Empresa, file);
+    setSubiendoLogo(false);
+
+    if (res.exito) {
+      setLogoUrl(res.v_Url ?? null);
+      toast.success("Logo actualizado");
+    } else {
+      toast.error(res.mensaje || "Ocurrió un error al subir el logo.");
+    }
+  };
+
+  const handleSeleccionarPlantillaLicencia = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !empresaEditar?.iD_Empresa || !cursoLicenciaSeleccionadoId) return;
+
+    if (!file.name.toLowerCase().endsWith(".pptx")) {
+      toast.error("Formato inválido. Solo se permiten archivos .pptx.");
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("El archivo supera el límite permitido de 20 MB.");
+      return;
+    }
+
+    setSubiendoPlantillaLicencia(true);
+    const res = await EmpresasService.subirPlantillaLicencia(
+      empresaEditar.iD_Empresa,
+      cursoLicenciaSeleccionadoId,
+      file
+    );
+    setSubiendoPlantillaLicencia(false);
+
+    if (res.exito) {
+      toast.success("Plantilla de licencia actualizada");
+      await cargarPlantillasLicencia(empresaEditar.iD_Empresa);
+    } else {
+      toast.error(res.mensaje || "Ocurrió un error al subir la plantilla.");
+    }
+  };
+
+  const handleDescargarPlantillaCurso = async (i_CveServicio: number) => {
+    if (!empresaEditar?.iD_Empresa || descargandoCursoId !== null) return;
+    setDescargandoCursoId(i_CveServicio);
+    const info = await EmpresasService.getPlantillaLicenciaCurso(
+      empresaEditar.iD_Empresa,
+      i_CveServicio
+    );
+    setDescargandoCursoId(null);
+
+    if (info?.v_Url) {
+      window.open(info.v_Url, "_blank", "noopener,noreferrer");
+    } else {
+      toast.error("No se pudo obtener la URL de descarga de la plantilla.");
+    }
+  };
+
+  const handleConfirmarEliminarPlantillaCurso = async () => {
+    if (!empresaEditar?.iD_Empresa || !cursoPlantillaEliminar) return;
+    setEliminandoPlantillaLicencia(true);
+    const res = await EmpresasService.eliminarPlantillaLicencia(
+      empresaEditar.iD_Empresa,
+      cursoPlantillaEliminar.i_CveServicio
+    );
+    setEliminandoPlantillaLicencia(false);
+    setCursoPlantillaEliminar(null);
+
+    if (res.exito) {
+      toast.success("Plantilla personalizada eliminada");
+      await cargarPlantillasLicencia(empresaEditar.iD_Empresa);
+    } else {
+      toast.error(res.mensaje || "Ocurrió un error al eliminar la plantilla.");
+    }
+  };
+
+  const cursosConPersonalizada = cursosLicencia.filter(
+    (c) => c.v_NombreArchivoPersonalizada != null
+  );
+  const cursosSinNingunaPlantilla = cursosLicencia.filter(
+    (c) => !c.b_PlantillaGeneral && !c.v_NombreArchivoPersonalizada
+  );
+  const cursoSeleccionadoObj =
+    cursosLicencia.find((c) => c.i_CveServicio === cursoLicenciaSeleccionadoId) || null;
+  const cursosFiltradosDropdown = cursosLicencia.filter((c) =>
+    (c.v_Servicio || "").toLowerCase().includes(busquedaCursoLicencia.trim().toLowerCase())
+  );
 
   // Validaciones visuales (showErrors === true)
   const esRazonInvalida = showErrors && !razonSocial.trim();
@@ -250,6 +419,8 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
       i_TipoContacto: tipoContacto,
       i_CodigoPostal: Number(codigoPostal),
       i_CveTenant: tenantId,
+      v_RepComisionEmpresa: repComisionEmpresa.trim() ? repComisionEmpresa.trim().toUpperCase() : null,
+      v_RepComisionTrabajadores: repComisionTrabajadores.trim() ? repComisionTrabajadores.trim().toUpperCase() : null,
     };
 
     let exito = false;
@@ -857,6 +1028,455 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* 4.3.5 SECCIÓN DATOS PARA DC-3 */}
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              border: "1px solid #d8e6f0",
+              borderRadius: "12px",
+              padding: "20px 22px",
+              marginTop: "20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <h5
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                color: "#1e3a5f",
+                borderBottom: "1px solid #ddeaf5",
+                paddingBottom: "8px",
+                margin: "0 0 4px 0",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <Award size={16} style={{ color: "#2B8FCC" }} />
+              Datos para DC-3
+            </h5>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "14px" }}>
+              <div>
+                <label style={{ fontSize: "11px", fontWeight: 600, color: "#4a6580", display: "block", marginBottom: "4px" }}>
+                  Representante Comisión Mixta — por la empresa
+                </label>
+                <input
+                  type="text"
+                  maxLength={200}
+                  className="form-control"
+                  style={{ width: "100%", borderRadius: "8px", height: "36px", border: "1px solid #d0dce8", textTransform: "uppercase" }}
+                  placeholder="NOMBRE COMPLETO"
+                  value={repComisionEmpresa}
+                  onChange={(e) => setRepComisionEmpresa(e.target.value.toUpperCase())}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "11px", fontWeight: 600, color: "#4a6580", display: "block", marginBottom: "4px" }}>
+                  Representante Comisión Mixta — por los trabajadores
+                </label>
+                <input
+                  type="text"
+                  maxLength={200}
+                  className="form-control"
+                  style={{ width: "100%", borderRadius: "8px", height: "36px", border: "1px solid #d0dce8", textTransform: "uppercase" }}
+                  placeholder="NOMBRE COMPLETO"
+                  value={repComisionTrabajadores}
+                  onChange={(e) => setRepComisionTrabajadores(e.target.value.toUpperCase())}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: "11px", fontWeight: 600, color: "#4a6580", display: "block", marginBottom: "6px" }}>
+                Logo de la empresa
+              </label>
+              {!esEdicion ? (
+                <p style={{ fontSize: "12.5px", color: "#64748b", margin: 0 }}>
+                  Podrás subir el logo después de guardar la empresa.
+                </p>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      width: "120px",
+                      height: "72px",
+                      borderRadius: "8px",
+                      border: "1px solid #d0dce8",
+                      backgroundColor: "#f8fafc",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {cargandoLogo ? (
+                      <Loader2 size={18} className="animate-spin" style={{ color: "#2B8FCC" }} />
+                    ) : logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt="Logo de la empresa"
+                        style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                      />
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", color: "#94a3b8", fontSize: "11px" }}>
+                        <ImageIcon size={16} />
+                        <span>Sin logo</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      style={{ display: "none" }}
+                      onChange={handleSeleccionarLogo}
+                    />
+                    <button
+                      type="button"
+                      disabled={subiendoLogo}
+                      onClick={() => logoInputRef.current?.click()}
+                      style={{
+                        height: "34px",
+                        padding: "0 14px",
+                        borderRadius: "8px",
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #2B8FCC",
+                        color: "#2B8FCC",
+                        fontSize: "12.5px",
+                        fontWeight: 500,
+                        cursor: subiendoLogo ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        width: "fit-content",
+                      }}
+                    >
+                      {subiendoLogo ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                      <span>{subiendoLogo ? "Subiendo..." : logoUrl ? "Cambiar logo" : "Subir logo"}</span>
+                    </button>
+                    <span style={{ fontSize: "11px", color: "#7a96b0" }}>
+                      Formato PNG o JPG, máximo 2 MB.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 4.3.6 SECCIÓN PLANTILLAS DE LICENCIA PERSONALIZADAS */}
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              border: "1px solid #d8e6f0",
+              borderRadius: "12px",
+              padding: "20px 22px",
+              marginTop: "20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <h5
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                color: "#1e3a5f",
+                borderBottom: "1px solid #ddeaf5",
+                paddingBottom: "8px",
+                margin: "0 0 4px 0",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <FileText size={16} style={{ color: "#2B8FCC" }} />
+              Plantillas de licencia personalizadas
+            </h5>
+
+            {!esEdicion ? (
+              <p style={{ fontSize: "12.5px", color: "#64748b", margin: 0 }}>
+                Podrás cargar plantillas personalizadas después de guardar la empresa.
+              </p>
+            ) : cargandoCursosLicencia ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "#64748b" }}>
+                <Loader2 size={15} className="animate-spin" style={{ color: "#2B8FCC" }} />
+                <span>Cargando cursos con entregable Licencia...</span>
+              </div>
+            ) : cursosLicencia.length === 0 ? (
+              <p style={{ fontSize: "12.5px", color: "#64748b", margin: 0 }}>
+                No hay cursos con entregable Licencia en el catálogo de servicios.
+              </p>
+            ) : (
+              <>
+                <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                  Si un curso no tiene plantilla personalizada, se usa la general del catálogo de servicios.
+                </p>
+
+                {/* Fila de carga */}
+                <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", flexWrap: "wrap" }}>
+                  <div ref={dropdownCursoRef} style={{ flex: "1 1 280px", position: "relative" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#4a6580", display: "block", marginBottom: "4px" }}>
+                      Curso
+                    </label>
+                    <div
+                      onClick={() => setDropdownCursoAbierto((prev) => !prev)}
+                      style={{
+                        height: "36px",
+                        borderRadius: "8px",
+                        border: "1px solid #d0dce8",
+                        backgroundColor: "#ffffff",
+                        padding: "0 10px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "8px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        color: cursoSeleccionadoObj ? "#0f172a" : "#94a3b8",
+                      }}
+                    >
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {cursoSeleccionadoObj?.v_Servicio || "-- Selecciona un curso --"}
+                      </span>
+                      <ChevronDown size={15} style={{ color: "#64748b", flexShrink: 0 }} />
+                    </div>
+
+                    {dropdownCursoAbierto && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 4px)",
+                          left: 0,
+                          right: 0,
+                          backgroundColor: "#ffffff",
+                          border: "1px solid #d0dce8",
+                          borderRadius: "8px",
+                          boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.14)",
+                          zIndex: 40,
+                          padding: "8px",
+                        }}
+                      >
+                        <div style={{ position: "relative", marginBottom: "6px" }}>
+                          <Search
+                            size={13}
+                            style={{
+                              position: "absolute",
+                              left: "9px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              color: "#94a3b8",
+                              pointerEvents: "none",
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Buscar curso..."
+                            value={busquedaCursoLicencia}
+                            onChange={(e) => setBusquedaCursoLicencia(e.target.value)}
+                            autoFocus
+                            style={{
+                              width: "100%",
+                              height: "30px",
+                              paddingLeft: "28px",
+                              paddingRight: "8px",
+                              fontSize: "12.5px",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "6px",
+                              outline: "none",
+                            }}
+                          />
+                        </div>
+                        <div style={{ maxHeight: "180px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "2px" }}>
+                          {cursosFiltradosDropdown.length === 0 ? (
+                            <div style={{ padding: "8px", fontSize: "12px", color: "#94a3b8", textAlign: "center" }}>
+                              Sin coincidencias
+                            </div>
+                          ) : (
+                            cursosFiltradosDropdown.map((c) => {
+                              const sel = c.i_CveServicio === cursoLicenciaSeleccionadoId;
+                              return (
+                                <button
+                                  key={c.i_CveServicio}
+                                  type="button"
+                                  onClick={() => {
+                                    setCursoLicenciaSeleccionadoId(c.i_CveServicio);
+                                    setDropdownCursoAbierto(false);
+                                    setBusquedaCursoLicencia("");
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    textAlign: "left",
+                                    padding: "6px 8px",
+                                    borderRadius: "6px",
+                                    border: "none",
+                                    backgroundColor: sel ? "#eef6fd" : "transparent",
+                                    color: sel ? "#1d4ed8" : "#334155",
+                                    fontSize: "12.5px",
+                                    fontWeight: sel ? 600 : 400,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: "8px",
+                                  }}
+                                >
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {c.v_Servicio || `Curso #${c.i_CveServicio}`}
+                                  </span>
+                                  {c.v_NombreArchivoPersonalizada && (
+                                    <span style={{ fontSize: "10.5px", color: "#2B8FCC", flexShrink: 0 }}>
+                                      Personalizada
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <input
+                      ref={plantillaLicenciaInputRef}
+                      type="file"
+                      accept=".pptx"
+                      style={{ display: "none" }}
+                      onChange={handleSeleccionarPlantillaLicencia}
+                    />
+                    <button
+                      type="button"
+                      disabled={!cursoSeleccionadoObj || subiendoPlantillaLicencia}
+                      onClick={() => plantillaLicenciaInputRef.current?.click()}
+                      style={{
+                        height: "36px",
+                        padding: "0 14px",
+                        borderRadius: "8px",
+                        backgroundColor: !cursoSeleccionadoObj ? "#f8fafc" : "#ffffff",
+                        border: !cursoSeleccionadoObj ? "1px solid #d0dce8" : "1px solid #2B8FCC",
+                        color: !cursoSeleccionadoObj ? "#94a3b8" : "#2B8FCC",
+                        fontSize: "12.5px",
+                        fontWeight: 500,
+                        cursor: !cursoSeleccionadoObj || subiendoPlantillaLicencia ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      {subiendoPlantillaLicencia ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Upload size={14} />
+                      )}
+                      <span>
+                        {subiendoPlantillaLicencia
+                          ? "Subiendo..."
+                          : cursoSeleccionadoObj?.v_NombreArchivoPersonalizada
+                          ? "Reemplazar plantilla"
+                          : "Cargar plantilla"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tabla de plantillas personalizadas */}
+                {cursosConPersonalizada.length > 0 && (
+                  <div className="alegra-table-container" style={{ border: "1px solid #e2e8f0", borderRadius: "8px" }}>
+                    <table className="alegra-table alegra-table-compact" style={{ width: "100%" }}>
+                      <thead>
+                        <tr>
+                          <th>Curso</th>
+                          <th>Archivo</th>
+                          <th>Fecha de carga</th>
+                          <th className="text-center" style={{ width: "90px" }}>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cursosConPersonalizada.map((c) => (
+                          <tr key={c.i_CveServicio}>
+                            <td style={{ fontSize: "12.5px", fontWeight: 500, color: "#1e293b" }}>
+                              {c.v_Servicio || `Curso #${c.i_CveServicio}`}
+                            </td>
+                            <td style={{ fontSize: "12px", color: "#475569" }}>
+                              {c.v_NombreArchivoPersonalizada}
+                            </td>
+                            <td style={{ fontSize: "12px", color: "#64748b", whiteSpace: "nowrap" }}>
+                              {c.d_FechaCargaPersonalizada ? formatearFechaTexto(c.d_FechaCargaPersonalizada) : "—"}
+                            </td>
+                            <td className="text-center">
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                <button
+                                  type="button"
+                                  className="btn-icon"
+                                  title="Descargar plantilla"
+                                  disabled={descargandoCursoId === c.i_CveServicio}
+                                  onClick={() => handleDescargarPlantillaCurso(c.i_CveServicio)}
+                                  style={{ padding: "4px", color: "#2B8FCC", cursor: "pointer" }}
+                                >
+                                  {descargandoCursoId === c.i_CveServicio ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <Download size={14} />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-icon danger"
+                                  title="Eliminar plantilla personalizada"
+                                  onClick={() => setCursoPlantillaEliminar(c)}
+                                  style={{ padding: "4px", color: "#ef4444", cursor: "pointer" }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Aviso ámbar si algún curso no tiene ni personalizada ni general */}
+                {cursosSinNingunaPlantilla.length > 0 && (
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      backgroundColor: "#fffbeb",
+                      border: "1px solid #fde68a",
+                      borderRadius: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "12px",
+                      color: "#b45309",
+                    }}
+                  >
+                    <AlertTriangle size={15} style={{ color: "#d97706", flexShrink: 0 }} />
+                    <span>
+                      Sin plantilla de licencia:{" "}
+                      {cursosSinNingunaPlantilla
+                        .map((c) => c.v_Servicio || `Curso #${c.i_CveServicio}`)
+                        .join(", ")}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* 4.4 Pie de acciones (footer) */}
@@ -1581,6 +2201,14 @@ export const FormularioEmpresa: React.FC<Props> = ({ empresaEditar }) => {
           </div>
         </div>
       )}
+      <ModalConfirmarEliminar
+        abierto={Boolean(cursoPlantillaEliminar)}
+        nombreElemento={cursoPlantillaEliminar?.v_Servicio || "plantilla personalizada"}
+        mensajePersonalizado="Este curso volverá a usar la plantilla general."
+        cargando={eliminandoPlantillaLicencia}
+        onCerrar={() => setCursoPlantillaEliminar(null)}
+        onConfirmar={handleConfirmarEliminarPlantillaCurso}
+      />
     </div>
   );
 };

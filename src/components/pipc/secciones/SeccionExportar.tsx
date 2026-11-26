@@ -307,7 +307,7 @@ export const SeccionExportar: React.FC<Props> = ({
             Exportación de expediente para generación Word
           </h3>
           <p style={{ fontSize: "11px", color: "#64748b", margin: 0 }}>
-            Genera el paquete ZIP con datos en formato JSON (schema 4.7), imágenes generadas, fotografías descargadas y documentación para la IA.
+            Genera el paquete ZIP con datos en formato JSON (schema 4.8), imágenes generadas, fotografías descargadas y documentación para la IA.
           </p>
         </div>
 

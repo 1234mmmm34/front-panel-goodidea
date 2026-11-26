@@ -194,5 +194,140 @@ export const EmpresasService = {
     );
     return resp.data;
   },
+
+  /**
+   * Obtiene la URL temporal (15 min) del logo de la empresa.
+   * GET empresas/{id}/logo
+   */
+  async obtenerLogo(idEmpresa: number): Promise<string | null> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.get<{ v_Url: string | null }>(`empresas/${idEmpresa}/logo`);
+      return resp.data?.v_Url ?? null;
+    }, null);
+  },
+
+  /**
+   * Sube o actualiza el logo de la empresa (PNG o JPG, máx. 2 MB).
+   * POST empresas/{id}/logo
+   */
+  async subirLogo(
+    idEmpresa: number,
+    archivo: File
+  ): Promise<{ exito: boolean; v_Url?: string; v_KeyLogo?: string; mensaje?: string }> {
+    try {
+      const formData = new FormData();
+      formData.append("archivo", archivo);
+      const resp = await apiClient.post<import("@/types/empresas").EmpresaLogoResponse>(
+        `empresas/${idEmpresa}/logo`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return {
+        exito: true,
+        v_Url: resp.data?.v_Url,
+        v_KeyLogo: resp.data?.v_KeyLogo,
+      };
+    } catch (err: any) {
+      const data = err?.response?.data;
+      const mensaje =
+        data?.error ||
+        data?.mensaje ||
+        data?.message ||
+        (typeof data === "string" && data.trim() ? data : null) ||
+        "Ocurrió un error al subir el logo.";
+      return { exito: false, mensaje };
+    }
+  },
+
+  /**
+   * Lista los cursos con entregable Licencia y el estado de plantilla para la empresa.
+   * GET empresas/{id}/plantillas-licencia
+   */
+  async getPlantillasLicencia(
+    idEmpresa: number
+  ): Promise<import("@/types/servicios").CursoLicenciaDto[]> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.get<import("@/types/servicios").CursoLicenciaDto[]>(
+        `empresas/${idEmpresa}/plantillas-licencia`
+      );
+      return Array.isArray(resp.data) ? resp.data : [];
+    }, []);
+  },
+
+  /**
+   * Obtiene la plantilla personalizada de un curso para la empresa (incluye v_Url temporal).
+   * GET empresas/{id}/plantillas-licencia/{i_CveServicio}
+   */
+  async getPlantillaLicenciaCurso(
+    idEmpresa: number,
+    i_CveServicio: number
+  ): Promise<import("@/types/servicios").PlantillaLicenciaInfoDto | null> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.get<{
+        plantilla: import("@/types/servicios").PlantillaLicenciaInfoDto | null;
+      }>(`empresas/${idEmpresa}/plantillas-licencia/${i_CveServicio}`);
+      return resp.data?.plantilla ?? null;
+    }, null);
+  },
+
+  /**
+   * Sube o reemplaza la plantilla personalizada de licencia de un curso (.pptx, máx. 20 MB).
+   * POST empresas/{id}/plantillas-licencia/{i_CveServicio}
+   */
+  async subirPlantillaLicencia(
+    idEmpresa: number,
+    i_CveServicio: number,
+    archivo: File
+  ): Promise<{
+    exito: boolean;
+    plantilla?: import("@/types/servicios").PlantillaLicenciaInfoDto;
+    mensaje?: string;
+  }> {
+    try {
+      const formData = new FormData();
+      formData.append("archivo", archivo);
+      const resp = await apiClient.post<import("@/types/servicios").PlantillaLicenciaInfoDto>(
+        `empresas/${idEmpresa}/plantillas-licencia/${i_CveServicio}`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      return { exito: true, plantilla: resp.data };
+    } catch (err: any) {
+      const data = err?.response?.data;
+      const mensaje =
+        data?.error ||
+        data?.mensaje ||
+        data?.message ||
+        (typeof data === "string" && data.trim() ? data : null) ||
+        "Ocurrió un error al subir la plantilla.";
+      return { exito: false, mensaje };
+    }
+  },
+
+  /**
+   * Elimina la plantilla personalizada de licencia de un curso para la empresa.
+   * DELETE empresas/{id}/plantillas-licencia/{i_CveServicio}
+   */
+  async eliminarPlantillaLicencia(
+    idEmpresa: number,
+    i_CveServicio: number
+  ): Promise<{ exito: boolean; mensaje?: string }> {
+    try {
+      await apiClient.delete(`empresas/${idEmpresa}/plantillas-licencia/${i_CveServicio}`);
+      return { exito: true };
+    } catch (err: any) {
+      const data = err?.response?.data;
+      const mensaje =
+        data?.error ||
+        data?.mensaje ||
+        data?.message ||
+        "Ocurrió un error al eliminar la plantilla.";
+      return { exito: false, mensaje };
+    }
+  },
 };
 

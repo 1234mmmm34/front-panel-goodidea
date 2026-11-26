@@ -48,6 +48,9 @@ export interface EmpresaGetDto {
   v_Municipio: string | null;
   v_NombreEstado: string | null;
   b_AvisoInscritos: boolean;
+  v_RepComisionEmpresa?: string | null;
+  v_RepComisionTrabajadores?: string | null;
+  v_KeyLogo?: string | null;
 }
 
 export interface EmpresaPostPayload {
@@ -68,6 +71,14 @@ export interface EmpresaPostPayload {
   i_TipoContacto: number;
   i_CodigoPostal: number;
   i_CveTenant: number;
+  v_RepComisionEmpresa?: string | null;
+  v_RepComisionTrabajadores?: string | null;
+}
+
+export interface EmpresaLogoResponse {
+  ID_Empresa: number;
+  v_KeyLogo: string;
+  v_Url: string;
 }
 
 export interface SP_CodigoPostal {

@@ -12,6 +12,8 @@ import {
   migrateProbabilidad,
   migrateConsecuencia,
   calcMagnitud,
+  normTxt,
+  normalizarBrigadaAntigua,
 } from "./pipcCalculos";
 import {
   ANEXOS_CATALOGO,
@@ -37,8 +39,81 @@ import {
   generarTablaMesesCanvasBlob,
 } from "./pipcCanvasGenerators";
 
-export const APP_VERSION = "v3.42";
-export const SCHEMA_VERSION = "4.7";
+export const APP_VERSION = "v3.43";
+export const SCHEMA_VERSION = "4.8";
+
+// Certificado de capacitación a brigadas (desde v3.43). Textos ya armados para el Template.
+// Brigadas en orden fijo; participantes = líder primero y luego los integrantes, en el orden capturado.
+const CERTIFICADO_BRIGADAS = [
+  { clave: "primeros_auxilios", brigada: "Primeros Auxilios",    titulo: "Primeros auxilios" },
+  { clave: "evacuacion",        brigada: "Evacuación",           titulo: "Evacuación" },
+  { clave: "busqueda_rescate",  brigada: "Búsqueda y Rescate",   titulo: "Búsqueda y rescate" },
+  { clave: "combate_incendios", brigada: "Combate de Incendios", titulo: "Combate de Incendios" },
+];
+
+function listaConY(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return items.slice(0, -1).join(", ") + " y " + items[items.length - 1];
+}
+
+function buildCertificadoCapacitacionExport(exp: PipcExpediente, docs: any) {
+  const d = exp.form;
+  const fe = String(d.fecha_elaboracion || "");
+  const anio = /^\d{4}-\d{2}-\d{2}$/.test(fe) ? fe.substring(0, 4) : String(new Date().getFullYear());
+
+  // Meses del programa anual de capacitación, sin repetir y en orden de calendario
+  const idx: number[] = [];
+  (exp.capacitacion || []).forEach((c: any) => {
+    const i = MESES_NOMBRE_MIN.indexOf(normTxt(c?.mes));
+    if (i !== -1 && !idx.includes(i)) idx.push(i);
+  });
+  idx.sort((a, b) => a - b);
+  const meses = idx.map((i) => MESES_NOMBRE_MIN[i]);
+  const periodo = !meses.length
+    ? ""
+    : (meses.length === 1 ? "el mes de " : "los meses de ") + listaConY(meses) + " del año " + anio;
+
+  // OJO: aquí es "de" antes del año ("26 de octubre de 2026").
+  // fechaLargaTexto (Oficio) usa "del"; NO reutilizarla ni unificarla.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fe);
+  const fechaTexto = m ? `${m[3]} de ${MESES_NOMBRE_MIN[parseInt(m[2], 10) - 1]} de ${m[1]}` : "";
+
+  const participantes: Record<string, string[]> = {};
+  const brigadas: any[] = [];
+  CERTIFICADO_BRIGADAS.forEach((cb) => {
+    const filas = (exp.brigadistas || []).filter(
+      (b: any) =>
+        normTxt(normalizarBrigadaAntigua(b?.brigada)) === normTxt(cb.brigada) && String(b.nombre || "").trim()
+    );
+    const esLider = (b: any) => normTxt(b.rol) === "lider";
+    const lideres = filas.filter(esLider);
+    const resto = filas.filter((b: any) => !esLider(b));
+    const nombres = lideres.concat(resto).map((b: any) => String(b.nombre).trim());
+    participantes[cb.clave] = nombres;
+    brigadas.push({
+      clave: cb.clave,
+      brigada: cb.brigada,
+      titulo: cb.titulo,
+      lider: lideres.length ? String(lideres[0].nombre).trim() : "",
+      total: nombres.length,
+    });
+  });
+
+  return {
+    lugar: docs.oficio_responsiva.lugar,
+    fecha_texto: fechaTexto,
+    destinatario_nombre: docs.oficio_responsiva.destinatario_nombre,
+    destinatario_cargo: docs.oficio_responsiva.destinatario_cargo,
+    instructor_nombre: String(d.consultor_externo_nombre || "").trim(),
+    instructor_registro: String(d.consultor_externo_registro || "").trim(),
+    periodo_texto: periodo,
+    meses,
+    anio,
+    razon_social: docs.oficio_responsiva.razon_social,
+    brigadas,
+    participantes,
+  };
+}
 
 function fechaLargaTexto(iso: string) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
@@ -417,6 +492,7 @@ export function buildSemanticExportObject(
     plan_contingencias: documentosAdicionales.plan_contingencias,
     oficio_responsiva: documentosAdicionales.oficio_responsiva,
     acta_constitutiva_uiri: documentosAdicionales.acta_constitutiva_uiri,
+    certificado_capacitacion: buildCertificadoCapacitacionExport(exp, documentosAdicionales),
     personal: {
       administrativo_total: d.personal_admin || "",
       operativo_total: d.personal_operativo || "",

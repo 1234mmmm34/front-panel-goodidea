@@ -358,6 +358,27 @@ export function normTxt(v: any): string {
     .trim();
 }
 
+// Nombres anteriores a v3.43: la brigada "Incendios" ahora se llama "Combate de Incendios".
+export function normalizarBrigadaAntigua(v: any): string {
+  const n = normTxt(v);
+  if (n === "incendios" || n === "incendio" || n === "contra incendios" || n === "brigada de incendios")
+    return "Combate de Incendios";
+  return v;
+}
+
+export function normalizarRolAntiguo(v: any): string {
+  return normTxt(v) === "brigadista de incendios" ? "Brigadista de combate de incendios" : v;
+}
+
+export function normalizarBrigadistasAntiguos<T extends { brigada?: any; rol?: any }>(lista: T[]): T[] {
+  (lista || []).forEach((b) => {
+    if (!b) return;
+    b.brigada = normalizarBrigadaAntigua(b.brigada);
+    b.rol = normalizarRolAntiguo(b.rol);
+  });
+  return lista;
+}
+
 export function getTurnosDisponibles(turnosOperativo: TurnoRow[] = [], turnosAdmin: TurnoRow[] = []): string[] {
   const turnos = new Set<string>();
   (turnosOperativo || []).forEach((t) => {
@@ -379,6 +400,7 @@ export function getTurnosDisponibles(turnosOperativo: TurnoRow[] = [], turnosAdm
 }
 
 export function interpretarBrigada(v: any): string {
+  v = normalizarBrigadaAntigua(v);
   const n = normTxt(v);
   if (!n) return "";
   const exacta = (BRIGADAS_OPCIONES as readonly string[]).find((b) => normTxt(b) === n);
@@ -388,7 +410,10 @@ export function interpretarBrigada(v: any): string {
 }
 
 export function interpretarRol(v: any, brigada?: string): string {
+  v = normalizarRolAntiguo(v);
   const n = normTxt(v);
+  if (n.includes("incendio") && !n.includes("combate"))
+    return (BRIGADA_A_ROL as any)["Combate de Incendios"];
   if (!n) return (BRIGADA_A_ROL as any)[brigada || ""] || "";
   const exacto = (ROL_OPCIONES as readonly string[]).find((r) => normTxt(r) === n);
   if (exacto) return exacto;
@@ -644,14 +669,14 @@ export function getPendingItems(exp: PipcExpediente): PendienteItem[] {
     filled(d.consultor_externo_nombre) && filled(d.consultor_externo_registro),
     "Datos generales",
     0,
-    "Faltan nombre y registro del consultor externo (Oficio responsiva)",
+    "Faltan nombre y registro del consultor externo (Oficio responsiva y Certificado de capacitación)",
     "Media"
   );
   req(
     (d.fecha_elaboracion || "").trim(),
     "Datos generales",
     0,
-    "Falta la fecha de elaboración (también fecha del Oficio y del Acta)"
+    "Falta la fecha de elaboración (también fecha del Oficio, del Acta y del Certificado)"
   );
 
   // ② Inmueble (índice 1)

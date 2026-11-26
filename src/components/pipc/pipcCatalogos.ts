@@ -1,7 +1,7 @@
-// Catálogos e información base del Módulo PIPC v3.42 (fuente de verdad: captura_pipc_goodidea-4_modificado_v3_42.html)
+// Catálogos e información base del Módulo PIPC v3.43 (fuente de verdad: captura_pipc_goodidea-4_modificado_v3_43.html)
 
-export const APP_VERSION = 'v3.42';
-export const SCHEMA_VERSION = '4.7';
+export const APP_VERSION = 'v3.43';
+export const SCHEMA_VERSION = '4.8';
 
 export const TEXTO_OBJETIVO_PIPC = 'Establecer una organización que permita llevar a cabo acciones para el control de los diferentes tipos de emergencia que pudieran presentarse en las instalaciones de la empresa, con el fin de proteger la integridad física de las personas que laboran en el inmueble, así como a visitantes y población en general que pudiera verse afectada, a través de la implementación de medidas preventivas, de respuesta y de recuperación, conforme a los lineamientos establecidos por la Ley General de Protección Civil y sus reglamentos aplicables.';
 
@@ -502,7 +502,7 @@ export const CATALOGO_AGENTES = [
    "Evacuación",
    "Primeros Auxilios",
    "Búsqueda y Rescate",
-   "Incendios"
+   "Combate de Incendios"
   ],
   "brigadas_texto": "Evacuación, Primeros auxilios, Búsqueda y rescate, Combate de incendios",
   "recursos": "Botiquín, radio portátil, linternas, megáfono, señalización de rutas y zonas seguras, directorio de emergencias",
@@ -541,7 +541,7 @@ export const CATALOGO_AGENTES = [
    "Evacuación",
    "Primeros Auxilios",
    "Búsqueda y Rescate",
-   "Incendios"
+   "Combate de Incendios"
   ],
   "brigadas_texto": "Evacuación, Primeros auxilios, Búsqueda y rescate, Combate de incendios",
   "recursos": "Botiquín, linternas, radio, cinta de acordonamiento, equipo básico de emergencia",
@@ -578,7 +578,7 @@ export const CATALOGO_AGENTES = [
   "brigadas": [
    "Evacuación",
    "Primeros Auxilios",
-   "Incendios"
+   "Combate de Incendios"
   ],
   "brigadas_texto": "Evacuación, Primeros auxilios, Combate de incendios",
   "recursos": "Costales de arena, bombas sumergibles con fuente de respaldo (planta de emergencia o bomba a gasolina), lámparas de emergencia, linternas, radios con baterías de repuesto, botiquín, directorio de emergencias",
@@ -596,7 +596,7 @@ export const CATALOGO_AGENTES = [
   "descripcion": "Fenómeno hidrometeorológico · Natural · Externo",
   "brigadas": [
    "Evacuación",
-   "Incendios"
+   "Combate de Incendios"
   ],
   "brigadas_texto": "Evacuación, Combate de incendios",
   "recursos": "Sistema de pararrayos, protección contra sobretensiones, radio, cinta de acordonamiento",
@@ -699,7 +699,7 @@ export const CATALOGO_AGENTES = [
   "descripcion": "Fenómeno químico-tecnológico · Antropogénico · Externo",
   "brigadas": [
    "Evacuación",
-   "Incendios"
+   "Combate de Incendios"
   ],
   "brigadas_texto": "Evacuación, Combate de incendios",
   "recursos": "Puntos de reunión alternos, radio, directorio de emergencias",
@@ -934,7 +934,7 @@ export const CATALOGO_AGENTES = [
   "grupo": "FENÓMENOS QUÍMICO-TECNOLÓGICOS",
   "descripcion": "Fenómeno químico-tecnológico · Antropogénico · Interno",
   "brigadas": [
-   "Incendios",
+   "Combate de Incendios",
    "Evacuación",
    "Primeros Auxilios",
    "Búsqueda y Rescate",
@@ -958,7 +958,7 @@ export const CATALOGO_AGENTES = [
    "Evacuación",
    "Primeros Auxilios",
    "Búsqueda y Rescate",
-   "Incendios",
+   "Combate de Incendios",
    "HAZMAT"
   ],
   "brigadas_texto": "Evacuación, Primeros auxilios, Búsqueda y rescate, Combate de incendios, HazMat",
@@ -978,7 +978,7 @@ export const CATALOGO_AGENTES = [
   "brigadas": [
    "HAZMAT",
    "Evacuación",
-   "Incendios"
+   "Combate de Incendios"
   ],
   "brigadas_texto": "HazMat, Evacuación, Combate de incendios",
   "recursos": "Explosímetro calibrado, agua jabonosa, EPP para reparación, cinta de acordonamiento, HDS del gas",
@@ -998,7 +998,7 @@ export const CATALOGO_AGENTES = [
    "HAZMAT",
    "Evacuación",
    "Primeros Auxilios",
-   "Incendios"
+   "Combate de Incendios"
   ],
   "brigadas_texto": "HazMat, Evacuación, Primeros auxilios, Combate de incendios",
   "recursos": "Kit antiderrames, material absorbente no inflamable, EPP según HDS, contenedores para residuo peligroso",
@@ -1265,14 +1265,14 @@ export const uiriRoles = [
 ];
 
 export const JEFES_BRIGADA = [
-    { id: 'jefe_brigada_ci', brigada: 'Incendios' },
+    { id: 'jefe_brigada_ci', brigada: 'Combate de Incendios' },
     { id: 'jefe_brigada_pa', brigada: 'Primeros Auxilios' },
     { id: 'jefe_brigada_br', brigada: 'Búsqueda y Rescate' },
     { id: 'jefe_brigada_ev', brigada: 'Evacuación' },
 ];
 
 export const BRIGADA_A_ROL = {
-    'Incendios': 'Brigadista de incendios',
+    'Combate de Incendios': 'Brigadista de combate de incendios',
     'Primeros Auxilios': 'Brigadista de primeros auxilios',
     'Evacuación': 'Brigadista de evacuación',
     'Búsqueda y Rescate': 'Brigadista de búsqueda y rescate',
@@ -1317,7 +1317,7 @@ export const ANEXOS_CATALOGO = [
 ];
 
 export const BRIGADAS_OPCIONES = [
-    'Incendios',
+    'Combate de Incendios',
     'Primeros Auxilios',
     'Evacuación',
     'Búsqueda y Rescate',
@@ -1327,7 +1327,7 @@ export const BRIGADAS_OPCIONES = [
 
 export const ROL_OPCIONES = [
     'Líder',
-    'Brigadista de incendios',
+    'Brigadista de combate de incendios',
     'Brigadista de primeros auxilios',
     'Brigadista de evacuación',
     'Brigadista de búsqueda y rescate',

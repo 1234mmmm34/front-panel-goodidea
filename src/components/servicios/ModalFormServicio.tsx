@@ -1,12 +1,22 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { X, Save } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { X, Save, FileText, Download, RefreshCw, Trash2, Upload, AlertTriangle, Loader2 } from "lucide-react";
 import { entregables, Norma, rubros, unidades } from "@/types/catalogos";
-import { ServiciosDropdownDto, ServiciosPostDto, tiposServicios } from "@/types/servicios";
+import { PlantillaLicenciaInfoDto, ServiciosDropdownDto, ServiciosPostDto, tiposServicios } from "@/types/servicios";
 import { CatalogosService } from "@/services/catalogos.service";
 import { ServiciosService } from "@/services/servicios.service";
 import { useToast } from "@/context/ToastContext";
+import { ModalConfirmarEliminar } from "@/components/ui/ModalConfirmarEliminar";
+import { formatearFechaTexto } from "@/lib/date-utils";
+
+function normalizarNombreEntregable(nombre: string): string {
+  return nombre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[\s\-_]+/g, "");
+}
 
 interface Props {
   abierto: boolean;
@@ -42,6 +52,14 @@ export const ModalFormServicio: React.FC<Props> = ({
   // Validation State
   const [showErrors, setShowErrors] = useState<boolean>(false);
   const [guardando, setGuardando] = useState<boolean>(false);
+
+  // Plantilla de licencia (general)
+  const [plantillaLicencia, setPlantillaLicencia] = useState<PlantillaLicenciaInfoDto | null>(null);
+  const [cargandoPlantilla, setCargandoPlantilla] = useState<boolean>(false);
+  const [subiendoPlantilla, setSubiendoPlantilla] = useState<boolean>(false);
+  const [modalEliminarPlantilla, setModalEliminarPlantilla] = useState<boolean>(false);
+  const [eliminandoPlantilla, setEliminandoPlantilla] = useState<boolean>(false);
+  const plantillaInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     async function cargarCat() {
@@ -87,6 +105,86 @@ export const ModalFormServicio: React.FC<Props> = ({
     }
     setShowErrors(false);
   }, [servicioEditar, abierto]);
+
+  const idEntregableLicencia = useMemo(() => {
+    const encontrado = listaEntregables.find(
+      (e) => normalizarNombreEntregable(e.v_Nombre || "") === "LICENCIA"
+    );
+    return encontrado?.i_CveEntregables ?? null;
+  }, [listaEntregables]);
+
+  const licenciaMarcada =
+    idEntregableLicencia !== null && entregablesSeleccionados.includes(idEntregableLicencia);
+
+  const licenciaGuardadaEnServicio = Boolean(
+    servicioEditar &&
+      idEntregableLicencia !== null &&
+      (servicioEditar.entregables || []).includes(idEntregableLicencia)
+  );
+
+  useEffect(() => {
+    if (!abierto || !servicioEditar?.i_CveServicio || !licenciaGuardadaEnServicio) {
+      setPlantillaLicencia(null);
+      setCargandoPlantilla(false);
+      return;
+    }
+
+    let activo = true;
+    setCargandoPlantilla(true);
+    ServiciosService.getPlantillaLicencia(servicioEditar.i_CveServicio)
+      .then((res) => {
+        if (activo) setPlantillaLicencia(res);
+      })
+      .finally(() => {
+        if (activo) setCargandoPlantilla(false);
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [abierto, servicioEditar?.i_CveServicio, licenciaGuardadaEnServicio]);
+
+  const handleSeleccionarPlantilla = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !servicioEditar?.i_CveServicio) return;
+
+    if (!file.name.toLowerCase().endsWith(".pptx")) {
+      toast.error("Formato inválido. Solo se permiten archivos .pptx.");
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("El archivo supera el límite permitido de 20 MB.");
+      return;
+    }
+
+    setSubiendoPlantilla(true);
+    const res = await ServiciosService.subirPlantillaLicencia(servicioEditar.i_CveServicio, file);
+    setSubiendoPlantilla(false);
+
+    if (res.exito && res.plantilla) {
+      setPlantillaLicencia(res.plantilla);
+      toast.success("Plantilla de licencia actualizada");
+    } else {
+      toast.error(res.mensaje || "Ocurrió un error al subir la plantilla.");
+    }
+  };
+
+  const handleConfirmarEliminarPlantilla = async () => {
+    if (!servicioEditar?.i_CveServicio) return;
+    setEliminandoPlantilla(true);
+    const res = await ServiciosService.eliminarPlantillaLicencia(servicioEditar.i_CveServicio);
+    setEliminandoPlantilla(false);
+    setModalEliminarPlantilla(false);
+
+    if (res.exito) {
+      setPlantillaLicencia(null);
+      toast.success("Plantilla de licencia eliminada");
+    } else {
+      toast.error(res.mensaje || "Ocurrió un error al eliminar la plantilla.");
+    }
+  };
 
   // Autocompletar Unidad por Tipo de Servicio
   const handleCambioTipoServicio = (idTipo: number) => {
@@ -302,6 +400,130 @@ export const ModalFormServicio: React.FC<Props> = ({
                 </div>
               </div>
 
+              {/* Plantilla de licencia (general) */}
+              {licenciaMarcada && (
+                <div className="form-group margin-0" style={{ gridColumn: "span 3", marginTop: "4px" }}>
+                  <label className="form-label" style={{ marginBottom: "4px" }}>
+                    Plantilla de licencia (general)
+                  </label>
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    {!servicioEditar ? (
+                      <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                        Podrás cargar la plantilla después de guardar el servicio.
+                      </p>
+                    ) : !licenciaGuardadaEnServicio ? (
+                      <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                        Guarda el servicio para poder cargar la plantilla.
+                      </p>
+                    ) : cargandoPlantilla ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#64748b" }}>
+                        <Loader2 size={14} className="animate-spin" style={{ color: "#2B8FCC" }} />
+                        <span>Cargando plantilla...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          ref={plantillaInputRef}
+                          type="file"
+                          accept=".pptx"
+                          style={{ display: "none" }}
+                          onChange={handleSeleccionarPlantilla}
+                        />
+                        {plantillaLicencia ? (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                              <FileText size={18} style={{ color: "#2B8FCC", flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: "12.5px", fontWeight: 500, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {plantillaLicencia.v_NombreArchivo || "plantilla.pptx"}
+                                </div>
+                                <div style={{ fontSize: "11px", color: "#64748b" }}>
+                                  Cargada el {formatearFechaTexto(plantillaLicencia.d_FechaCarga)}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              {plantillaLicencia.v_Url && (
+                                <button
+                                  type="button"
+                                  className="btn-icon"
+                                  title="Descargar plantilla"
+                                  onClick={() => window.open(plantillaLicencia.v_Url!, "_blank", "noopener,noreferrer")}
+                                  style={{ padding: "5px", color: "#2B8FCC", cursor: "pointer" }}
+                                >
+                                  <Download size={15} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="btn-icon"
+                                title="Reemplazar plantilla"
+                                disabled={subiendoPlantilla}
+                                onClick={() => plantillaInputRef.current?.click()}
+                                style={{ padding: "5px", color: "#475569", cursor: subiendoPlantilla ? "wait" : "pointer" }}
+                              >
+                                {subiendoPlantilla ? (
+                                  <Loader2 size={15} className="animate-spin" style={{ color: "#2B8FCC" }} />
+                                ) : (
+                                  <RefreshCw size={15} />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-icon danger"
+                                title="Eliminar plantilla"
+                                disabled={subiendoPlantilla}
+                                onClick={() => setModalEliminarPlantilla(true)}
+                                style={{ padding: "5px", color: "#ef4444", cursor: subiendoPlantilla ? "not-allowed" : "pointer" }}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#b45309" }}>
+                              <AlertTriangle size={15} style={{ color: "#d97706", flexShrink: 0 }} />
+                              <span>Sin plantilla: no se podrán generar licencias de este curso.</span>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={subiendoPlantilla}
+                              onClick={() => plantillaInputRef.current?.click()}
+                              style={{
+                                height: "30px",
+                                padding: "0 12px",
+                                borderRadius: "6px",
+                                border: "1px solid #2B8FCC",
+                                backgroundColor: "#ffffff",
+                                color: "#2B8FCC",
+                                fontSize: "12px",
+                                fontWeight: 500,
+                                cursor: subiendoPlantilla ? "wait" : "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                              }}
+                            >
+                              {subiendoPlantilla ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                              <span>{subiendoPlantilla ? "Subiendo..." : "Cargar plantilla"}</span>
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Renglón a ancho completo: Aplica visto bueno de la autoridad */}
               <div className="form-group margin-0" style={{ gridColumn: "span 3", marginTop: "4px" }}>
                 <label
@@ -343,6 +565,15 @@ export const ModalFormServicio: React.FC<Props> = ({
           </div>
         </form>
       </div>
+
+      <ModalConfirmarEliminar
+        abierto={modalEliminarPlantilla}
+        nombreElemento={plantillaLicencia?.v_NombreArchivo || "plantilla general"}
+        mensajePersonalizado="Se eliminará la plantilla general. Los cursos de empresas sin plantilla personalizada ya no podrán generar licencias."
+        cargando={eliminandoPlantilla}
+        onCerrar={() => setModalEliminarPlantilla(false)}
+        onConfirmar={handleConfirmarEliminarPlantilla}
+      />
     </div>
   );
 };

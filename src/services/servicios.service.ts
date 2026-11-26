@@ -1,6 +1,7 @@
 import { apiClient, httpDefensivo } from "@/lib/api-client";
 import {
   PaginadoResponse,
+  PlantillaLicenciaInfoDto,
   ServiciosDrpDto,
   ServiciosDropdownDto,
   ServiciosPostDto,
@@ -105,5 +106,68 @@ export const ServiciosService = {
       const resp = await apiClient.get<ServiciosDropdownDto[]>("servicios/GetDropdown");
       return resp.data || [];
     }, []);
+  },
+
+  /**
+   * Obtiene la información de la plantilla general de licencia del curso.
+   * GET servicios/{i_CveServicio}/plantilla-licencia
+   */
+  async getPlantillaLicencia(i_CveServicio: number): Promise<PlantillaLicenciaInfoDto | null> {
+    return httpDefensivo(async () => {
+      const resp = await apiClient.get<{ plantilla: PlantillaLicenciaInfoDto | null }>(
+        `servicios/${i_CveServicio}/plantilla-licencia`
+      );
+      return resp.data?.plantilla ?? null;
+    }, null);
+  },
+
+  /**
+   * Sube o reemplaza la plantilla general de licencia (.pptx, máx. 20 MB).
+   * POST servicios/{i_CveServicio}/plantilla-licencia
+   */
+  async subirPlantillaLicencia(
+    i_CveServicio: number,
+    archivo: File
+  ): Promise<{ exito: boolean; plantilla?: PlantillaLicenciaInfoDto; mensaje?: string }> {
+    try {
+      const formData = new FormData();
+      formData.append("archivo", archivo);
+      const resp = await apiClient.post<PlantillaLicenciaInfoDto>(
+        `servicios/${i_CveServicio}/plantilla-licencia`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      return { exito: true, plantilla: resp.data };
+    } catch (err: any) {
+      const data = err?.response?.data;
+      const mensaje =
+        data?.error ||
+        data?.mensaje ||
+        data?.message ||
+        (typeof data === "string" && data.trim() ? data : null) ||
+        "Ocurrió un error al subir la plantilla.";
+      return { exito: false, mensaje };
+    }
+  },
+
+  /**
+   * Elimina la plantilla general de licencia del curso.
+   * DELETE servicios/{i_CveServicio}/plantilla-licencia
+   */
+  async eliminarPlantillaLicencia(
+    i_CveServicio: number
+  ): Promise<{ exito: boolean; mensaje?: string }> {
+    try {
+      await apiClient.delete(`servicios/${i_CveServicio}/plantilla-licencia`);
+      return { exito: true };
+    } catch (err: any) {
+      const data = err?.response?.data;
+      const mensaje =
+        data?.error ||
+        data?.mensaje ||
+        data?.message ||
+        "Ocurrió un error al eliminar la plantilla.";
+      return { exito: false, mensaje };
+    }
   },
 };

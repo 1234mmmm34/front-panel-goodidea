@@ -115,7 +115,7 @@ export function crearExpedienteVacio(
     pc_dependencia: "",
 
     consultor_externo_nombre: "Ing. Faustino Carlos Alatorre Hernández",
-    consultor_externo_registro: "DPCE-APF-146-2025",
+    consultor_externo_registro: "DPCE-APF-146-2026",
 
     personal_admin: "",
     personal_operativo: "",

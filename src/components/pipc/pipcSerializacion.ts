@@ -1,6 +1,7 @@
 import {
   PipcExpediente,
   PipcFormData,
+  normalizarBrigadistasAntiguos,
 } from "./pipcCalculos";
 import { PipcSeccionClave } from "@/types/pipc";
 
@@ -276,7 +277,7 @@ export function applySectionJson(
     }
 
     case "seguridad": {
-      if (Array.isArray(parsed.brigadas)) nextExp.brigadistas = parsed.brigadas;
+      if (Array.isArray(parsed.brigadas)) nextExp.brigadistas = normalizarBrigadistasAntiguos(parsed.brigadas);
       if (Array.isArray(parsed.capacitacion)) nextExp.capacitacion = parsed.capacitacion;
       if (Array.isArray(parsed.simulacros)) nextExp.simulacros = parsed.simulacros;
       if (parsed.seguro_fecha !== undefined) nextExp.form.seguro_fecha = parsed.seguro_fecha;
