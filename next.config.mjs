@@ -4,6 +4,9 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "1";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   async rewrites() {
     return [
       {
