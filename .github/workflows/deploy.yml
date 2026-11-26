@@ -27,26 +27,22 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=3072"
           NEXT_TELEMETRY_DISABLED: "1"
           NODE_TLS_REJECT_UNAUTHORIZED: "1"
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          http_proxy: ""
+          https_proxy: ""
         run: npx next build --webpack
 
-      - name: Preparar artefacto de despliegue
-        run: |
-          rm -rf ./deploy_package
-          mkdir -p ./deploy_package
-          cp -r .next ./deploy_package/.next
-          cp -r public ./deploy_package/public
-          cp package.json ./deploy_package/package.json
-          cp package-lock.json ./deploy_package/package-lock.json
-          for f in next.config.ts next.config.mjs next.config.js; do
-            if [ -f "$f" ]; then cp "$f" ./deploy_package/; fi
-          done
-
-      - name: Subir por FTP
+      - name: Subir todo el proyecto por FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./deploy_package/
+          local-dir: ./
           server-dir: /
           dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .github/**
