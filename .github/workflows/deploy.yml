@@ -20,46 +20,29 @@ jobs:
           cache: 'npm'
 
       - name: Instalar dependencias
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --no-audit
 
-      - name: Bypass next/font/google loader during CI build
-        run: |
-          node -e '
-            const fs = require("fs");
-            const loaderPath = "node_modules/next/dist/compiled/@next/font/dist/google/loader.js";
-            if (fs.existsSync(loaderPath)) {
-              const stub = `module.exports = async function nextFontGoogleFontLoader(opts) {
-                return {
-                  fontFamily: opts.fontFamily,
-                  weight: opts.weight || ["400"],
-                  style: opts.style || ["normal"],
-                  css: "",
-                  fontFace: "",
-                  fallbackFonts: opts.fallback || [],
-                  adjustFontFallback: false,
-                  variable: opts.variable
-                };
-              };`;
-              fs.writeFileSync(loaderPath, stub, "utf8");
-            }
-          '
-
-      - name: Compilar Next.js con limite de RAM y Webpack
+      - name: Compilar Next.js
         env:
           NODE_OPTIONS: "--max-old-space-size=3072"
           NEXT_TELEMETRY_DISABLED: "1"
         run: npx next build --webpack
 
-      - name: Subir todo el proyecto por FTP
+      - name: Quitar devDependencies
+        run: npm prune --omit=dev
+
+      - name: Armar carpeta de deploy
+        run: |
+          mkdir deploy
+          cp -r .next public node_modules package.json next.config.mjs server.js web.config deploy/
+          rm -rf deploy/.next/cache
+
+      - name: Subir por FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./
+          local-dir: ./deploy/
           server-dir: /
           dangerous-clean-slate: false
-          exclude: |
-            **/.git*
-            **/.git*/**
-            .github/**
