@@ -20,6 +20,12 @@ export interface FiltroColumnaProp {
   ) => void;
 }
 
+export interface FiltroColumnaSimpleProp<T extends string | number = number> {
+  cargarOpciones: () => Promise<OpcionFiltro<T>[]>;
+  seleccionados: T[] | null;
+  onAplicar: (seleccionados: T[] | null) => void;
+}
+
 interface Props {
   datosPaginados: PaginadoResponse<FacturaProv> | null;
   cargando: boolean;
@@ -31,6 +37,10 @@ interface Props {
   onCambioPagina: (pagina: number) => void;
   onCambioTamano: (tamano: number) => void;
   filtroColumna: FiltroColumnaProp;
+  filtroOcs: FiltroColumnaSimpleProp<string>;
+  filtroCotizaciones: FiltroColumnaSimpleProp<string>;
+  filtroConceptos: FiltroColumnaSimpleProp<string>;
+  filtroPagosPendientes: FiltroColumnaSimpleProp<number>;
 }
 
 export const TablaGastos: React.FC<Props> = ({
@@ -44,6 +54,10 @@ export const TablaGastos: React.FC<Props> = ({
   onCambioPagina,
   onCambioTamano,
   filtroColumna,
+  filtroOcs,
+  filtroCotizaciones,
+  filtroConceptos,
+  filtroPagosPendientes,
 }) => {
   const formatearMonto = (monto: number): string => {
     const val = isNaN(monto) ? 0 : monto;
@@ -193,21 +207,54 @@ export const TablaGastos: React.FC<Props> = ({
             <th>
               <FiltroColumnaChecklist
                 titulo="Proveedor"
+                textoSinOpciones="Sin proveedores"
                 cargarOpciones={filtroColumna.cargarOpciones}
                 seleccionados={filtroColumna.seleccionados}
                 orden={filtroColumna.orden}
                 onAplicar={filtroColumna.onAplicar}
               />
             </th>
-            <th>OC prov.</th>
-            <th>Cotización prov.</th>
-            <th>Concepto</th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="OC prov."
+                permitirOrden={false}
+                cargarOpciones={filtroOcs.cargarOpciones}
+                seleccionados={filtroOcs.seleccionados}
+                onAplicar={(sel) => filtroOcs.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Cotización prov."
+                permitirOrden={false}
+                cargarOpciones={filtroCotizaciones.cargarOpciones}
+                seleccionados={filtroCotizaciones.seleccionados}
+                onAplicar={(sel) => filtroCotizaciones.onAplicar(sel)}
+              />
+            </th>
+            <th>
+              <FiltroColumnaChecklist<string>
+                titulo="Concepto"
+                permitirOrden={false}
+                cargarOpciones={filtroConceptos.cargarOpciones}
+                seleccionados={filtroConceptos.seleccionados}
+                onAplicar={(sel) => filtroConceptos.onAplicar(sel)}
+              />
+            </th>
             <th>Fecha del servicio</th>
             <th>Próximo pago</th>
             <th style={{ textAlign: "right" }}>Total s/IVA</th>
             <th style={{ textAlign: "right" }}>Total c/IVA</th>
             <th style={{ textAlign: "right" }}>Por pagar</th>
-            <th style={{ textAlign: "center" }}>Pagos pendientes</th>
+            <th style={{ textAlign: "center" }}>
+              <FiltroColumnaChecklist
+                titulo="Pagos pendientes"
+                permitirOrden={false}
+                cargarOpciones={filtroPagosPendientes.cargarOpciones}
+                seleccionados={filtroPagosPendientes.seleccionados}
+                onAplicar={(sel) => filtroPagosPendientes.onAplicar(sel)}
+              />
+            </th>
             <th style={{ textAlign: "center" }}>Estado</th>
             <th style={{ textAlign: "center", width: "110px" }}>Acciones</th>
           </tr>

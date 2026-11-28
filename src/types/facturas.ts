@@ -23,9 +23,15 @@ export interface FiltrosFacturasState {
   estado: string; // "" (Todos), "Pendientes", "Vencidas", "Abonada", "Cobrada", "SinProgramar", "Canceladas"
   fechaInicio: string;
   fechaFin: string;
+  fechaPagoInicio?: string;
+  fechaPagoFin?: string;
   fechaPago?: string | null; // "yyyy-MM-dd"
   searchTerm: string;
   empresa?: string;
+}
+
+export interface FacturaPagosPendientesFiltroDto {
+  i_PagosPendientes: number;
 }
 
 export interface CrearVentaFacturasResponse {
@@ -106,6 +112,7 @@ export interface ServicioSinFacturaDto {
   i_CveServAgendaDet: number;
   v_Servicio: string;
   v_NoCotizacionGI?: string | null;
+  v_NoOrdenCompraCliente?: string | null;
   d_FechaInicio?: string | null;
   d_Subtotal: number;
   d_Total: number;

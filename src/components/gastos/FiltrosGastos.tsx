@@ -21,28 +21,26 @@ export const FiltrosGastos: React.FC<Props> = ({
     setLocalSearch(filtros.searchTerm);
   }, [filtros.searchTerm]);
 
+  const ocultarProximoPago = (estado: string): boolean =>
+    estado === "Pagada" ||
+    estado === "Cancelada" ||
+    estado === "Canceladas" ||
+    estado === "SinProgramar";
+
   const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nuevoEstado = e.target.value;
-    onCambiarFiltros({
-      ...filtros,
-      estado: nuevoEstado,
-    });
-  };
-
-  const obtenerLabelFecha = (estado: string): string => {
-    switch (estado) {
-      case "Pagada":
-        return "Fecha de pago";
-      case "Pendientes":
-      case "Sin pagar":
-      case "Abonada":
-      case "Vencidas":
-        return "Fecha de pago programada";
-      case "Cancelada":
-      case "SinProgramar":
-      case "":
-      default:
-        return "Fecha del servicio";
+    if (ocultarProximoPago(nuevoEstado)) {
+      onCambiarFiltros({
+        ...filtros,
+        estado: nuevoEstado,
+        fechaPagoInicio: "",
+        fechaPagoFin: "",
+      });
+    } else {
+      onCambiarFiltros({
+        ...filtros,
+        estado: nuevoEstado,
+      });
     }
   };
 
@@ -78,7 +76,7 @@ export const FiltrosGastos: React.FC<Props> = ({
             alignItems: "flex-end",
             gap: "12px",
             flexWrap: "wrap",
-            flex: "1 1 auto",
+            flex: "0 1 auto",
             overflow: "visible",
           }}
         >
@@ -126,13 +124,13 @@ export const FiltrosGastos: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* 2. Rango de fechas */}
+          {/* 2. Fecha del servicio (todos los estados) */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               gap: "3px",
-              minWidth: "220px",
+              width: "auto",
               position: "relative",
               zIndex: 50,
             }}
@@ -146,21 +144,73 @@ export const FiltrosGastos: React.FC<Props> = ({
                 color: "#475569",
               }}
             >
-              {obtenerLabelFecha(filtros.estado)}
+              Fecha del servicio
             </label>
             <DateRangePickerPopover
               fechaInicio={filtros.fechaInicio}
               fechaFin={filtros.fechaFin}
+              placeholder="Todas"
               onChangeRange={(inicio, fin) => {
                 onCambiarFiltros({
                   ...filtros,
                   fechaInicio: inicio,
                   fechaFin: fin,
                 });
-                onBuscar();
+              }}
+              onLimpiar={() => {
+                onCambiarFiltros({
+                  ...filtros,
+                  fechaInicio: "",
+                  fechaFin: "",
+                });
               }}
             />
           </div>
+
+          {/* 3. Próximo pago (oculto en Pagada, Cancelada, SinProgramar) */}
+          {!ocultarProximoPago(filtros.estado) && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "3px",
+                width: "auto",
+                position: "relative",
+                zIndex: 49,
+              }}
+            >
+              <label
+                className="form-label"
+                style={{
+                  marginBottom: 0,
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "#475569",
+                }}
+              >
+                Próximo pago
+              </label>
+              <DateRangePickerPopover
+                fechaInicio={filtros.fechaPagoInicio || ""}
+                fechaFin={filtros.fechaPagoFin || ""}
+                placeholder="Todas"
+                onChangeRange={(inicio, fin) => {
+                  onCambiarFiltros({
+                    ...filtros,
+                    fechaPagoInicio: inicio,
+                    fechaPagoFin: fin,
+                  });
+                }}
+                onLimpiar={() => {
+                  onCambiarFiltros({
+                    ...filtros,
+                    fechaPagoInicio: "",
+                    fechaPagoFin: "",
+                  });
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Buscador a la derecha */}

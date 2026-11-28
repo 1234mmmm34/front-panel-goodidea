@@ -1560,7 +1560,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                         }}
                         placeholder={
                           empresaSeleccionadaId
-                            ? "Escribe el nombre o folio de cotización..."
+                            ? "Escribe el nombre, cotización u OC"
                             : "Selecciona primero una empresa"
                         }
                         value={searchServicioText}
@@ -1655,15 +1655,19 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                   {renderBadgeTipo(srv.v_TipoServicio)}
-                                  {noCot ? (
-                                    <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>
-                                      Cot. {noCot}
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: "11px", color: "#ef4444", fontWeight: 700 }}>
-                                      Pendiente
-                                    </span>
-                                  )}
+                                  <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>
+                                    {noCot ? (
+                                      `Cot. ${noCot}`
+                                    ) : (
+                                      <span className="text-red-600 font-bold">Pendiente</span>
+                                    )}
+                                    {" · "}
+                                    {srv.v_NoOrdenCompraCliente ? (
+                                      `OC ${srv.v_NoOrdenCompraCliente}`
+                                    ) : (
+                                      <span className="text-red-600">OC pendiente</span>
+                                    )}
+                                  </span>
                                 </div>
                               </div>
                             );
@@ -1965,6 +1969,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                               )}
                             </th>
                             <th>No. cotización</th>
+                            <th>No. OC</th>
                             <th>Servicio</th>
                             <th>Tipo</th>
                             <th>Fecha inicio</th>
@@ -2003,6 +2008,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                     <Folder size={12} style={{ marginRight: "4px" }} /> GRUPO
                                   </span>
                                 </td>
+                                <td></td>
                                 <td>
                                   <div style={{ fontWeight: 700, color: "#1e3a5f" }}>{grp.v_NombreProyecto}</div>
                                   <div style={{ fontSize: "11px", color: "#64748b" }}>
@@ -2071,6 +2077,17 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                         )}
                                       </td>
                                       <td>
+                                        {child.v_NoOrdenCompraCliente ? (
+                                          <span style={{ fontSize: "12px", fontWeight: 600, color: "#475569" }}>
+                                            {child.v_NoOrdenCompraCliente}
+                                          </span>
+                                        ) : (
+                                          <span className="text-red-600 font-semibold" style={{ fontSize: "12px" }}>
+                                            Pendiente
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td>
                                         <div style={{ fontWeight: 600, color: "#1e293b" }}>{child.v_Servicio}</div>
                                         {(child.i_Cantidad != null || child.v_Unidad) && (
                                           <div style={{ fontSize: "11px", color: "#64748b", marginTop: "1px" }}>
@@ -2094,7 +2111,7 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                   );
                                 })}
                               <tr style={{ backgroundColor: "#f8fafc", borderLeft: "4px solid #7a96b0" }}>
-                                <td colSpan={7} style={{ padding: "6px 12px 10px 16px" }}>
+                                <td colSpan={8} style={{ padding: "6px 12px 10px 16px" }}>
                                   <AvisoInfo tipo="info">
                                     El monto global sustituye la suma de los precios de estos servicios. Si después facturas solo una parte, el restante aparecerá por servicio y ya no se podrá volver a agrupar.
                                   </AvisoInfo>
@@ -2158,6 +2175,17 @@ export const ModalNuevaFactura: React.FC<ModalNuevaFacturaProps> = ({
                                     </span>
                                   ) : (
                                     <span style={{ fontSize: "12px", fontWeight: 600, color: "#ef4444" }}>
+                                      Pendiente
+                                    </span>
+                                  )}
+                                </td>
+                                <td>
+                                  {item.v_NoOrdenCompraCliente ? (
+                                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>
+                                      {item.v_NoOrdenCompraCliente}
+                                    </span>
+                                  ) : (
+                                    <span className="text-red-600 font-semibold" style={{ fontSize: "12px" }}>
                                       Pendiente
                                     </span>
                                   )}

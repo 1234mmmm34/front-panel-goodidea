@@ -29,10 +29,16 @@ function GastosContent() {
   const paramEstado = searchParams.get("estado");
   const paramDesde = searchParams.get("desde");
   const paramHasta = searchParams.get("hasta");
+  const paramPDesde = searchParams.get("pdesde");
+  const paramPHasta = searchParams.get("phasta");
   const paramQ = searchParams.get("q");
   const paramPagina = searchParams.get("pagina");
   const paramProv = searchParams.get("prov");
   const paramOrd = searchParams.get("ord");
+  const paramOc = searchParams.get("oc");
+  const paramCot = searchParams.get("cot");
+  const paramCon = searchParams.get("con");
+  const paramPend = searchParams.get("pend");
 
   const parseProveedoresParam = (val: string | null): number[] | null => {
     if (val === null || val.trim() === "") return null;
@@ -44,15 +50,39 @@ function GastosContent() {
     return ids;
   };
 
+  const parsePipeParam = (val: string | null): string[] | null => {
+    if (val === null || val.trim() === "") return null;
+    if (val.trim() === "~") return [];
+    return val.split("|").filter((s) => s.length > 0);
+  };
+
+  const parseListaNumerosParam = (val: string | null): number[] | null => {
+    if (val === null || val.trim() === "") return null;
+    if (val.trim() === "-1") return [];
+    return val
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n) && n >= 0);
+  };
+
   const parseOrdenParam = (val: string | null): "ASC" | "DESC" | null => {
     return val === "ASC" || val === "DESC" ? val : null;
   };
 
-  // Filtros (Default: "Todos" y rango del mes en curso)
+  const estadoInicial = paramEstado !== null ? paramEstado : "";
+  const sinProximoPagoInicial =
+    estadoInicial === "Pagada" ||
+    estadoInicial === "Cancelada" ||
+    estadoInicial === "Canceladas" ||
+    estadoInicial === "SinProgramar";
+
+  // Filtros (Default: "Todos", Fecha del servicio = mes actual, Próximo pago vacío)
   const [filtros, setFiltros] = useState<FiltrosGastosState>({
-    estado: paramEstado !== null ? paramEstado : "",
-    fechaInicio: paramDesde || primerDiaMes,
-    fechaFin: paramHasta || ultimoDiaMes,
+    estado: estadoInicial,
+    fechaInicio: paramDesde !== null ? paramDesde : primerDiaMes,
+    fechaFin: paramHasta !== null ? paramHasta : ultimoDiaMes,
+    fechaPagoInicio: sinProximoPagoInicial ? "" : paramPDesde || "",
+    fechaPagoFin: sinProximoPagoInicial ? "" : paramPHasta || "",
     searchTerm: paramQ || "",
   });
 
@@ -61,6 +91,18 @@ function GastosContent() {
   );
   const [ordenProveedor, setOrdenProveedor] = useState<"ASC" | "DESC" | null>(
     () => parseOrdenParam(paramOrd)
+  );
+  const [ocsFiltro, setOcsFiltro] = useState<string[] | null>(() =>
+    parsePipeParam(paramOc)
+  );
+  const [cotizacionesFiltro, setCotizacionesFiltro] = useState<string[] | null>(() =>
+    parsePipeParam(paramCot)
+  );
+  const [conceptosFiltro, setConceptosFiltro] = useState<string[] | null>(() =>
+    parsePipeParam(paramCon)
+  );
+  const [pagosPendientesFiltro, setPagosPendientesFiltro] = useState<number[] | null>(() =>
+    parseListaNumerosParam(paramPend)
   );
 
   // Paginación
@@ -88,6 +130,10 @@ function GastosContent() {
       nuevaPagina?: number;
       nuevosProveedores?: number[] | null;
       nuevoOrdenProveedor?: "ASC" | "DESC" | null;
+      nuevasOcs?: string[] | null;
+      nuevasCotizaciones?: string[] | null;
+      nuevosConceptos?: string[] | null;
+      nuevosPagosPendientes?: number[] | null;
     }) => {
       const fact = cambios.nuevosFiltros ?? filtros;
       const targetPagina = cambios.nuevaPagina ?? pagina;
@@ -99,6 +145,20 @@ function GastosContent() {
         cambios.nuevoOrdenProveedor !== undefined
           ? cambios.nuevoOrdenProveedor
           : ordenProveedor;
+      const targetOc =
+        cambios.nuevasOcs !== undefined ? cambios.nuevasOcs : ocsFiltro;
+      const targetCot =
+        cambios.nuevasCotizaciones !== undefined
+          ? cambios.nuevasCotizaciones
+          : cotizacionesFiltro;
+      const targetCon =
+        cambios.nuevosConceptos !== undefined
+          ? cambios.nuevosConceptos
+          : conceptosFiltro;
+      const targetPend =
+        cambios.nuevosPagosPendientes !== undefined
+          ? cambios.nuevosPagosPendientes
+          : pagosPendientesFiltro;
 
       const params = new URLSearchParams();
       if (fact.estado) {
@@ -110,6 +170,12 @@ function GastosContent() {
       if (fact.fechaFin) {
         params.set("hasta", fact.fechaFin);
       }
+      if (fact.fechaPagoInicio) {
+        params.set("pdesde", fact.fechaPagoInicio);
+      }
+      if (fact.fechaPagoFin) {
+        params.set("phasta", fact.fechaPagoFin);
+      }
       if (fact.searchTerm && fact.searchTerm.trim() !== "") {
         params.set("q", fact.searchTerm.trim());
       }
@@ -119,6 +185,18 @@ function GastosContent() {
       if (targetOrd) {
         params.set("ord", targetOrd);
       }
+      if (Array.isArray(targetOc)) {
+        params.set("oc", targetOc.length > 0 ? targetOc.join("|") : "~");
+      }
+      if (Array.isArray(targetCot)) {
+        params.set("cot", targetCot.length > 0 ? targetCot.join("|") : "~");
+      }
+      if (Array.isArray(targetCon)) {
+        params.set("con", targetCon.length > 0 ? targetCon.join("|") : "~");
+      }
+      if (Array.isArray(targetPend)) {
+        params.set("pend", targetPend.length > 0 ? targetPend.join(",") : "-1");
+      }
       if (targetPagina > 1) {
         params.set("pagina", String(targetPagina));
       }
@@ -127,7 +205,17 @@ function GastosContent() {
       const url = qs ? `/gastos?${qs}` : `/gastos`;
       router.replace(url, { scroll: false });
     },
-    [filtros, pagina, proveedoresFiltro, ordenProveedor, router]
+    [
+      filtros,
+      pagina,
+      proveedoresFiltro,
+      ordenProveedor,
+      ocsFiltro,
+      cotizacionesFiltro,
+      conceptosFiltro,
+      pagosPendientesFiltro,
+      router,
+    ]
   );
 
   // Carga de gastos y resumen
@@ -137,7 +225,11 @@ function GastosContent() {
       pageSizeToLoad: number,
       currentFiltros: FiltrosGastosState,
       currentProveedores: number[] | null,
-      currentOrden: "ASC" | "DESC" | null
+      currentOrden: "ASC" | "DESC" | null,
+      currentOcs: string[] | null,
+      currentCotizaciones: string[] | null,
+      currentConceptos: string[] | null,
+      currentPagosPendientes: number[] | null
     ) => {
       setCargando(true);
       setCargandoResumen(true);
@@ -148,8 +240,14 @@ function GastosContent() {
             estado: currentFiltros.estado,
             fechaInicio: currentFiltros.fechaInicio,
             fechaFin: currentFiltros.fechaFin,
+            fechaPagoInicio: currentFiltros.fechaPagoInicio,
+            fechaPagoFin: currentFiltros.fechaPagoFin,
             searchTerm: currentFiltros.searchTerm,
             proveedores: currentProveedores,
+            ocs: currentOcs,
+            cotizaciones: currentCotizaciones,
+            conceptos: currentConceptos,
+            pagosPendientes: currentPagosPendientes,
             ordenProveedor: currentOrden,
             pagina: pageToLoad,
             tamano: pageSizeToLoad,
@@ -158,8 +256,14 @@ function GastosContent() {
             estado: currentFiltros.estado,
             fechaInicio: currentFiltros.fechaInicio,
             fechaFin: currentFiltros.fechaFin,
+            fechaPagoInicio: currentFiltros.fechaPagoInicio,
+            fechaPagoFin: currentFiltros.fechaPagoFin,
             searchTerm: currentFiltros.searchTerm,
             proveedores: currentProveedores,
+            ocs: currentOcs,
+            cotizaciones: currentCotizaciones,
+            conceptos: currentConceptos,
+            pagosPendientes: currentPagosPendientes,
           }),
         ]);
 
@@ -176,8 +280,29 @@ function GastosContent() {
   );
 
   useEffect(() => {
-    cargarGastos(pagina, tamano, filtros, proveedoresFiltro, ordenProveedor);
-  }, [pagina, tamano, filtros, proveedoresFiltro, ordenProveedor, cargarGastos]);
+    cargarGastos(
+      pagina,
+      tamano,
+      filtros,
+      proveedoresFiltro,
+      ordenProveedor,
+      ocsFiltro,
+      cotizacionesFiltro,
+      conceptosFiltro,
+      pagosPendientesFiltro
+    );
+  }, [
+    pagina,
+    tamano,
+    filtros,
+    proveedoresFiltro,
+    ordenProveedor,
+    ocsFiltro,
+    cotizacionesFiltro,
+    conceptosFiltro,
+    pagosPendientesFiltro,
+    cargarGastos,
+  ]);
 
   const handleCambiarFiltros = (nuevosFiltros: FiltrosGastosState) => {
     setFiltros(nuevosFiltros);
@@ -200,13 +325,102 @@ function GastosContent() {
       searchTerm: filtros.searchTerm || undefined,
       fechaInicio: filtros.fechaInicio || undefined,
       fechaFin: filtros.fechaFin || undefined,
+      fechaPagoInicio: filtros.fechaPagoInicio || undefined,
+      fechaPagoFin: filtros.fechaPagoFin || undefined,
       estado: filtros.estado || undefined,
+      ocs: ocsFiltro,
+      cotizaciones: cotizacionesFiltro,
+      conceptos: conceptosFiltro,
+      pagosPendientes: pagosPendientesFiltro,
     });
     return lista.map((e) => ({
       valor: e.i_CveEmpresa,
       etiqueta: e.v_Empresa,
     }));
-  }, [filtros.searchTerm, filtros.fechaInicio, filtros.fechaFin, filtros.estado]);
+  }, [
+    filtros.searchTerm,
+    filtros.fechaInicio,
+    filtros.fechaFin,
+    filtros.fechaPagoInicio,
+    filtros.fechaPagoFin,
+    filtros.estado,
+    ocsFiltro,
+    cotizacionesFiltro,
+    conceptosFiltro,
+    pagosPendientesFiltro,
+  ]);
+
+  const cargarOpcionesTexto = useCallback(
+    async (campo: "OC" | "COT" | "CONCEPTO") => {
+      const lista = await GastosService.getOpcionesFiltro(campo, {
+        searchTerm: filtros.searchTerm || undefined,
+        fechaInicio: filtros.fechaInicio || undefined,
+        fechaFin: filtros.fechaFin || undefined,
+        fechaPagoInicio: filtros.fechaPagoInicio || undefined,
+        fechaPagoFin: filtros.fechaPagoFin || undefined,
+        estado: filtros.estado || undefined,
+        proveedores: proveedoresFiltro,
+        ocs: ocsFiltro,
+        cotizaciones: cotizacionesFiltro,
+        conceptos: conceptosFiltro,
+        pagosPendientes: pagosPendientesFiltro,
+      });
+      return lista.map((item) => {
+        const val = item.v_Valor ?? "__SIN__";
+        let etiqueta = val;
+        if (val === "__SIN__") {
+          etiqueta = campo === "OC" ? "Sin OC" : campo === "COT" ? "Sin cotización" : "Sin concepto";
+        }
+        return { valor: val, etiqueta };
+      });
+    },
+    [
+      filtros.searchTerm,
+      filtros.fechaInicio,
+      filtros.fechaFin,
+      filtros.fechaPagoInicio,
+      filtros.fechaPagoFin,
+      filtros.estado,
+      proveedoresFiltro,
+      ocsFiltro,
+      cotizacionesFiltro,
+      conceptosFiltro,
+      pagosPendientesFiltro,
+    ]
+  );
+
+  const cargarOpcionesPagosPendientes = useCallback(async () => {
+    const lista = await GastosService.getPagosPendientesFiltro({
+      searchTerm: filtros.searchTerm || undefined,
+      fechaInicio: filtros.fechaInicio || undefined,
+      fechaFin: filtros.fechaFin || undefined,
+      fechaPagoInicio: filtros.fechaPagoInicio || undefined,
+      fechaPagoFin: filtros.fechaPagoFin || undefined,
+      estado: filtros.estado || undefined,
+      proveedores: proveedoresFiltro,
+      ocs: ocsFiltro,
+      cotizaciones: cotizacionesFiltro,
+      conceptos: conceptosFiltro,
+    });
+    return lista.map((item) => {
+      const n = item.i_PagosPendientes;
+      return {
+        valor: n,
+        etiqueta: n === 0 ? "Sin pendientes" : n === 1 ? "1 pendiente" : `${n} pendientes`,
+      };
+    });
+  }, [
+    filtros.searchTerm,
+    filtros.fechaInicio,
+    filtros.fechaFin,
+    filtros.fechaPagoInicio,
+    filtros.fechaPagoFin,
+    filtros.estado,
+    proveedoresFiltro,
+    ocsFiltro,
+    cotizacionesFiltro,
+    conceptosFiltro,
+  ]);
 
   const handleAplicarFiltroColumna = (
     seleccionados: number[] | null,
@@ -290,6 +504,42 @@ function GastosContent() {
             orden: ordenProveedor,
             onAplicar: handleAplicarFiltroColumna,
           }}
+          filtroOcs={{
+            cargarOpciones: () => cargarOpcionesTexto("OC"),
+            seleccionados: ocsFiltro,
+            onAplicar: (sel) => {
+              setOcsFiltro(sel);
+              setPagina(1);
+              actualizarUrl({ nuevasOcs: sel, nuevaPagina: 1 });
+            },
+          }}
+          filtroCotizaciones={{
+            cargarOpciones: () => cargarOpcionesTexto("COT"),
+            seleccionados: cotizacionesFiltro,
+            onAplicar: (sel) => {
+              setCotizacionesFiltro(sel);
+              setPagina(1);
+              actualizarUrl({ nuevasCotizaciones: sel, nuevaPagina: 1 });
+            },
+          }}
+          filtroConceptos={{
+            cargarOpciones: () => cargarOpcionesTexto("CONCEPTO"),
+            seleccionados: conceptosFiltro,
+            onAplicar: (sel) => {
+              setConceptosFiltro(sel);
+              setPagina(1);
+              actualizarUrl({ nuevosConceptos: sel, nuevaPagina: 1 });
+            },
+          }}
+          filtroPagosPendientes={{
+            cargarOpciones: cargarOpcionesPagosPendientes,
+            seleccionados: pagosPendientesFiltro,
+            onAplicar: (sel) => {
+              setPagosPendientesFiltro(sel);
+              setPagina(1);
+              actualizarUrl({ nuevosPagosPendientes: sel, nuevaPagina: 1 });
+            },
+          }}
         />
       </div>
 
@@ -304,7 +554,17 @@ function GastosContent() {
           setAutoAbrirProgramar(false);
         }}
         onCambio={() =>
-          cargarGastos(pagina, tamano, filtros, proveedoresFiltro, ordenProveedor)
+          cargarGastos(
+            pagina,
+            tamano,
+            filtros,
+            proveedoresFiltro,
+            ordenProveedor,
+            ocsFiltro,
+            cotizacionesFiltro,
+            conceptosFiltro,
+            pagosPendientesFiltro
+          )
         }
       />
 
@@ -316,7 +576,17 @@ function GastosContent() {
           setGastoSeleccionado(null);
         }}
         onExito={() =>
-          cargarGastos(pagina, tamano, filtros, proveedoresFiltro, ordenProveedor)
+          cargarGastos(
+            pagina,
+            tamano,
+            filtros,
+            proveedoresFiltro,
+            ordenProveedor,
+            ocsFiltro,
+            cotizacionesFiltro,
+            conceptosFiltro,
+            pagosPendientesFiltro
+          )
         }
       />
     </AppLayout>

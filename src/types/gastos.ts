@@ -92,7 +92,17 @@ export interface FiltrosGastosState {
   estado: string;
   fechaInicio: string;
   fechaFin: string;
+  fechaPagoInicio?: string;
+  fechaPagoFin?: string;
   searchTerm: string;
+}
+
+export interface GastoOpcionFiltroDto {
+  v_Valor: string | null;
+}
+
+export interface GastoPagosPendientesFiltroDto {
+  i_PagosPendientes: number;
 }
 
 export interface ResultadoRespuestaApi {

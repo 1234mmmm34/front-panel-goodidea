@@ -556,6 +556,7 @@ function MisActividadesContent() {
           i_CveAgenda: h.i_CveAgenda ?? null,
           v_Titulo: h.v_Titulo || h.v_Actividad || "Actividad",
           v_Notas: h.v_Notas ?? h.v_Descripcion ?? null,
+          v_NotasFinales: h.v_NotasFinales ?? null,
           v_Proyecto:
             h.i_CveServAgendaDet == null
               ? "GENERAL"

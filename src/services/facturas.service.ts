@@ -12,8 +12,34 @@ import {
   FacturasResumenDto,
   CrearVentaFacturasResponse,
   SubirArchivosFacturaResponse,
+  FacturaPagosPendientesFiltroDto,
 } from "@/types/facturas";
 import { AgendaEmpresaFiltroDto, PaginadoResponse, TerminoServicioDto } from "@/types/servicios";
+
+function agregarFiltrosFacturasExtra(
+  queryParams: Record<string, string | number>,
+  params: {
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
+    pagosPendientes?: number[] | null;
+    timbrado?: number[] | null;
+  }
+) {
+  if (params.fechaPagoInicio && params.fechaPagoInicio.trim().length > 0) {
+    queryParams.fechaPagoInicio = params.fechaPagoInicio.trim();
+  }
+  if (params.fechaPagoFin && params.fechaPagoFin.trim().length > 0) {
+    queryParams.fechaPagoFin = params.fechaPagoFin.trim();
+  }
+  if (Array.isArray(params.pagosPendientes)) {
+    queryParams.pagosPendientes =
+      params.pagosPendientes.length > 0 ? params.pagosPendientes.join(",") : "-1";
+  }
+  if (Array.isArray(params.timbrado)) {
+    queryParams.timbrado =
+      params.timbrado.length > 0 ? params.timbrado.join(",") : "-1";
+  }
+}
 
 function extraerMensajeError(error: any, defaultMsg: string): string {
   if (!error?.response?.data) {
@@ -48,12 +74,15 @@ export const FacturasService = {
   async getFacturas(params: {
     estado?: string;
     fechaPago?: string | null;
-    fechaPagoFin?: string | null;
     fechaInicio?: string | null;
     fechaFin?: string | null;
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
     searchTerm?: string;
     empresa?: string;
     empresas?: number[] | null;
+    pagosPendientes?: number[] | null;
+    timbrado?: number[] | null;
     ordenCliente?: "ASC" | "DESC" | null;
     pagina: number;
     tamano: number;
@@ -83,6 +112,7 @@ export const FacturasService = {
     if (params.ordenCliente) {
       queryParams.ordenCliente = params.ordenCliente;
     }
+    agregarFiltrosFacturasExtra(queryParams, params);
 
     let resp = await apiClient.get<any>("facturas", {
       params: queryParams,
@@ -164,12 +194,15 @@ export const FacturasService = {
   async getFacturasResumen(params: {
     estado?: string;
     fechaPago?: string | null;
-    fechaPagoFin?: string | null;
     fechaInicio?: string | null;
     fechaFin?: string | null;
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
     searchTerm?: string;
     empresa?: string;
     empresas?: number[] | null;
+    pagosPendientes?: number[] | null;
+    timbrado?: number[] | null;
     signal?: AbortSignal;
   }): Promise<FacturasResumenDto> {
     const queryParams: Record<string, string> = {
@@ -191,6 +224,7 @@ export const FacturasService = {
       queryParams.empresas =
         params.empresas.length > 0 ? params.empresas.join(",") : "0";
     }
+    agregarFiltrosFacturasExtra(queryParams, params);
 
     let resp = await apiClient.get<any>("facturas/Resumen", {
       params: queryParams,
@@ -233,7 +267,11 @@ export const FacturasService = {
     searchTerm?: string;
     fechaInicio?: string | null;
     fechaFin?: string | null;
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
     estado?: string;
+    pagosPendientes?: number[] | null;
+    timbrado?: number[] | null;
   }): Promise<AgendaEmpresaFiltroDto[]> {
     try {
       const queryParams: Record<string, string> = {};
@@ -249,6 +287,7 @@ export const FacturasService = {
       if (params.estado && params.estado.trim().length > 0) {
         queryParams.estado = params.estado.trim();
       }
+      agregarFiltrosFacturasExtra(queryParams, params);
 
       const resp = await apiClient.get<any>("facturas/GetEmpresasFiltro", {
         params: queryParams,
@@ -267,6 +306,66 @@ export const FacturasService = {
       return raw.map((item: any) => ({
         i_CveEmpresa: Number(item.i_CveEmpresa ?? item.iCveEmpresa ?? 0),
         v_Empresa: item.v_Empresa ?? item.vEmpresa ?? "",
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * 1.3 Opciones de pagos pendientes para filtro de columna (Checklist)
+   * GET facturas/GetPagosPendientesFiltro
+   */
+  async getPagosPendientesFiltro(params: {
+    searchTerm?: string;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
+    estado?: string;
+    empresas?: number[] | null;
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
+    timbrado?: number[] | null;
+  }): Promise<FacturaPagosPendientesFiltroDto[]> {
+    try {
+      const queryParams: Record<string, string> = {};
+      if (params.searchTerm && params.searchTerm.trim().length > 0) {
+        queryParams.searchTerm = params.searchTerm.trim();
+      }
+      if (params.fechaInicio && params.fechaInicio.trim().length > 0) {
+        queryParams.fechaInicio = params.fechaInicio.trim();
+      }
+      if (params.fechaFin && params.fechaFin.trim().length > 0) {
+        queryParams.fechaFin = params.fechaFin.trim();
+      }
+      if (params.estado && params.estado.trim().length > 0) {
+        queryParams.estado = params.estado.trim();
+      }
+      if (Array.isArray(params.empresas)) {
+        queryParams.empresas =
+          params.empresas.length > 0 ? params.empresas.join(",") : "0";
+      }
+      agregarFiltrosFacturasExtra(queryParams, {
+        fechaPagoInicio: params.fechaPagoInicio,
+        fechaPagoFin: params.fechaPagoFin,
+        timbrado: params.timbrado,
+      });
+
+      const resp = await apiClient.get<any>("facturas/GetPagosPendientesFiltro", {
+        params: queryParams,
+      });
+      const data = resp.data;
+      const raw = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.datos)
+        ? data.datos
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.Datos)
+        ? data.Datos
+        : [];
+
+      return raw.map((item: any) => ({
+        i_PagosPendientes: Number(item.i_PagosPendientes ?? item.iPagosPendientes ?? 0),
       }));
     } catch {
       return [];

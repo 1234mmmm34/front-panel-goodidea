@@ -8,8 +8,55 @@ import {
   CrearFacturaProvDto,
   ResultadoRespuestaApi,
   ResultadoAplicarDescuentoApi,
+  GastoOpcionFiltroDto,
+  GastoPagosPendientesFiltroDto,
 } from "@/types/gastos";
 import { AgendaEmpresaFiltroDto, PaginadoResponse } from "@/types/servicios";
+
+interface FiltrosGastosExtra {
+  fechaPagoInicio?: string | null;
+  fechaPagoFin?: string | null;
+  ocs?: string[] | null;
+  cotizaciones?: string[] | null;
+  conceptos?: string[] | null;
+  pagosPendientes?: number[] | null;
+}
+
+function agregarFiltrosGastosExtra(
+  queryParams: Record<string, string | number>,
+  params: FiltrosGastosExtra,
+  incluirPagosPendientes: boolean = true
+) {
+  if (params.fechaPagoInicio && params.fechaPagoInicio.trim().length > 0) {
+    queryParams.fechaPagoInicio = params.fechaPagoInicio.trim();
+  }
+  if (params.fechaPagoFin && params.fechaPagoFin.trim().length > 0) {
+    queryParams.fechaPagoFin = params.fechaPagoFin.trim();
+  }
+  if (Array.isArray(params.ocs)) {
+    queryParams.ocs = params.ocs.length > 0 ? params.ocs.join("|") : "~";
+  }
+  if (Array.isArray(params.cotizaciones)) {
+    queryParams.cotizaciones =
+      params.cotizaciones.length > 0 ? params.cotizaciones.join("|") : "~";
+  }
+  if (Array.isArray(params.conceptos)) {
+    queryParams.conceptos =
+      params.conceptos.length > 0 ? params.conceptos.join("|") : "~";
+  }
+  if (incluirPagosPendientes && Array.isArray(params.pagosPendientes)) {
+    queryParams.pagosPendientes =
+      params.pagosPendientes.length > 0 ? params.pagosPendientes.join(",") : "-1";
+  }
+}
+
+function normalizarListaRespuesta(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.datos)) return data.datos;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.Datos)) return data.Datos;
+  return [];
+}
 
 function extraerMensajeError(error: any, defaultMsg: string): string {
   if (!error?.response?.data) {
@@ -45,8 +92,14 @@ export const GastosService = {
     estado?: string;
     fechaInicio?: string | null;
     fechaFin?: string | null;
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
     searchTerm?: string;
     proveedores?: number[] | null;
+    ocs?: string[] | null;
+    cotizaciones?: string[] | null;
+    conceptos?: string[] | null;
+    pagosPendientes?: number[] | null;
     ordenProveedor?: "ASC" | "DESC" | null;
     pagina: number;
     tamano: number;
@@ -73,6 +126,7 @@ export const GastosService = {
         if (params.ordenProveedor) {
           queryParams.ordenProveedor = params.ordenProveedor;
         }
+        agregarFiltrosGastosExtra(queryParams, params);
 
         const resp = await apiClient.get<any>("facturasProveedor", { params: queryParams });
         let rawDatos: FacturaProv[] = [];
@@ -131,8 +185,14 @@ export const GastosService = {
     estado?: string;
     fechaInicio?: string | null;
     fechaFin?: string | null;
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
     searchTerm?: string;
     proveedores?: number[] | null;
+    ocs?: string[] | null;
+    cotizaciones?: string[] | null;
+    conceptos?: string[] | null;
+    pagosPendientes?: number[] | null;
   }): Promise<FacturasProvResumen> {
     return httpDefensivo(
       async () => {
@@ -154,6 +214,7 @@ export const GastosService = {
           queryParams.proveedores =
             params.proveedores.length > 0 ? params.proveedores.join(",") : "0";
         }
+        agregarFiltrosGastosExtra(queryParams, params);
 
         const resp = await apiClient.get<any>("facturasProveedor/Resumen", {
           params: queryParams,
@@ -184,10 +245,16 @@ export const GastosService = {
     searchTerm?: string;
     fechaInicio?: string | null;
     fechaFin?: string | null;
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
     estado?: string;
+    ocs?: string[] | null;
+    cotizaciones?: string[] | null;
+    conceptos?: string[] | null;
+    pagosPendientes?: number[] | null;
   }): Promise<AgendaEmpresaFiltroDto[]> {
     try {
-      const queryParams: Record<string, string> = {};
+      const queryParams: Record<string, string | number> = {};
       if (params.searchTerm && params.searchTerm.trim().length > 0) {
         queryParams.searchTerm = params.searchTerm.trim();
       }
@@ -200,20 +267,12 @@ export const GastosService = {
       if (params.estado && params.estado.trim().length > 0) {
         queryParams.estado = params.estado.trim();
       }
+      agregarFiltrosGastosExtra(queryParams, params);
 
       const resp = await apiClient.get<any>("facturasProveedor/GetProveedoresFiltro", {
         params: queryParams,
       });
-      const data = resp.data;
-      const raw = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.datos)
-        ? data.datos
-        : Array.isArray(data?.data)
-        ? data.data
-        : Array.isArray(data?.Datos)
-        ? data.Datos
-        : [];
+      const raw = normalizarListaRespuesta(resp.data);
 
       return raw.map((item: any) => ({
         i_CveEmpresa: Number(
@@ -221,6 +280,108 @@ export const GastosService = {
         ),
         v_Empresa:
           item.v_Empresa ?? item.v_Proveedor ?? item.vProveedor ?? item.vEmpresa ?? "",
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * 2.2 Opciones de OC, Cotización o Concepto para filtro de columna (Checklist)
+   * GET facturasProveedor/GetOpcionesFiltro?campo={OC|COT|CONCEPTO}
+   */
+  async getOpcionesFiltro(
+    campo: "OC" | "COT" | "CONCEPTO",
+    filtros: {
+      searchTerm?: string;
+      fechaInicio?: string | null;
+      fechaFin?: string | null;
+      fechaPagoInicio?: string | null;
+      fechaPagoFin?: string | null;
+      estado?: string;
+      proveedores?: number[] | null;
+      ocs?: string[] | null;
+      cotizaciones?: string[] | null;
+      conceptos?: string[] | null;
+      pagosPendientes?: number[] | null;
+    }
+  ): Promise<GastoOpcionFiltroDto[]> {
+    try {
+      const queryParams: Record<string, string | number> = { campo };
+      if (filtros.searchTerm && filtros.searchTerm.trim().length > 0) {
+        queryParams.searchTerm = filtros.searchTerm.trim();
+      }
+      if (filtros.fechaInicio && filtros.fechaInicio.trim().length > 0) {
+        queryParams.fechaInicio = filtros.fechaInicio.trim();
+      }
+      if (filtros.fechaFin && filtros.fechaFin.trim().length > 0) {
+        queryParams.fechaFin = filtros.fechaFin.trim();
+      }
+      if (filtros.estado && filtros.estado.trim().length > 0) {
+        queryParams.estado = filtros.estado.trim();
+      }
+      if (Array.isArray(filtros.proveedores)) {
+        queryParams.proveedores =
+          filtros.proveedores.length > 0 ? filtros.proveedores.join(",") : "0";
+      }
+      agregarFiltrosGastosExtra(queryParams, filtros);
+
+      const resp = await apiClient.get<any>("facturasProveedor/GetOpcionesFiltro", {
+        params: queryParams,
+      });
+      const raw = normalizarListaRespuesta(resp.data);
+
+      return raw.map((item: any) => ({
+        v_Valor: item.v_Valor ?? item.vValor ?? null,
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * 2.3 Opciones de pagos pendientes para filtro de columna (Checklist)
+   * GET facturasProveedor/GetPagosPendientesFiltro
+   */
+  async getPagosPendientesFiltro(filtros: {
+    searchTerm?: string;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
+    fechaPagoInicio?: string | null;
+    fechaPagoFin?: string | null;
+    estado?: string;
+    proveedores?: number[] | null;
+    ocs?: string[] | null;
+    cotizaciones?: string[] | null;
+    conceptos?: string[] | null;
+  }): Promise<GastoPagosPendientesFiltroDto[]> {
+    try {
+      const queryParams: Record<string, string | number> = {};
+      if (filtros.searchTerm && filtros.searchTerm.trim().length > 0) {
+        queryParams.searchTerm = filtros.searchTerm.trim();
+      }
+      if (filtros.fechaInicio && filtros.fechaInicio.trim().length > 0) {
+        queryParams.fechaInicio = filtros.fechaInicio.trim();
+      }
+      if (filtros.fechaFin && filtros.fechaFin.trim().length > 0) {
+        queryParams.fechaFin = filtros.fechaFin.trim();
+      }
+      if (filtros.estado && filtros.estado.trim().length > 0) {
+        queryParams.estado = filtros.estado.trim();
+      }
+      if (Array.isArray(filtros.proveedores)) {
+        queryParams.proveedores =
+          filtros.proveedores.length > 0 ? filtros.proveedores.join(",") : "0";
+      }
+      agregarFiltrosGastosExtra(queryParams, filtros, false);
+
+      const resp = await apiClient.get<any>("facturasProveedor/GetPagosPendientesFiltro", {
+        params: queryParams,
+      });
+      const raw = normalizarListaRespuesta(resp.data);
+
+      return raw.map((item: any) => ({
+        i_PagosPendientes: Number(item.i_PagosPendientes ?? item.iPagosPendientes ?? 0),
       }));
     } catch {
       return [];

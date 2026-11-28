@@ -30,10 +30,14 @@ function FacturasContent() {
   const paramEstado = searchParams.get("estado");
   const paramDesde = searchParams.get("desde");
   const paramHasta = searchParams.get("hasta");
+  const paramPDesde = searchParams.get("pdesde");
+  const paramPHasta = searchParams.get("phasta");
   const paramQ = searchParams.get("q");
   const paramPagina = searchParams.get("pagina");
   const paramEmp = searchParams.get("emp");
   const paramOrd = searchParams.get("ord");
+  const paramPend = searchParams.get("pend");
+  const paramTimb = searchParams.get("timb");
 
   const parseEmpresasParam = (val: string | null): number[] | null => {
     if (val === null || val.trim() === "") return null;
@@ -45,16 +49,41 @@ function FacturasContent() {
     return ids;
   };
 
+  const parseListaNumerosParam = (val: string | null): number[] | null => {
+    if (val === null || val.trim() === "") return null;
+    if (val.trim() === "-1") return [];
+    return val
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n) && n >= 0);
+  };
+
   const parseOrdenParam = (val: string | null): "ASC" | "DESC" | null => {
     return val === "ASC" || val === "DESC" ? val : null;
   };
 
-  // 1. Estado de filtros (Default: "Pendientes" y Rango del mes completo)
+  const estadoInicial = paramEstado !== null ? paramEstado : "Pendientes";
+  const sinProximoPagoInicial =
+    estadoInicial === "Cobrada" ||
+    estadoInicial === "Canceladas" ||
+    estadoInicial === "Cancelada" ||
+    estadoInicial === "SinProgramar";
+
+  // 1. Estado de filtros (Default: "Pendientes", Próximo pago = mes actual, Fecha de facturación vacía)
   const [filtros, setFiltros] = useState<FiltrosFacturasState>({
-    estado: paramEstado !== null ? paramEstado : "Pendientes",
-    fechaInicio: paramDesde || primerDiaMes,
-    fechaFin: paramHasta || ultimoDiaMes,
-    fechaPago: paramDesde || primerDiaMes,
+    estado: estadoInicial,
+    fechaInicio: paramDesde || "",
+    fechaFin: paramHasta || "",
+    fechaPagoInicio: sinProximoPagoInicial
+      ? ""
+      : paramPDesde !== null
+      ? paramPDesde
+      : primerDiaMes,
+    fechaPagoFin: sinProximoPagoInicial
+      ? ""
+      : paramPHasta !== null
+      ? paramPHasta
+      : ultimoDiaMes,
     searchTerm: paramQ || "",
   });
 
@@ -63,6 +92,12 @@ function FacturasContent() {
   );
   const [ordenCliente, setOrdenCliente] = useState<"ASC" | "DESC" | null>(() =>
     parseOrdenParam(paramOrd)
+  );
+  const [pagosPendientesFiltro, setPagosPendientesFiltro] = useState<number[] | null>(() =>
+    parseListaNumerosParam(paramPend)
+  );
+  const [timbradoFiltro, setTimbradoFiltro] = useState<number[] | null>(() =>
+    parseListaNumerosParam(paramTimb)
   );
 
   // 2. Estado de paginación
@@ -99,6 +134,8 @@ function FacturasContent() {
       nuevaPagina?: number;
       nuevasEmpresas?: number[] | null;
       nuevoOrdenCliente?: "ASC" | "DESC" | null;
+      nuevosPagosPendientes?: number[] | null;
+      nuevoTimbrado?: number[] | null;
     }) => {
       const fact = cambios.nuevosFiltros ?? filtros;
       const targetPagina = cambios.nuevaPagina ?? pagina;
@@ -110,6 +147,14 @@ function FacturasContent() {
         cambios.nuevoOrdenCliente !== undefined
           ? cambios.nuevoOrdenCliente
           : ordenCliente;
+      const targetPend =
+        cambios.nuevosPagosPendientes !== undefined
+          ? cambios.nuevosPagosPendientes
+          : pagosPendientesFiltro;
+      const targetTimb =
+        cambios.nuevoTimbrado !== undefined
+          ? cambios.nuevoTimbrado
+          : timbradoFiltro;
 
       const params = new URLSearchParams();
       if (fact.estado && fact.estado !== "Pendientes") {
@@ -121,6 +166,12 @@ function FacturasContent() {
       if (fact.fechaFin) {
         params.set("hasta", fact.fechaFin);
       }
+      if (fact.fechaPagoInicio) {
+        params.set("pdesde", fact.fechaPagoInicio);
+      }
+      if (fact.fechaPagoFin) {
+        params.set("phasta", fact.fechaPagoFin);
+      }
       if (fact.searchTerm && fact.searchTerm.trim() !== "") {
         params.set("q", fact.searchTerm.trim());
       }
@@ -130,6 +181,12 @@ function FacturasContent() {
       if (targetOrd) {
         params.set("ord", targetOrd);
       }
+      if (Array.isArray(targetPend)) {
+        params.set("pend", targetPend.length > 0 ? targetPend.join(",") : "-1");
+      }
+      if (Array.isArray(targetTimb)) {
+        params.set("timb", targetTimb.length > 0 ? targetTimb.join(",") : "-1");
+      }
       if (targetPagina > 1) {
         params.set("pagina", String(targetPagina));
       }
@@ -138,14 +195,11 @@ function FacturasContent() {
       const url = qs ? `/facturas?${qs}` : `/facturas`;
       router.replace(url, { scroll: false });
     },
-    [filtros, pagina, empresasFiltro, ordenCliente, router]
+    [filtros, pagina, empresasFiltro, ordenCliente, pagosPendientesFiltro, timbradoFiltro, router]
   );
 
   // 6. Carga sincronizada de datos y resumen con cancelación (AbortController)
   useEffect(() => {
-    // No consultar con el rango incompleto
-    if (!filtros.fechaInicio || !filtros.fechaFin) return;
-
     const controller = new AbortController();
 
     const cargar = async () => {
@@ -156,13 +210,15 @@ function FacturasContent() {
         const [resFacturas, resResumen] = await Promise.all([
           FacturasService.getFacturas({
             estado: filtros.estado,
-            fechaInicio: filtros.fechaInicio,
-            fechaFin: filtros.fechaFin,
-            fechaPago: filtros.fechaInicio,
-            fechaPagoFin: filtros.fechaFin,
+            fechaInicio: filtros.fechaInicio || undefined,
+            fechaFin: filtros.fechaFin || undefined,
+            fechaPagoInicio: filtros.fechaPagoInicio || undefined,
+            fechaPagoFin: filtros.fechaPagoFin || undefined,
             searchTerm: filtros.searchTerm,
             empresa: filtros.empresa,
             empresas: empresasFiltro,
+            pagosPendientes: pagosPendientesFiltro,
+            timbrado: timbradoFiltro,
             ordenCliente: ordenCliente,
             pagina,
             tamano,
@@ -170,13 +226,15 @@ function FacturasContent() {
           }),
           FacturasService.getFacturasResumen({
             estado: filtros.estado,
-            fechaInicio: filtros.fechaInicio,
-            fechaFin: filtros.fechaFin,
-            fechaPago: filtros.fechaInicio,
-            fechaPagoFin: filtros.fechaFin,
+            fechaInicio: filtros.fechaInicio || undefined,
+            fechaFin: filtros.fechaFin || undefined,
+            fechaPagoInicio: filtros.fechaPagoInicio || undefined,
+            fechaPagoFin: filtros.fechaPagoFin || undefined,
             searchTerm: filtros.searchTerm,
             empresa: filtros.empresa,
             empresas: empresasFiltro,
+            pagosPendientes: pagosPendientesFiltro,
+            timbrado: timbradoFiltro,
             signal: controller.signal,
           }),
         ]);
@@ -209,9 +267,13 @@ function FacturasContent() {
     filtros.estado,
     filtros.fechaInicio,
     filtros.fechaFin,
+    filtros.fechaPagoInicio,
+    filtros.fechaPagoFin,
     filtros.searchTerm,
     filtros.empresa,
     empresasFiltro,
+    pagosPendientesFiltro,
+    timbradoFiltro,
     ordenCliente,
     pagina,
     tamano,
@@ -244,13 +306,62 @@ function FacturasContent() {
       searchTerm: filtros.searchTerm || undefined,
       fechaInicio: filtros.fechaInicio || undefined,
       fechaFin: filtros.fechaFin || undefined,
+      fechaPagoInicio: filtros.fechaPagoInicio || undefined,
+      fechaPagoFin: filtros.fechaPagoFin || undefined,
       estado: filtros.estado || undefined,
+      pagosPendientes: pagosPendientesFiltro,
+      timbrado: timbradoFiltro,
     });
     return lista.map((e) => ({
       valor: e.i_CveEmpresa,
       etiqueta: e.v_Empresa,
     }));
-  }, [filtros.searchTerm, filtros.fechaInicio, filtros.fechaFin, filtros.estado]);
+  }, [
+    filtros.searchTerm,
+    filtros.fechaInicio,
+    filtros.fechaFin,
+    filtros.fechaPagoInicio,
+    filtros.fechaPagoFin,
+    filtros.estado,
+    pagosPendientesFiltro,
+    timbradoFiltro,
+  ]);
+
+  const cargarOpcionesPagosPendientes = useCallback(async () => {
+    const lista = await FacturasService.getPagosPendientesFiltro({
+      searchTerm: filtros.searchTerm || undefined,
+      fechaInicio: filtros.fechaInicio || undefined,
+      fechaFin: filtros.fechaFin || undefined,
+      estado: filtros.estado || undefined,
+      empresas: empresasFiltro,
+      fechaPagoInicio: filtros.fechaPagoInicio || undefined,
+      fechaPagoFin: filtros.fechaPagoFin || undefined,
+      timbrado: timbradoFiltro,
+    });
+    return lista.map((item) => {
+      const n = item.i_PagosPendientes;
+      return {
+        valor: n,
+        etiqueta: n === 0 ? "Sin pendientes" : n === 1 ? "1 pendiente" : `${n} pendientes`,
+      };
+    });
+  }, [
+    filtros.searchTerm,
+    filtros.fechaInicio,
+    filtros.fechaFin,
+    filtros.estado,
+    empresasFiltro,
+    filtros.fechaPagoInicio,
+    filtros.fechaPagoFin,
+    timbradoFiltro,
+  ]);
+
+  const cargarOpcionesTimbrado = useCallback(async () => {
+    return [
+      { valor: 1, etiqueta: "Timbrada" },
+      { valor: 0, etiqueta: "Sin timbrar" },
+    ];
+  }, []);
 
   const handleAplicarFiltroColumna = (
     seleccionados: number[] | null,
@@ -262,6 +373,24 @@ function FacturasContent() {
     actualizarUrl({
       nuevasEmpresas: seleccionados,
       nuevoOrdenCliente: orden,
+      nuevaPagina: 1,
+    });
+  };
+
+  const handleAplicarPagosPendientes = (seleccionados: number[] | null) => {
+    setPagosPendientesFiltro(seleccionados);
+    setPagina(1);
+    actualizarUrl({
+      nuevosPagosPendientes: seleccionados,
+      nuevaPagina: 1,
+    });
+  };
+
+  const handleAplicarTimbrado = (seleccionados: number[] | null) => {
+    setTimbradoFiltro(seleccionados);
+    setPagina(1);
+    actualizarUrl({
+      nuevoTimbrado: seleccionados,
       nuevaPagina: 1,
     });
   };
@@ -331,6 +460,16 @@ function FacturasContent() {
             seleccionados: empresasFiltro,
             orden: ordenCliente,
             onAplicar: handleAplicarFiltroColumna,
+          }}
+          filtroPagosPendientes={{
+            cargarOpciones: cargarOpcionesPagosPendientes,
+            seleccionados: pagosPendientesFiltro,
+            onAplicar: handleAplicarPagosPendientes,
+          }}
+          filtroTimbrado={{
+            cargarOpciones: cargarOpcionesTimbrado,
+            seleccionados: timbradoFiltro,
+            onAplicar: handleAplicarTimbrado,
           }}
         />
       </div>

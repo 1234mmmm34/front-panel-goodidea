@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Plus } from "lucide-react";
-import { FiltrosFacturasState, EsEstadoPendiente } from "@/types/facturas";
+import { FiltrosFacturasState } from "@/types/facturas";
 import DateRangePickerPopover from "@/components/ui/DateRangePickerPopover";
 
 interface Props {
@@ -40,25 +39,18 @@ export const FiltrosFacturas: React.FC<Props> = ({
     };
   }, [localSearch]);
 
-  const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onCambiarFiltros({ estado: e.target.value });
-  };
+  const ocultarProximoPago = (estado: string): boolean =>
+    estado === "Cobrada" ||
+    estado === "Canceladas" ||
+    estado === "Cancelada" ||
+    estado === "SinProgramar";
 
-  const obtenerLabelFecha = (estado: string): string => {
-    switch (estado) {
-      case "Cobrada":
-        return "Fecha de pago";
-      case "Pendientes":
-      case "No cobrada":
-      case "Abonada":
-      case "Vencidas":
-        return "Fecha de pago programada";
-      case "Canceladas":
-      case "SinProgramar":
-        return "Fecha de emisión";
-      case "":
-      default:
-        return "Fecha de facturación";
+  const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nuevoEstado = e.target.value;
+    if (ocultarProximoPago(nuevoEstado)) {
+      onCambiarFiltros({ estado: nuevoEstado, fechaPagoInicio: "", fechaPagoFin: "" });
+    } else {
+      onCambiarFiltros({ estado: nuevoEstado });
     }
   };
 
@@ -94,7 +86,7 @@ export const FiltrosFacturas: React.FC<Props> = ({
             alignItems: "flex-end",
             gap: "12px",
             flexWrap: "wrap",
-            flex: "1 1 auto",
+            flex: "0 1 auto",
             overflow: "visible",
           }}
         >
@@ -119,18 +111,39 @@ export const FiltrosFacturas: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* 1.2 Filtro Rango de fechas de pago (Condicional) */}
-          {EsEstadoPendiente(filtros.estado) && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: "220px", position: "relative", zIndex: 50 }}>
+          {/* 1.2 Fecha de facturación (todos los estados) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "auto", position: "relative", zIndex: 50 }}>
+            <label className="form-label" style={{ marginBottom: 0, fontSize: "11px", fontWeight: 600, color: "#475569" }}>
+              Fecha de facturación
+            </label>
+            <DateRangePickerPopover
+              fechaInicio={filtros.fechaInicio}
+              fechaFin={filtros.fechaFin}
+              placeholder="Todas"
+              onChangeRange={(inicio, fin) => {
+                onCambiarFiltros({ fechaInicio: inicio, fechaFin: fin });
+              }}
+              onLimpiar={() => {
+                onCambiarFiltros({ fechaInicio: "", fechaFin: "" });
+              }}
+            />
+          </div>
+
+          {/* 1.3 Próximo pago (oculto en Cobrada, Canceladas, SinProgramar) */}
+          {!ocultarProximoPago(filtros.estado) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "auto", position: "relative", zIndex: 49 }}>
               <label className="form-label" style={{ marginBottom: 0, fontSize: "11px", fontWeight: 600, color: "#475569" }}>
-                {obtenerLabelFecha(filtros.estado)}
+                Próximo pago
               </label>
               <DateRangePickerPopover
-                fechaInicio={filtros.fechaInicio}
-                fechaFin={filtros.fechaFin}
+                fechaInicio={filtros.fechaPagoInicio || ""}
+                fechaFin={filtros.fechaPagoFin || ""}
+                placeholder="Todas"
                 onChangeRange={(inicio, fin) => {
-                  if (!inicio || !fin) return;
-                  onCambiarFiltros({ fechaInicio: inicio, fechaFin: fin, fechaPago: inicio });
+                  onCambiarFiltros({ fechaPagoInicio: inicio, fechaPagoFin: fin });
+                }}
+                onLimpiar={() => {
+                  onCambiarFiltros({ fechaPagoInicio: "", fechaPagoFin: "" });
                 }}
               />
             </div>

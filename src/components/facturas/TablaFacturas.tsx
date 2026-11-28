@@ -20,6 +20,12 @@ export interface FiltroColumnaProp {
   ) => void;
 }
 
+export interface FiltroColumnaSimpleProp {
+  cargarOpciones: () => Promise<OpcionFiltro[]>;
+  seleccionados: number[] | null;
+  onAplicar: (seleccionados: number[] | null) => void;
+}
+
 interface Props {
   datos: FacturaGetDto[];
   cargando: boolean;
@@ -33,6 +39,8 @@ interface Props {
   onTimbrar: (item: FacturaGetDto) => void;
   onCancelar: (item: FacturaGetDto) => void;
   filtroColumna: FiltroColumnaProp;
+  filtroPagosPendientes: FiltroColumnaSimpleProp;
+  filtroTimbrado: FiltroColumnaSimpleProp;
 }
 
 export const TablaFacturas: React.FC<Props> = ({
@@ -48,6 +56,8 @@ export const TablaFacturas: React.FC<Props> = ({
   onTimbrar,
   onCancelar,
   filtroColumna,
+  filtroPagosPendientes,
+  filtroTimbrado,
 }) => {
   const hoyStr = new Date().toISOString().split("T")[0];
 
@@ -188,6 +198,7 @@ export const TablaFacturas: React.FC<Props> = ({
             <th>
               <FiltroColumnaChecklist
                 titulo="Empresa / Cliente"
+                textoSinOpciones="Sin empresas"
                 cargarOpciones={filtroColumna.cargarOpciones}
                 seleccionados={filtroColumna.seleccionados}
                 orden={filtroColumna.orden}
@@ -199,8 +210,24 @@ export const TablaFacturas: React.FC<Props> = ({
             <th>Próximo pago</th>
             <th style={{ textAlign: "right" }}>Total</th>
             <th style={{ textAlign: "right" }}>Por cobrar</th>
-            <th style={{ textAlign: "center" }}>Pagos pendientes</th>
-            <th style={{ textAlign: "center" }}>Estado timbre</th>
+            <th style={{ textAlign: "center" }}>
+              <FiltroColumnaChecklist
+                titulo="Pagos pendientes"
+                permitirOrden={false}
+                cargarOpciones={filtroPagosPendientes.cargarOpciones}
+                seleccionados={filtroPagosPendientes.seleccionados}
+                onAplicar={(sel) => filtroPagosPendientes.onAplicar(sel)}
+              />
+            </th>
+            <th style={{ textAlign: "center" }}>
+              <FiltroColumnaChecklist
+                titulo="Estado timbre"
+                permitirOrden={false}
+                cargarOpciones={filtroTimbrado.cargarOpciones}
+                seleccionados={filtroTimbrado.seleccionados}
+                onAplicar={(sel) => filtroTimbrado.onAplicar(sel)}
+              />
+            </th>
             <th style={{ textAlign: "center" }}>Estado</th>
             <th style={{ textAlign: "center", width: "110px" }}>Acciones</th>
           </tr>

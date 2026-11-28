@@ -36,6 +36,7 @@ export const ModalDetalleActividadConsultor: React.FC<Props> = ({
 
   const esGeneral = actividad.i_CveServAgendaDet == null;
   const notasLimpias = actividad.v_Notas?.trim() || "";
+  const notasFinalesLimpias = actividad.v_NotasFinales?.trim() || "";
   const esAtrasada = actividad.i_CveEstatus === 5;
   const esTerminada = actividad.i_CveEstatus === 3;
   const finRealTexto = actividad.d_FinReal
@@ -219,6 +220,32 @@ export const ModalDetalleActividadConsultor: React.FC<Props> = ({
                 }}
               >
                 Sin notas
+              </div>
+            )}
+          </div>
+
+          {/* 2.1 Notas finales */}
+          <div>
+            <span style={labelStyle}>Notas finales</span>
+            {notasFinalesLimpias ? (
+              <div
+                className="whitespace-pre-line"
+                style={{
+                  ...valueStyle,
+                  wordBreak: "break-word",
+                }}
+              >
+                {notasFinalesLimpias}
+              </div>
+            ) : (
+              <div
+                style={{
+                  ...valueStyle,
+                  color: "#94a3b8",
+                  fontStyle: "italic",
+                }}
+              >
+                Sin notas finales
               </div>
             )}
           </div>

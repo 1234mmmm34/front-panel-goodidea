@@ -184,6 +184,7 @@ export interface ActividadPendienteConsultor {
   i_CveAgenda: number | null;
   v_Titulo: string;
   v_Notas: string | null;
+  v_NotasFinales: string | null;
   v_Proyecto: string;                // nombre del servicio o "GENERAL"
   v_Empresa: string | null;          // null en GENERAL
   v_Planta: string | null;           // null en GENERAL
